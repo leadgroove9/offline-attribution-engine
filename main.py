@@ -57,7 +57,7 @@ init_db()
 # ---------------------------------------------------------
 # Hardcoded verified API Key (for local development sandbox)
 # Note: For production deployments, we will load this from environment variables.
-API_KEY = "API_KEY = os.environ.get("ANTHROPIC_API_KEY")"
+API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 client = Anthropic(api_key=API_KEY)
 
 def analyze_transcript_with_claude(transcript: str) -> dict:
