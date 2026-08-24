@@ -1,0 +1,16 @@
+# Database
+offline_attribution.db
+offline_attribution.db-journal
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+
+# Ignore all local testing, diagnostic, and simulator scripts containing hardcoded API keys
+diagnose*.py
+test*.py
+simulate*.py
+query*.py
