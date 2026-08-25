@@ -2,8 +2,10 @@ import os
 import sqlite3
 import re
 import json
+import csv
+import io
 from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel
 from typing import Optional
 from anthropic import Anthropic
@@ -12,7 +14,7 @@ from anthropic import Anthropic
 app = FastAPI(
     title="Offline Attribution Engine",
     description="MVP for matching offline leads/sales with Google click IDs (GCLID) and AI analysis",
-    version="3.0.0"
+    version="4.0.0"
 )
 
 # ---------------------------------------------------------
@@ -239,6 +241,9 @@ def view_dashboard():
     qualified_leads = sum(1 for r in rows if r[7] == 'YES')
     sales_closed = sum(1 for r in rows if r[8] == 'YES')
     total_revenue = sum(float(r[9] or 0.0) for r in rows)
+    
+    # Count how many of these qualified or closed leads actually have a GCLID for export
+    exportable_conversions = sum(1 for r in rows if r[5] and (r[7] == 'YES' or r[8] == 'YES'))
 
     # Convert rows to HTML table items
     table_rows_html = ""
@@ -280,8 +285,12 @@ def view_dashboard():
                 .container {{ max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0px 4px 15px rgba(0,0,0,0.05); }}
                 header {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eaeaea; padding-bottom: 20px; margin-bottom: 30px; }}
                 h1 {{ margin: 0; color: #1a237e; font-size: 28px; }}
-                .btn-home {{ background-color: #1a237e; color: white; padding: 10px 18px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 14px; transition: background 0.2s; }}
+                .btn-group {{ display: flex; gap: 10px; }}
+                .btn-home {{ background-color: #1a237e; color: white; padding: 10px 18px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 14px; transition: background 0.2s; display: flex; align-items: center; }}
                 .btn-home:hover {{ background-color: #0d1b2a; }}
+                .btn-export {{ background-color: #2e7d32; color: white; padding: 10px 18px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 14px; transition: background 0.2s; display: flex; align-items: center; gap: 6px; }}
+                .btn-export:hover {{ background-color: #1b5e20; }}
+                .btn-export.disabled {{ background-color: #bdc3c7; cursor: not-allowed; pointer-events: none; }}
                 
                 /* Analytics Stats */
                 .stats-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }}
@@ -289,6 +298,7 @@ def view_dashboard():
                 .stat-card h3 {{ margin: 0 0 10px 0; font-size: 14px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }}
                 .stat-card .value {{ font-size: 28px; font-weight: bold; color: #1a237e; margin: 0; }}
                 .stat-card.rev .value {{ color: #2e7d32; }}
+                .stat-card.export .value {{ color: #e65100; }}
                 
                 /* Table Styles */
                 .table-responsive {{ overflow-x: auto; }}
@@ -306,7 +316,10 @@ def view_dashboard():
                         <h1>Offline Lead & Conversion Dashboard 📊</h1>
                         <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">Real-time AI conversions and click-ID attribution matched by Claude 4.5 Haiku</p>
                     </div>
-                    <a href="/" class="btn-home">⬅️ Back Home</a>
+                    <div class="btn-group">
+                        <a href="/dashboard/export" class="btn-export {'disabled' if exportable_conversions == 0 else ''}">📥 Export Google Ads CSV ({exportable_conversions})</a>
+                        <a href="/" class="btn-home">⬅️ Back Home</a>
+                    </div>
                 </header>
 
                 <!-- Stats Cards -->
@@ -326,6 +339,10 @@ def view_dashboard():
                     <div class="stat-card rev">
                         <h3>Tracked Sales Value 💰</h3>
                         <p class="value">${total_revenue:,.2f}</p>
+                    </div>
+                    <div class="stat-card export">
+                        <h3>Ready for Google Ads 🚀</h3>
+                        <p class="value">{exportable_conversions}</p>
                     </div>
                 </div>
 
@@ -354,6 +371,65 @@ def view_dashboard():
         </body>
     </html>
     """
+
+
+@app.get("/dashboard/export")
+def export_google_conversions():
+    """
+    Exports qualified and closed conversions that have a valid GCLID 
+    into a Google Ads-compliant CSV upload format.
+    """
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        # Pull records that have a GCLID and are either Qualified or Closed
+        cursor.execute("""
+            SELECT gclid, qualified, sale_closed, value, created_at
+            FROM sessions
+            WHERE gclid IS NOT NULL AND gclid != '' AND (qualified = 'YES' OR sale_closed = 'YES')
+            ORDER BY created_at DESC
+        """)
+        rows = cursor.fetchall()
+        conn.close()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+    # Generate CSV in memory
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # 1. Google Ads template parameter header
+    # Since SQLite CURRENT_TIMESTAMP is UTC (+0000), we format our export as UTC
+    writer.writerow(["Parameters:TimeZone=+0000"])
+    
+    # 2. Google Ads standard headers
+    writer.writerow(["Google Click ID", "Conversion Name", "Conversion Time", "Conversion Value", "Conversion Currency"])
+    
+    for r in rows:
+        gclid, qualified, sale_closed, value, created_at = r
+        
+        # Format the time exactly how Google Ads expects it: 'YYYY-MM-DD HH:MM:SS' with a +0000 suffix
+        conv_time = f"{created_at} +0000" if created_at else ""
+        
+        # Distinguish between Closed Sales and Qualified Leads
+        if sale_closed == 'YES':
+            conv_name = "Offline Sale"
+            conv_value = float(value or 0.0)
+        else:
+            conv_name = "Qualified Lead"
+            conv_value = 1.0  # Default lead qualification value
+            
+        writer.writerow([gclid, conv_name, conv_time, conv_value, "USD"])
+            
+    output.seek(0)
+    
+    # Prepare HTTP headers to trigger file download
+    headers = {
+        'Content-Disposition': 'attachment; filename="google_ads_conversions.csv"',
+        'Content-Type': 'text/csv'
+    }
+    return StreamingResponse(output, headers=headers)
 
 
 @app.post("/webhooks/callrail")
