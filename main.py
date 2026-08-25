@@ -12,7 +12,7 @@ from anthropic import Anthropic
 app = FastAPI(
     title="Offline Attribution Engine",
     description="MVP for matching offline leads/sales with Google click IDs (GCLID) and AI analysis",
-    version="2.0.0"
+    version="3.0.0"
 )
 
 # ---------------------------------------------------------
@@ -55,16 +55,33 @@ init_db()
 # ---------------------------------------------------------
 # ANTHROPIC CLAUDE CONFIGURATION
 # ---------------------------------------------------------
-# Hardcoded verified API Key (for local development sandbox)
-# Note: For production deployments, we will load this from environment variables.
+# Securely loaded from Render/environment variables
 API_KEY = os.environ.get("ANTHROPIC_API_KEY")
-client = Anthropic(api_key=API_KEY)
+client = Anthropic(api_key=API_KEY) if API_KEY else None
+
+def clean_json_string(text: str) -> str:
+    """
+    Strips out markdown code block wrappers like ```json ... ``` if Claude
+    accidentally includes them in the raw response.
+    """
+    text = text.strip()
+    text = re.sub(r"^```(?:json)?\s*", "", text)
+    text = re.sub(r"\s*```$", "", text)
+    return text.strip()
 
 def analyze_transcript_with_claude(transcript: str) -> dict:
     """
     Sends a phone transcript to Claude 4.5 Haiku to evaluate qualification and sales value.
     Strips markdown wrapper symbols from the response safely.
     """
+    if not client:
+        return {
+            "qualified": "NO",
+            "sale_closed": "NO",
+            "value": 0.0,
+            "reason": "Anthropic API Key is not configured on the server."
+        }
+        
     if not transcript or not transcript.strip():
         return {
             "qualified": "NO",
@@ -105,17 +122,10 @@ def analyze_transcript_with_claude(transcript: str) -> dict:
         response_text = message.content[0].text.strip()
         
         # Safe clean-up for Markdown codeblock formatting if Claude added it
-        if response_text.startswith("```"):
-            # Remove ```json from start and ``` from end
-            lines = response_text.split("\n")
-            if lines[0].startswith("```"):
-                lines = lines[1:]
-            if lines[-1].startswith("```"):
-                lines = lines[:-1]
-            response_text = "\n".join(lines).strip()
+        cleaned_text = clean_json_string(response_text)
 
         # Parse into a native Python dictionary
-        result = json.loads(response_text)
+        result = json.loads(cleaned_text)
         return result
 
     except json.JSONDecodeError:
@@ -167,17 +177,19 @@ class FormLead(BaseModel):
 
 @app.get("/", response_class=HTMLResponse)
 def read_root():
-    """Live Status Landing Page."""
+    """Live Status Landing Page with Dashboard link."""
     return """
     <html>
         <head>
             <title>Attribution Engine Live with AI 🤖</title>
             <style>
                 body { font-family: Arial, sans-serif; text-align: center; padding-top: 100px; background-color: #f4f6f9; }
-                .container { display: inline-block; background: white; padding: 40px; border-radius: 10px; box-shadow: 0px 4px 10px rgba(0,0,0,0.1); }
+                .container { display: inline-block; background: white; padding: 40px; border-radius: 10px; box-shadow: 0px 4px 10px rgba(0,0,0,0.1); max-width: 600px; }
                 h1 { color: #2e7d32; margin-bottom: 10px; }
                 p { color: #555; font-size: 18px; }
                 .badge { background-color: #e8f5e9; color: #2e7d32; padding: 5px 15px; border-radius: 15px; font-weight: bold; }
+                .btn { display: inline-block; background-color: #2e7d32; color: white; padding: 12px 24px; text-decoration: none; font-size: 16px; font-weight: bold; border-radius: 5px; margin-top: 20px; transition: background 0.2s; }
+                .btn:hover { background-color: #1b5e20; }
                 .feature-list { text-align: left; margin-top: 20px; color: #333; line-height: 1.6; }
             </style>
         </head>
@@ -186,6 +198,9 @@ def read_root():
                 <h1>Attribution Engine is Live! 🚀</h1>
                 <p>Status: <span class="badge">Healthy, Listening & AI-Enabled</span></p>
                 <p>Welcome Corey. Your FastAPI server is connected to SQLite and Claude 4.5 Haiku.</p>
+                
+                <a href="/dashboard" class="btn">📊 View Lead & Attribution Dashboard</a>
+                
                 <div class="feature-list">
                     <h3>Enabled Capabilities:</h3>
                     <ul>
@@ -194,6 +209,146 @@ def read_root():
                         <li>🧠 <strong>Claude 4.5 Haiku</strong>: Audits conversations for qualified leads and closed sales value.</li>
                         <li>🗄️ <strong>SQLite Database</strong>: Locally tracks, matches, and logs all events instantly.</li>
                     </ul>
+                </div>
+            </div>
+        </body>
+    </html>
+    """
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+def view_dashboard():
+    """Live web-based conversion tracking dashboard."""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        # Pull all completed sessions, sorting newest first
+        cursor.execute("""
+            SELECT id, phone, email, name, company, gclid, source, qualified, sale_closed, value, reason, created_at
+            FROM sessions
+            ORDER BY created_at DESC
+        """)
+        rows = cursor.fetchall()
+        conn.close()
+    except Exception as e:
+        return f"<html><body><h3>❌ Database Error: {e}</h3></body></html>"
+
+    # Count analytics
+    total_leads = len(rows)
+    qualified_leads = sum(1 for r in rows if r[7] == 'YES')
+    sales_closed = sum(1 for r in rows if r[8] == 'YES')
+    total_revenue = sum(float(r[9] or 0.0) for r in rows)
+
+    # Convert rows to HTML table items
+    table_rows_html = ""
+    for r in rows:
+        id_val, phone, email, name, company, gclid, source, qualified, sale_closed, value, reason, created_at = r
+        
+        # Beautify badges
+        qual_badge = '<span style="background: #e8f5e9; color: #2e7d32; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 12px;">YES</span>' if qualified == 'YES' else '<span style="background: #ffebee; color: #c62828; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 12px;">NO</span>'
+        closed_badge = '<span style="background: #e8f5e9; color: #2e7d32; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 12px;">YES</span>' if sale_closed == 'YES' else '<span style="background: #ffebee; color: #c62828; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 12px;">NO</span>'
+        gclid_display = f'<code style="background: #f1f3f4; padding: 2px 6px; border-radius: 4px; font-size: 12px; word-break: break-all;">{gclid}</code>' if gclid else '<span style="color: #999; font-style: italic;">None</span>'
+        value_display = f"<strong>${value:,.2f}</strong>" if value and value > 0 else '<span style="color: #999;">$0.00</span>'
+        
+        table_rows_html += f"""
+        <tr>
+            <td>{id_val}</td>
+            <td><small>{created_at}</small></td>
+            <td><span class="badge-source">{source.upper()}</span></td>
+            <td><strong>{name or 'Unknown'}</strong><br><small style="color:#666;">{phone}</small></td>
+            <td>{gclid_display}</td>
+            <td>{qual_badge}</td>
+            <td>{closed_badge}</td>
+            <td>{value_display}</td>
+            <td><small>{reason or 'N/A'}</small></td>
+        </tr>
+        """
+
+    if not table_rows_html:
+        table_rows_html = '<tr><td colspan="9" style="text-align: center; color: #888; padding: 40px;">No lead sessions recorded yet. Send a test webhook to populate this dashboard!</td></tr>'
+
+    return f"""
+    <!DOCTYPE html>
+    <html>
+        <head>
+            <title>Offline Lead & Conversion Dashboard 📊</title>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>
+                body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background-color: #f4f6f9; color: #333; margin: 0; padding: 20px; }}
+                .container {{ max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0px 4px 15px rgba(0,0,0,0.05); }}
+                header {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eaeaea; padding-bottom: 20px; margin-bottom: 30px; }}
+                h1 {{ margin: 0; color: #1a237e; font-size: 28px; }}
+                .btn-home {{ background-color: #1a237e; color: white; padding: 10px 18px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 14px; transition: background 0.2s; }}
+                .btn-home:hover {{ background-color: #0d1b2a; }}
+                
+                /* Analytics Stats */
+                .stats-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }}
+                .stat-card {{ background: #fafafa; border: 1px solid #e0e0e0; padding: 20px; border-radius: 8px; text-align: center; }}
+                .stat-card h3 {{ margin: 0 0 10px 0; font-size: 14px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }}
+                .stat-card .value {{ font-size: 28px; font-weight: bold; color: #1a237e; margin: 0; }}
+                .stat-card.rev .value {{ color: #2e7d32; }}
+                
+                /* Table Styles */
+                .table-responsive {{ overflow-x: auto; }}
+                table {{ width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }}
+                th, td {{ padding: 12px 15px; text-align: left; border-bottom: 1px solid #eaeaea; }}
+                th {{ background-color: #f8f9fa; color: #495057; font-weight: 600; text-transform: uppercase; font-size: 12px; }}
+                tr:hover {{ background-color: #fdfdfd; }}
+                .badge-source {{ background: #e0f2f1; color: #00695c; font-size: 11px; padding: 2px 6px; border-radius: 4px; font-weight: bold; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <header>
+                    <div>
+                        <h1>Offline Lead & Conversion Dashboard 📊</h1>
+                        <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">Real-time AI conversions and click-ID attribution matched by Claude 4.5 Haiku</p>
+                    </div>
+                    <a href="/" class="btn-home">⬅️ Back Home</a>
+                </header>
+
+                <!-- Stats Cards -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>Total Lead Sessions</h3>
+                        <p class="value">{total_leads}</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Qualified Leads 🟢</h3>
+                        <p class="value">{qualified_leads}</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Sales Closed 🤝</h3>
+                        <p class="value">{sales_closed}</p>
+                    </div>
+                    <div class="stat-card rev">
+                        <h3>Tracked Sales Value 💰</h3>
+                        <p class="value">${total_revenue:,.2f}</p>
+                    </div>
+                </div>
+
+                <!-- Table -->
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Timestamp</th>
+                                <th>Source</th>
+                                <th>Lead Contact</th>
+                                <th>Google Click ID (GCLID)</th>
+                                <th>Qualified</th>
+                                <th>Closed</th>
+                                <th>Value</th>
+                                <th>Claude Decision Reasoning</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {table_rows_html}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </body>
