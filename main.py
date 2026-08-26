@@ -2,8 +2,10 @@ import os
 import sqlite3
 import re
 import json
+import csv
+import io
 from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, StreamingResponse, Response
 from pydantic import BaseModel
 from typing import Optional
 from anthropic import Anthropic
@@ -12,7 +14,7 @@ from anthropic import Anthropic
 app = FastAPI(
     title="Offline Attribution Engine (Multi-Tenant)",
     description="Multi-tenant agency platform for tracking offline leads/sales and AI audits",
-    version="5.0.0"
+    version="6.0.0"
 )
 
 # ---------------------------------------------------------
@@ -99,6 +101,7 @@ def clean_json_string(text: str) -> str:
 def analyze_transcript_with_claude(transcript: str) -> dict:
     """
     Sends a phone transcript to Claude 4.5 Haiku to evaluate qualification and sales value.
+    Strips markdown wrapper symbols from the response safely.
     """
     if not client:
         return {
@@ -134,6 +137,7 @@ def analyze_transcript_with_claude(transcript: str) -> dict:
     )
 
     try:
+        # Use your verified active next-gen model
         message = client.messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=500,
@@ -143,8 +147,13 @@ def analyze_transcript_with_claude(transcript: str) -> dict:
             ]
         )
         
+        # Get raw response and strip any surrounding white spaces
         response_text = message.content[0].text.strip()
+        
+        # Safe clean-up for Markdown codeblock formatting if Claude added it
         cleaned_text = clean_json_string(response_text)
+
+        # Parse into a native Python dictionary
         result = json.loads(cleaned_text)
         return result
 
@@ -191,43 +200,50 @@ class FormLead(BaseModel):
     gclid: Optional[str] = None
 
 
+class ClientCreate(BaseModel):
+    name: str
+    callrail_company_id: str
+    google_ads_customer_id: str
+
+
 # ---------------------------------------------------------
 # ENDPOINTS (Routes for Render)
 # ---------------------------------------------------------
 
 @app.get("/", response_class=HTMLResponse)
 def read_root():
-    """Live Status Landing Page with Dashboard link."""
+    """Agency Portal Landing Page."""
     return """
     <html>
         <head>
-            <title>Attribution Engine Live with AI 🤖</title>
+            <title>Multi-Tenant Attribution Engine Live 🤖</title>
             <style>
-                body { font-family: Arial, sans-serif; text-align: center; padding-top: 100px; background-color: #f4f6f9; }
+                body { font-family: Arial, sans-serif; text-align: center; padding-top: 80px; background-color: #f4f6f9; }
                 .container { display: inline-block; background: white; padding: 40px; border-radius: 10px; box-shadow: 0px 4px 10px rgba(0,0,0,0.1); max-width: 600px; }
                 h1 { color: #1a237e; margin-bottom: 10px; }
                 p { color: #555; font-size: 18px; }
                 .badge { background-color: #e8f5e9; color: #2e7d32; padding: 5px 15px; border-radius: 15px; font-weight: bold; }
                 .btn { display: inline-block; background-color: #1a237e; color: white; padding: 12px 24px; text-decoration: none; font-size: 16px; font-weight: bold; border-radius: 5px; margin-top: 20px; transition: background 0.2s; }
                 .btn:hover { background-color: #0d1b2a; }
-                .feature-list { text-align: left; margin-top: 20px; color: #333; line-height: 1.6; }
+                .feature-list { text-align: left; margin-top: 25px; color: #333; line-height: 1.6; }
             </style>
         </head>
         <body>
             <div class="container">
-                <h1>Attribution Engine is Live! 🚀</h1>
-                <p>Status: <span class="badge">Healthy, Listening & AI-Enabled</span></p>
-                <p>Welcome Corey. Your FastAPI server is connected to SQLite and Claude 4.5 Haiku.</p>
+                <h1>Multi-Tenant Attribution Engine Live! 🚀</h1>
+                <p>Status: <span class="badge">Healthy, Multi-Tenant & AI-Enabled</span></p>
+                <p>Welcome, Corey. Your agency platform is live with secure SQLite schema routing and Claude 4.5 Haiku.</p>
                 
-                <a href="/dashboard" class="btn">📊 View Lead & Attribution Dashboard</a>
+                <a href="/dashboard" class="btn">📊 Open Agency & Client Dashboard</a>
                 
                 <div class="feature-list">
-                    <h3>Enabled Capabilities:</h3>
+                    <h3>Multi-Tenant Architecture Capabilities:</h3>
                     <ul>
-                        <li>📥 <strong>/webhooks/callrail</strong>: Listens for incoming phone logs & analyzes transcripts.</li>
-                        <li>📥 <strong>/webhooks/form</strong>: Logs web forms containing visitor Google Click IDs (GCLID).</li>
-                        <li>🧠 <strong>Claude 4.5 Haiku</strong>: Audits conversations for qualified leads and closed sales value.</li>
-                        <li>🗄️ <strong>SQLite Database</strong>: Locally tracks, matches, and logs all events instantly.</li>
+                        <li>🏢 <strong>Client Isolation</strong>: Keep each client's conversions separate in SQLite.</li>
+                        <li>📥 <strong>Dynamic Webhook Endpoint</strong>: `/webhooks/callrail?client_id=X` automatically links tracking logs to the correct account.</li>
+                        <li>🧠 <strong>Claude 4.5 Haiku Audits</strong>: Real-time transcript parsing for qualification and cash value.</li>
+                        <li>📂 <strong>Client-Specific Google Ads Export</strong>: Export custom CSV files tailored to each client's separate ad account.</li>
+                        <li>👤 <strong>Client Self-Onboarding</strong>: Instantly register new client accounts through the dynamic web form.</li>
                     </ul>
                 </div>
             </div>
@@ -238,41 +254,47 @@ def read_root():
 
 @app.get("/dashboard", response_class=HTMLResponse)
 def view_dashboard(client_id: Optional[int] = None):
-    """Live web-based conversion tracking dashboard."""
+    """Interactive dashboard with client filtering."""
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         
-        # Load all clients for dropdown
-        cursor.execute("SELECT id, name FROM clients ORDER BY name ASC")
+        # 1. Fetch All Available Clients for the Dropdown Selector
+        cursor.execute("SELECT id, name, google_ads_customer_id FROM clients ORDER BY name ASC")
         clients = cursor.fetchall()
         
-        # Isolate database query based on client_id filter
-        if client_id:
-            cursor.execute("SELECT name, google_ads_customer_id FROM clients WHERE id = ?", (client_id,))
-            client_meta = cursor.fetchone()
-            client_name_header = client_meta[0] if client_meta else "Unknown Client"
-            client_ads_id = client_meta[1] if client_meta else "N/A"
-            
+        # Determine filtering
+        selected_client_id = client_id if client_id is not None else 0 # 0 signifies "All Clients" (Agency Overview)
+        
+        # 2. Query Dashboard Rows and Calculations
+        if selected_client_id == 0:
+            # Multi-Client (All Clients) View - Join with clients table to display client names
             cursor.execute("""
                 SELECT s.id, s.phone, s.email, s.name, s.company, s.gclid, s.source, s.qualified, s.sale_closed, s.value, s.reason, s.created_at, c.name
                 FROM sessions s
-                JOIN clients c ON s.client_id = c.id
-                WHERE s.client_id = ?
-                ORDER BY s.created_at DESC
-            """, (client_id,))
-        else:
-            client_name_header = "All Clients Overview"
-            client_ads_id = "Multiple Accounts"
-            
-            cursor.execute("""
-                SELECT s.id, s.phone, s.email, s.name, s.company, s.gclid, s.source, s.qualified, s.sale_closed, s.value, s.reason, s.created_at, c.name
-                FROM sessions s
-                JOIN clients c ON s.client_id = c.id
+                LEFT JOIN clients c ON s.client_id = c.id
                 ORDER BY s.created_at DESC
             """)
+            rows = cursor.fetchall()
+            client_name_header = "All Agency Accounts"
+            client_ads_id = "Multiple Accounts"
+        else:
+            # Single-Client Filtered View
+            cursor.execute("""
+                SELECT s.id, s.phone, s.email, s.name, s.company, s.gclid, s.source, s.qualified, s.sale_closed, s.value, s.reason, s.created_at, c.name
+                FROM sessions s
+                LEFT JOIN clients c ON s.client_id = c.id
+                WHERE s.client_id = ?
+                ORDER BY s.created_at DESC
+            """, (selected_client_id,))
+            rows = cursor.fetchall()
             
-        rows = cursor.fetchall()
+            # Fetch current client profile details
+            cursor.execute("SELECT name, google_ads_customer_id FROM clients WHERE id = ?", (selected_client_id,))
+            client_profile = cursor.fetchone()
+            client_name_header = client_profile[0] if client_profile else "Unknown Client"
+            client_ads_id = client_profile[1] if client_profile else "N/A"
+            
         conn.close()
     except Exception as e:
         return f"<html><body><h3>❌ Database Error: {e}</h3></body></html>"
@@ -282,28 +304,28 @@ def view_dashboard(client_id: Optional[int] = None):
     qualified_leads = sum(1 for r in rows if r[7] == 'YES')
     sales_closed = sum(1 for r in rows if r[8] == 'YES')
     total_revenue = sum(float(r[9] or 0.0) for r in rows)
-
-    # Populate dropdown options
-    dropdown_options = '<option value="">-- All Agency Clients --</option>'
-    for cid, cname in clients:
-        selected_attr = 'selected' if client_id == cid else ''
-        dropdown_options += f'<option value="{cid}" {selected_attr}>{cname}</option>'
-
-    # Dynamic headers for All Clients vs Isolated Client view
-    client_th_html = '<th>Client Account</th>' if not client_id else ''
     
-    # Convert rows to HTML table items
+    # Count how many of these leads have a GCLID for export
+    exportable_conversions = sum(1 for r in rows if r[5] and (r[7] == 'YES' or r[8] == 'YES'))
+
+    # Generate the Selector Dropdown Options
+    dropdown_options = f'<option value="0" {"selected" if selected_client_id == 0 else ""}>📂 [Show All Clients / Agency View]</option>'
+    for c_id, c_name, c_ads in clients:
+        is_selected = "selected" if selected_client_id == c_id else ""
+        dropdown_options += f'<option value="{c_id}" {is_selected}>👤 {c_name} (Ads: {c_ads})</option>'
+
+    # Convert rows to table items
     table_rows_html = ""
     for r in rows:
-        id_val, phone, email, name_val, company, gclid, source, qualified, sale_closed, value, reason, created_at, client_name_row = r
+        id_val, phone, email, name, company, gclid, source, qualified, sale_closed, value, reason, created_at, client_name_linked = r
         
-        # Format badges
         qual_badge = '<span style="background: #e8f5e9; color: #2e7d32; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 12px;">YES</span>' if qualified == 'YES' else '<span style="background: #ffebee; color: #c62828; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 12px;">NO</span>'
         closed_badge = '<span style="background: #e8f5e9; color: #2e7d32; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 12px;">YES</span>' if sale_closed == 'YES' else '<span style="background: #ffebee; color: #c62828; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 12px;">NO</span>'
         gclid_display = f'<code style="background: #f1f3f4; padding: 2px 6px; border-radius: 4px; font-size: 12px; word-break: break-all;">{gclid}</code>' if gclid else '<span style="color: #999; font-style: italic;">None</span>'
         value_display = f"<strong>${value:,.2f}</strong>" if value and value > 0 else '<span style="color: #999;">$0.00</span>'
         
-        client_column_html = f'<td><span class="client-badge">{client_name_row}</span></td>' if not client_id else ''
+        # Display the client column only in the multi-client view
+        client_column_html = f'<td><span class="client-badge">{client_name_linked}</span></td>' if selected_client_id == 0 else ''
         
         table_rows_html += f"""
         <tr>
@@ -311,7 +333,7 @@ def view_dashboard(client_id: Optional[int] = None):
             {client_column_html}
             <td><small>{created_at}</small></td>
             <td><span class="badge-source">{source.upper()}</span></td>
-            <td><strong>{name_val or 'Unknown'}</strong><br><small style="color:#666;">{phone}</small></td>
+            <td><strong>{name or 'Unknown'}</strong><br><small style="color:#666;">{phone}</small></td>
             <td>{gclid_display}</td>
             <td>{qual_badge}</td>
             <td>{closed_badge}</td>
@@ -321,13 +343,16 @@ def view_dashboard(client_id: Optional[int] = None):
         """
 
     if not table_rows_html:
-        table_rows_html = '<tr><td colspan="10" style="text-align: center; color: #888; padding: 40px;">No lead sessions recorded yet. Send a test webhook to populate this dashboard!</td></tr>'
+        table_rows_html = f'<tr><td colspan="{"10" if selected_client_id == 0 else "9"}" style="text-align: center; color: #888; padding: 40px;">No lead sessions recorded for this client. Set up their CallRail webhook to populate this space!</td></tr>'
 
-    # Build the action button for exporting
-    if client_id:
-        export_btn_html = f'<a href="/dashboard/export?client_id={client_id}" class="btn-export">📥 Export Google Ads CSV</a>'
-    else:
+    # Build the action button dynamically
+    if selected_client_id == 0:
         export_btn_html = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Google Ads offline conversion CSV!\')" style="opacity:0.6; cursor:not-allowed;">📥 Select a Client to Export</button>'
+    else:
+        export_btn_html = f'<a href="/dashboard/export?client_id={selected_client_id}" class="btn-export">📥 Export Google Ads CSV ({exportable_conversions})</a>'
+
+    # Conditionally show the Client header column
+    client_th_html = '<th>Client Account</th>' if selected_client_id == 0 else ''
 
     return f"""
     <!DOCTYPE html>
@@ -364,6 +389,8 @@ def view_dashboard(client_id: Optional[int] = None):
                 
                 .btn-export {{ display: inline-block; background-color: #2e7d32; color: white; padding: 10px 18px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 14px; border: none; transition: background 0.2s; cursor: pointer; }}
                 .btn-export:hover {{ background-color: #1b5e20; }}
+                .btn-add-client {{ display: inline-block; background-color: #1a237e; color: white; padding: 10px 18px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 14px; border: none; transition: background 0.2s; cursor: pointer; }}
+                .btn-add-client:hover {{ background-color: #0d1b2a; }}
             </style>
         </head>
         <body>
@@ -374,11 +401,14 @@ def view_dashboard(client_id: Optional[int] = None):
                         <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">Google Ads Account: <strong>{client_ads_id}</strong> | Multi-Tenant Agency Engine</p>
                     </div>
                     
-                    <div class="client-selector-container">
-                        <span class="client-label">Viewing Account:</span>
-                        <select class="client-select" onchange="window.location.href='/dashboard?client_id='+this.value">
-                            {dropdown_options}
-                        </select>
+                    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                        <div class="client-selector-container">
+                            <span class="client-label">Viewing Account:</span>
+                            <select class="client-select" onchange="window.location.href='/dashboard?client_id='+this.value">
+                                {dropdown_options}
+                            </select>
+                        </div>
+                        <a href="/dashboard/add-client" class="btn-add-client">➕ Add Client</a>
                     </div>
                 </header>
 
@@ -436,9 +466,156 @@ def view_dashboard(client_id: Optional[int] = None):
     """
 
 
+@app.get("/dashboard/add-client", response_class=HTMLResponse)
+def add_client_page():
+    """Page to add a new client."""
+    return """
+    <!DOCTYPE html>
+    <html>
+        <head>
+            <title>Add New Client 👤</title>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>
+                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background-color: #f4f6f9; color: #333; margin: 0; padding: 20px; }
+                .container { max-width: 500px; margin: 50px auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0px 4px 15px rgba(0,0,0,0.05); }
+                h1 { margin-top: 0; color: #1a237e; font-size: 24px; text-align: center; }
+                .form-group { margin-bottom: 20px; }
+                label { display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px; color: #495057; }
+                input[type="text"] { width: 100%; padding: 10px 12px; border-radius: 6px; border: 1px solid #ced4da; box-sizing: border-box; font-size: 14px; outline: none; transition: border-color 0.2s; }
+                input[type="text"]:focus { border-color: #1a237e; }
+                .btn-submit { width: 100%; background-color: #1a237e; color: white; padding: 12px; border: none; border-radius: 6px; font-weight: bold; font-size: 16px; cursor: pointer; transition: background 0.2s; margin-top: 10px; }
+                .btn-submit:hover { background-color: #0d1b2a; }
+                .btn-cancel { display: block; text-align: center; color: #666; text-decoration: none; font-size: 14px; margin-top: 15px; }
+                .btn-cancel:hover { color: #333; }
+                .alert { padding: 12px; border-radius: 6px; margin-bottom: 20px; display: none; font-size: 14px; font-weight: 600; }
+                .alert-error { background-color: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
+                .alert-success { background-color: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
+                .instructions { background-color: #e8eaf6; border-left: 4px solid #1a237e; padding: 12px; border-radius: 4px; font-size: 13px; color: #3f51b5; line-height: 1.5; margin-bottom: 20px; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>Add New Client Account 👤</h1>
+                <div class="instructions">
+                    💡 <strong>Agency Onboarding Step:</strong> Adding a client here creates their database profile. 
+                    They will get their own isolated space in your database and dynamic webhook triggers.
+                </div>
+                <div id="alert-box" class="alert alert-error"></div>
+                
+                <form id="add-client-form" onsubmit="submitForm(event)">
+                    <div class="form-group">
+                        <label for="name">Client Business Name</label>
+                        <input type="text" id="name" required placeholder="e.g. Priority Plumbing">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="callrail_company_id">CallRail Company ID (or Account ID)</label>
+                        <input type="text" id="callrail_company_id" required placeholder="e.g. comp_plumbing">
+                        <small style="color: #666; font-size: 11px; margin-top: 4px; display: block;">Used to auto-match webhooks if no client ID query parameter is passed.</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="google_ads_customer_id">Google Ads Customer ID</label>
+                        <input type="text" id="google_ads_customer_id" required placeholder="e.g. 123-456-7890">
+                        <small style="color: #666; font-size: 11px; margin-top: 4px; display: block;">Appears in exports for their specific offline conversion uploads.</small>
+                    </div>
+                    
+                    <button type="submit" class="btn-submit">🚀 Add Client & Generate Webhook</button>
+                </form>
+                
+                <a href="/dashboard" class="btn-cancel">⬅️ Cancel and Return to Dashboard</a>
+            </div>
+            
+            <script>
+                async function submitForm(event) {
+                    event.preventDefault();
+                    const alertBox = document.getElementById('alert-box');
+                    const btnSubmit = document.querySelector('.btn-submit');
+                    
+                    alertBox.style.display = 'none';
+                    alertBox.className = 'alert';
+                    
+                    const name = document.getElementById('name').value.trim();
+                    const callrail_company_id = document.getElementById('callrail_company_id').value.trim();
+                    const google_ads_customer_id = document.getElementById('google_ads_customer_id').value.trim();
+                    
+                    btnSubmit.disabled = true;
+                    btnSubmit.innerText = 'Adding client...';
+                    
+                    try {
+                        const response = await fetch('/dashboard/add-client', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                name,
+                                callrail_company_id,
+                                google_ads_customer_id
+                            })
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (response.ok) {
+                            alertBox.innerText = `Success! Client "${name}" added successfully. Redirecting...`;
+                            alertBox.className = 'alert alert-success';
+                            alertBox.style.display = 'block';
+                            
+                            setTimeout(() => {
+                                window.location.href = '/dashboard';
+                            }, 1500);
+                        } else {
+                            throw new Error(data.detail || 'An unexpected error occurred.');
+                        }
+                    } catch (error) {
+                        alertBox.innerText = 'Error: ' + error.message;
+                        alertBox.className = 'alert alert-error';
+                        alertBox.style.display = 'block';
+                        btnSubmit.disabled = false;
+                        btnSubmit.innerText = '🚀 Add Client & Generate Webhook';
+                    }
+                }
+            </script>
+        </body>
+    </html>
+    """
+
+
+@app.post("/dashboard/add-client")
+def create_client(client: ClientCreate):
+    """Endpoint to handle client form submission."""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        # Verify unique CallRail ID
+        cursor.execute("SELECT id, name FROM clients WHERE callrail_company_id = ?", (client.callrail_company_id,))
+        existing = cursor.fetchone()
+        if existing:
+            raise HTTPException(status_code=400, detail=f"CallRail Company ID '{client.callrail_company_id}' is already registered to client '{existing[1]}'.")
+            
+        cursor.execute("""
+            INSERT INTO clients (name, callrail_company_id, google_ads_customer_id)
+            VALUES (?, ?, ?)
+        """, (client.name, client.callrail_company_id, client.google_ads_customer_id))
+        
+        conn.commit()
+        conn.close()
+        return {"status": "success", "message": f"Client '{client.name}' created successfully!"}
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database insertion error: {str(e)}")
+
+
 @app.get("/dashboard/export")
-def export_google_ads_csv(client_id: int):
-    """Generates a custom Google Ads Offline Conversions CSV file filtered by client_id."""
+def export_google_conversions(client_id: int):
+    """
+    Exports qualified and closed conversions that have a valid GCLID 
+    into a Google Ads-compliant CSV upload format, filtered by client_id.
+    """
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
@@ -451,7 +628,7 @@ def export_google_ads_csv(client_id: int):
         
         client_name = client_row[0]
         
-        # Pull only rows belonging to this client that have a valid GCLID AND are either qualified or closed
+        # Pull records that have a GCLID and are either Qualified or Closed belonging to this client
         cursor.execute("""
             SELECT gclid, qualified, sale_closed, value, created_at
             FROM sessions
@@ -461,50 +638,66 @@ def export_google_ads_csv(client_id: int):
         rows = cursor.fetchall()
         conn.close()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
 
-    # Generate Google Ads Offline Conversion CSV template
-    csv_content = "Google Click ID,Conversion Name,Conversion Time,Conversion Value,Conversion Currency\n"
+    # Generate CSV in memory
+    output = io.StringIO()
+    writer = csv.writer(output)
     
-    for gclid, qualified, sale_closed, value, created_at in rows:
-        formatted_time = f"{created_at} +0000"
+    # 1. Google Ads template parameter header
+    # Since SQLite CURRENT_TIMESTAMP is UTC (+0000), we format our export as UTC
+    writer.writerow(["Parameters:TimeZone=+0000"])
+    
+    # 2. Google Ads standard headers
+    writer.writerow(["Google Click ID", "Conversion Name", "Conversion Time", "Conversion Value", "Conversion Currency"])
+    
+    for r in rows:
+        gclid, qualified, sale_closed, value, created_at = r
         
-        if sale_closed == "YES":
+        # Format the time exactly how Google Ads expects it: 'YYYY-MM-DD HH:MM:SS' with a +0000 suffix
+        conv_time = f"{created_at} +0000" if created_at else ""
+        
+        # Distinguish between Closed Sales and Qualified Leads
+        if sale_closed == 'YES':
             conv_name = "Offline Sale"
             conv_value = float(value or 0.0)
         else:
             conv_name = "Qualified Lead"
-            conv_value = 1.0
+            conv_value = 1.0  # Default lead qualification value
             
-        csv_content += f"{gclid},{conv_name},{formatted_time},{conv_value:.2f},USD\n"
-
+        writer.writerow([gclid, conv_name, conv_time, conv_value, "USD"])
+            
+    output.seek(0)
+    
     # Safe slug for file downloading
     safe_filename = re.sub(r'\s+', '-', client_name.strip().lower())
     
-    # Return raw text formatted as CSV download
-    return Response(
-        content=csv_content,
-        media_type="text/csv",
-        headers={
-            "Content-Disposition": f"attachment; filename=google_ads_offline_conversions_{safe_filename}.csv"
-        }
-    )
+    # Prepare HTTP headers to trigger file download
+    headers = {
+        'Content-Disposition': f'attachment; filename="google_ads_conversions_{safe_filename}.csv"',
+        'Content-Type': 'text/csv'
+    }
+    return StreamingResponse(output, headers=headers)
 
 
 @app.post("/webhooks/callrail")
 async def receive_callrail_webhook(request: Request, client_id: Optional[int] = None):
     """
     Multi-Tenant CallRail Webhook Receiver.
+    If no client_id query param is sent, parses the company/account info inside CallRail's payload to auto-map it!
     """
     try:
+        # 1. Parse the incoming JSON data from CallRail
         payload = await request.json()
         
-        # 1. Resolve Multi-Tenant Client Mapping
+        # Resolve Multi-Tenant Client Mapping
         resolved_client_id = 1  # Default fallback
         
         if client_id:
             resolved_client_id = client_id
         else:
+            # Try auto-mapping using CallRail payload parameters
+            # CallRail webhooks usually pass 'company_id', 'company_name', or 'account_id'
             company_id = payload.get('company_id') or payload.get('account_id')
             if company_id:
                 conn = sqlite3.connect(DB_PATH)
@@ -514,18 +707,22 @@ async def receive_callrail_webhook(request: Request, client_id: Optional[int] = 
                 if match:
                     resolved_client_id = match[0]
                 conn.close()
-                
-        # 2. Extract Webhook Variables
+        
+        # 2. Extract key fields
         gclid = payload.get('google_click_id') or payload.get('referrer', {}).get('gclid')
         caller_name = payload.get('customer_name', 'Unknown Caller')
         raw_phone = payload.get('customer_phone_number')
+        
+        # CallRail usually nests the call transcription inside 'transcript' or 'transcription'
         transcript = payload.get('transcript') or payload.get('transcription') or ""
         
+        # 3. Normalize the phone number
         normalized_phone = normalize_phone(raw_phone)
+        
         if not normalized_phone:
-            return {"status": "ignored", "message": "No valid phone number found in payload."}
+            return {"status": "ignored", "message": "No valid phone number in webhook payload."}
             
-        # 3. AI Transcript Audits using Claude 4.5 Haiku
+        # 4. Trigger the Claude AI Transcript Analyzer if a transcript exists
         ai_qualified = "NO"
         ai_sale_closed = "NO"
         ai_value = 0.0
@@ -533,20 +730,21 @@ async def receive_callrail_webhook(request: Request, client_id: Optional[int] = 
         model_name = "None"
         
         if transcript.strip():
-            print(f"🧠 [Client #{resolved_client_id}] Transcript detected for {caller_name}. Auditing with Claude...")
+            print(f"🧠 [Client #{resolved_client_id}] Transcript detected for {caller_name}. Analyzing with Claude...")
             ai_result = analyze_transcript_with_claude(transcript)
             ai_qualified = ai_result.get("qualified", "NO")
             ai_sale_closed = ai_result.get("sale_closed", "NO")
             ai_value = float(ai_result.get("value", 0.0))
             ai_reason = ai_result.get("reason", "No reason parsed.")
             model_name = "claude-haiku-4-5-20251001"
-            print(f"🎯 Audit Complete: Qualified={ai_qualified}, Sales Value=${ai_value}")
+            print(f"🎯 AI Analysis complete: Qualified={ai_qualified}, Value=${ai_value}")
         else:
-            print(f"⚠️ [Client #{resolved_client_id}] No transcript provided. Skipping AI analysis.")
+            print(f"⚠️ [Client #{resolved_client_id}] No transcript provided in CallRail webhook for {caller_name}. Skipping AI audit.")
 
-        # 4. Save Session to Isolated Client ID in SQLite
+        # 5. Save all parameters including the AI analysis results to SQLite
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
+        
         cursor.execute("""
             INSERT INTO sessions (
                 client_id, phone, name, gclid, source, qualified, sale_closed, value, reason, model_used, raw_data
@@ -565,13 +763,14 @@ async def receive_callrail_webhook(request: Request, client_id: Optional[int] = 
             model_name, 
             str(payload)
         ))
+        
         conn.commit()
         conn.close()
         
         return {
             "status": "success",
             "client_id": resolved_client_id,
-            "message": "Webhook successfully processed and saved.",
+            "message": "Call log and AI analysis processed and saved.",
             "ai_audit": {
                 "qualified": ai_qualified,
                 "sale_closed": ai_sale_closed,
@@ -581,7 +780,7 @@ async def receive_callrail_webhook(request: Request, client_id: Optional[int] = 
         }
             
     except Exception as e:
-        print(f"❌ Webhook Error: {e}")
+        print(f"❌ Error processing CallRail Webhook: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -589,13 +788,17 @@ async def receive_callrail_webhook(request: Request, client_id: Optional[int] = 
 async def receive_form_lead(lead: FormLead, client_id: Optional[int] = None):
     """
     Form Lead Webhook Receiver supporting Multi-Tenancy.
+    Saves website visitor form entries containing GCLIDs to allow back-end pairing.
     """
     try:
         resolved_client_id = client_id or 1  # Fallback to Client 1 if not defined
+        
+        # 1. Clean data
         full_name = f"{lead.first_name} {lead.last_name}".strip()
         normalized_phone = normalize_phone(lead.phone)
         email_clean = lead.email.strip().lower()
         
+        # 2. Save to SQLite
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute("""
@@ -605,9 +808,9 @@ async def receive_form_lead(lead: FormLead, client_id: Optional[int] = None):
         conn.commit()
         conn.close()
         
-        print(f"📝 [Client #{resolved_client_id}] Form Lead saved: Name={full_name}, Phone={normalized_phone}, GCLID={lead.gclid}")
+        print(f"📝 [Client #{resolved_client_id}] Form Lead saved: Name={full_name}, Phone={normalized_phone}, Email={email_clean}, GCLID={lead.gclid}")
         return {"status": "success", "message": f"Form lead saved under client #{resolved_client_id}."}
         
     except Exception as e:
-        print(f"❌ Form Lead Error: {e}")
+        print(f"❌ Error saving Form Lead: {e}")
         raise HTTPException(status_code=400, detail=str(e))
