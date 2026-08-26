@@ -496,8 +496,8 @@ def add_client_page():
         </head>
         <body>
             <div class="container">
-                <h1>Add New Client Account 👤</h1>
-                <div class="instructions">
+                <h1 id="heading-title">Add New Client Account 👤</h1>
+                <div class="instructions" id="instructions-container">
                     💡 <strong>Agency Onboarding Step:</strong> Adding a client here creates their database profile. 
                     They will get their own isolated space in your database and dynamic webhook triggers.
                 </div>
@@ -524,7 +524,32 @@ def add_client_page():
                     <button type="submit" class="btn-submit">🚀 Add Client & Generate Webhook</button>
                 </form>
                 
-                <a href="/dashboard" class="btn-cancel">⬅️ Cancel and Return to Dashboard</a>
+                <!-- Dynamic Setup Webhook Screen (Hidden initially) -->
+                <div id="success-screen" style="display: none; text-align: center;">
+                    <div style="font-size: 50px; margin-bottom: 15px;">🎉</div>
+                    <h2 style="color: #2e7d32; margin-top: 0;">Onboarding Successful!</h2>
+                    <p style="color: #555; font-size: 14px; margin-bottom: 20px;">
+                        Your client profile for <strong id="registered-client-name"></strong> has been created.
+                    </p>
+                    
+                    <div class="instructions" style="text-align: left; background-color: #e8eaf6; border-left: 4px solid #1a237e;">
+                        🔑 <strong>Step 2: Connect CallRail</strong><br>
+                        Copy this personalized URL and paste it as your Webhook URL inside CallRail:
+                    </div>
+                    
+                    <div style="display: flex; gap: 8px; margin-bottom: 15px;">
+                        <input type="text" id="webhook-url-input" readonly style="flex: 1; padding: 10px; border-radius: 6px; border: 1px solid #ced4da; font-family: monospace; font-size: 12px; background-color: #f8f9fa;">
+                        <button onclick="copyWebhookUrl()" id="copy-btn" class="btn-submit" style="margin: 0; width: auto; white-space: nowrap; padding: 0 15px; font-size: 14px; background-color: #2e7d32;">📋 Copy URL</button>
+                    </div>
+                    
+                    <div class="instructions" style="text-align: left; background-color: #fff3cd; border-left-color: #ffc107; color: #856404; font-size: 12px;">
+                        ⚠️ <strong>Important:</strong> Set the Trigger Event in CallRail to <strong>"Call Completed"</strong> so the audio transcript is ready for Claude.
+                    </div>
+                    
+                    <a href="/dashboard" class="btn-submit" style="display: block; text-decoration: none; text-align: center; line-height: 20px; background-color: #1a237e;">📊 Proceed to Dashboard</a>
+                </div>
+                
+                <a href="/dashboard" class="btn-cancel" id="cancel-link">⬅️ Cancel and Return to Dashboard</a>
             </div>
             
             <script>
@@ -532,6 +557,11 @@ def add_client_page():
                     event.preventDefault();
                     const alertBox = document.getElementById('alert-box');
                     const btnSubmit = document.querySelector('.btn-submit');
+                    const form = document.getElementById('add-client-form');
+                    const instContainer = document.getElementById('instructions-container');
+                    const cancelLink = document.getElementById('cancel-link');
+                    const heading = document.getElementById('heading-title');
+                    const successScreen = document.getElementById('success-screen');
                     
                     alertBox.style.display = 'none';
                     alertBox.className = 'alert';
@@ -559,13 +589,19 @@ def add_client_page():
                         const data = await response.json();
                         
                         if (response.ok) {
-                            alertBox.innerText = `Success! Client "${name}" added successfully. Redirecting...`;
-                            alertBox.className = 'alert alert-success';
-                            alertBox.style.display = 'block';
+                            // Hide registration UI and reveal instructions
+                            form.style.display = 'none';
+                            instContainer.style.display = 'none';
+                            cancelLink.style.display = 'none';
+                            heading.style.display = 'none';
                             
-                            setTimeout(() => {
-                                window.location.href = '/dashboard';
-                            }, 1500);
+                            document.getElementById('registered-client-name').innerText = name;
+                            
+                            // Generate the exact live webhook URL dynamically
+                            const liveWebhook = `${window.location.origin}/webhooks/callrail?client_id=${data.client_id}`;
+                            document.getElementById('webhook-url-input').value = liveWebhook;
+                            
+                            successScreen.style.display = 'block';
                         } else {
                             throw new Error(data.detail || 'An unexpected error occurred.');
                         }
@@ -576,6 +612,21 @@ def add_client_page():
                         btnSubmit.disabled = false;
                         btnSubmit.innerText = '🚀 Add Client & Generate Webhook';
                     }
+                }
+                
+                function copyWebhookUrl() {
+                    const copyText = document.getElementById("webhook-url-input");
+                    copyText.select();
+                    copyText.setSelectionRange(0, 99999);
+                    navigator.clipboard.writeText(copyText.value);
+                    
+                    const copyBtn = document.getElementById("copy-btn");
+                    copyBtn.innerText = "✅ Copied!";
+                    copyBtn.style.backgroundColor = "#1b5e20";
+                    setTimeout(() => {
+                        copyBtn.innerText = "📋 Copy URL";
+                        copyBtn.style.backgroundColor = "#2e7d32";
+                    }, 2000);
                 }
             </script>
         </body>
@@ -601,9 +652,16 @@ def create_client(client: ClientCreate):
             VALUES (?, ?, ?)
         """, (client.name, client.callrail_company_id, client.google_ads_customer_id))
         
+        # Capture the newly created client ID
+        client_id = cursor.lastrowid
+        
         conn.commit()
         conn.close()
-        return {"status": "success", "message": f"Client '{client.name}' created successfully!"}
+        return {
+            "status": "success", 
+            "client_id": client_id,
+            "message": f"Client '{client.name}' created successfully!"
+        }
     except HTTPException as he:
         raise he
     except Exception as e:
