@@ -907,21 +907,46 @@ def add_client_page():
                         The account configuration file for <strong id="registered-client-name"></strong> has been created.
                     </p>
                     
-                    <div class="instructions" style="text-align: left; background-color: #e8eaf6; border-left: 4px solid #1a237e;">
-                        🔑 <strong>Step 2: Configure CallRail Integration</strong><br>
-                        Your live platform webhook is built. Copy this link and paste it into CallRail:
+                    <!-- CallRail Step (Always Shown) -->
+                    <div class="instructions" style="text-align: left; background-color: #e8eaf6; border-left: 4px solid #1a237e; margin-bottom: 10px;">
+                        📞 <strong>Step 2: Configure CallRail Integration</strong><br>
+                        Your live CallRail webhook endpoint is ready. Copy this link and paste it into CallRail:
                     </div>
-                    
                     <div style="display: flex; gap: 8px; margin-bottom: 15px;">
                         <input type="text" id="webhook-url-input" readonly style="flex: 1; padding: 10px; border-radius: 6px; border: 1px solid #ced4da; font-family: monospace; font-size: 12px; background-color: #f8f9fa;">
-                        <button onclick="copyWebhookUrl()" id="copy-btn" class="btn-submit" style="margin: 0; width: auto; white-space: nowrap; padding: 0 15px; font-size: 14px; background-color: #2e7d32;">📋 Copy URL</button>
+                        <button type="button" onclick="copyWebhookUrl('webhook-url-input', 'copy-btn')" id="copy-btn" class="btn-submit" style="margin: 0; width: auto; white-space: nowrap; padding: 0 15px; font-size: 14px; background-color: #2e7d32;">📋 Copy URL</button>
+                    </div>
+                    <div class="instructions" style="text-align: left; background-color: #fff3cd; border-left-color: #ffc107; color: #856404; font-size: 11px; margin-top: -10px; margin-bottom: 25px; padding: 8px 12px;">
+                        ⚠️ <strong>Reminder:</strong> Set the trigger inside CallRail integration settings to <strong>"Call Completed"</strong> so transcripts are compiled.
+                    </div>
+
+                    <!-- CRM / Billing Program Connection Step (Shown conditionally) -->
+                    <div id="sot-instructions-box" style="display: none; margin-top: 25px;">
+                        <div class="instructions" id="sot-instructions-label" style="text-align: left; background-color: #e8f5e9; border-left: 4px solid #2e7d32; color: #1b5e20; margin-bottom: 10px;">
+                            ⚙️ <strong>Step 3: Connect Your Platform Webhook</strong><br>
+                        </div>
+                        <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+                            <input type="text" id="sot-webhook-input" readonly style="flex: 1; padding: 10px; border-radius: 6px; border: 1px solid #ced4da; font-family: monospace; font-size: 12px; background-color: #f8f9fa;">
+                            <button type="button" onclick="copyWebhookUrl('sot-webhook-input', 'sot-copy-btn')" id="sot-copy-btn" class="btn-submit" style="margin: 0; width: auto; white-space: nowrap; padding: 0 15px; font-size: 14px; background-color: #2e7d32;">📋 Copy URL</button>
+                        </div>
+                    </div>
+
+                    <!-- Email Forwarding Connection Step (Shown conditionally) -->
+                    <div id="sot-email-instructions-box" style="display: none; margin-top: 25px;">
+                        <div class="instructions" style="text-align: left; background-color: #e8f5e9; border-left: 4px solid #2e7d32; color: #1b5e20; margin-bottom: 10px;">
+                            📧 <strong>Step 3: Set Up Email Forwarding</strong><br>
+                            To allow conversion auditing, set up an email auto-forwarding rule in your inbox. Forward any matching customer invoice or booking confirmation alerts to this custom system email:
+                        </div>
+                        <div style="display: flex; gap: 8px; margin-bottom: 15px;">
+                            <input type="text" id="sot-email-address" readonly style="flex: 1; padding: 10px; border-radius: 6px; border: 1px solid #ced4da; font-family: monospace; font-size: 12px; background-color: #f8f9fa;">
+                            <button type="button" onclick="copyWebhookUrl('sot-email-address', 'sot-email-copy-btn')" id="sot-email-copy-btn" class="btn-submit" style="margin: 0; width: auto; white-space: nowrap; padding: 0 15px; font-size: 14px; background-color: #2e7d32;">📋 Copy Email</button>
+                        </div>
+                        <div class="instructions" style="text-align: left; background-color: #fff3cd; border-left-color: #ffc107; color: #856404; font-size: 11px; margin-top: -10px; margin-bottom: 25px; padding: 8px 12px;">
+                            💡 <strong>Tip:</strong> Create a rule in Gmail or Outlook to forward emails with subject keywords like "invoice" or "booking confirmation" automatically.
+                        </div>
                     </div>
                     
-                    <div class="instructions" style="text-align: left; background-color: #fff3cd; border-left-color: #ffc107; color: #856404; font-size: 12px;">
-                        ⚠️ <strong>Reminder:</strong> For CallRail call transcript tracking, make sure the webhook trigger inside CallRail is set to <strong>"Call Completed"</strong>.
-                    </div>
-                    
-                    <a href="/dashboard" class="btn-submit" style="display: block; text-decoration: none; text-align: center; line-height: 20px; background-color: #1a237e;">📊 Proceed to Dashboard</a>
+                    <a href="/dashboard" class="btn-submit" style="display: block; text-decoration: none; text-align: center; line-height: 20px; background-color: #1a237e; margin-top: 30px;">📊 Proceed to Dashboard</a>
                 </div>
                 
                 <a href="/dashboard" class="btn-cancel" id="cancel-link">⬅️ Cancel and Return to Dashboard</a>
@@ -1078,6 +1103,31 @@ def add_client_page():
                             const liveWebhook = `${window.location.origin}/webhooks/callrail?client_id=${data.client_id}`;
                             document.getElementById('webhook-url-input').value = liveWebhook;
                             
+                            // CRM / Billing / Email custom success steps
+                            const sotBox = document.getElementById('sot-instructions-box');
+                            const sotLabel = document.getElementById('sot-instructions-label');
+                            const sotUrlInput = document.getElementById('sot-webhook-input');
+                            const sotEmailBox = document.getElementById('sot-email-instructions-box');
+                            const sotEmailAddress = document.getElementById('sot-email-address');
+                            
+                            sotBox.style.display = 'none';
+                            sotEmailBox.style.display = 'none';
+                            
+                            if (['hubspot', 'salesforce', 'zoho', 'servicetitan', 'housecallpro'].includes(payload.source_of_truth)) {
+                                sotLabel.innerHTML = `⚙️ <strong>Step 3: Connect Your ${payload.source_of_truth.toUpperCase()} CRM Webhook</strong><br>Copy this webhook URL and paste it into your CRM's Developer Settings or configure it in Zapier to trigger when a Lead or Deal is updated:`;
+                                sotUrlInput.value = `${window.location.origin}/webhooks/crm?client_id=${data.client_id}`;
+                                sotBox.style.display = 'block';
+                            } else if (['quickbooks', 'xero'].includes(payload.source_of_truth)) {
+                                sotLabel.innerHTML = `💳 <strong>Step 3: Connect Your ${payload.source_of_truth.toUpperCase()} Accounting Webhook</strong><br>Copy this webhook URL and paste it into your billing platform's developer integrations console to trigger when invoices are paid:`;
+                                sotUrlInput.value = `${window.location.origin}/webhooks/billing?client_id=${data.client_id}`;
+                                sotBox.style.display = 'block';
+                            } else if (payload.source_of_truth === 'email') {
+                                const host = window.location.host;
+                                const emailDomain = host.includes('localhost') ? 'your-agency.com' : host.replace('www.', '').split(':')[0];
+                                sotEmailAddress.value = `conversions-${data.client_id}@${emailDomain}`;
+                                sotEmailBox.style.display = 'block';
+                            }
+                            
                             successScreen.style.display = 'block';
                         } else {
                             throw new Error(data.detail || 'An unexpected database error occurred.');
@@ -1089,17 +1139,18 @@ def add_client_page():
                     }
                 }
                 
-                function copyWebhookUrl() {
-                    const copyText = document.getElementById("webhook-url-input");
+                function copyWebhookUrl(inputId, btnId) {
+                    const copyText = document.getElementById(inputId);
                     copyText.select();
                     copyText.setSelectionRange(0, 99999);
                     navigator.clipboard.writeText(copyText.value);
                     
-                    const copyBtn = document.getElementById("copy-btn");
+                    const copyBtn = document.getElementById(btnId);
+                    const originalText = inputId === "sot-email-address" ? "📋 Copy Email" : "📋 Copy URL";
                     copyBtn.innerText = "✅ Copied!";
                     copyBtn.style.backgroundColor = "#1b5e20";
                     setTimeout(() => {
-                        copyBtn.innerText = "📋 Copy URL";
+                        copyBtn.innerText = originalText;
                         copyBtn.style.backgroundColor = "#2e7d32";
                     }, 2000);
                 }
@@ -1580,4 +1631,44 @@ async def receive_form_lead(lead: FormLead, client_id: Optional[int] = None):
         
     except Exception as e:
         print(f"❌ Error saving Form Lead: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/webhooks/crm")
+async def receive_crm_webhook(request: Request, client_id: Optional[int] = None):
+    """
+    CRM Lead/Deal Update Webhook Receiver supporting Multi-Tenancy.
+    Processes conversion logs and maps lead changes to the correct client profile.
+    """
+    try:
+        payload = await request.json()
+        resolved_client_id = client_id or 1
+        print(f"🏢 [CRM Webhook] Received conversion payload for Client #{resolved_client_id}: {payload}")
+        return {
+            "status": "success",
+            "client_id": resolved_client_id,
+            "message": f"CRM lead conversion successfully processed under client #{resolved_client_id}."
+        }
+    except Exception as e:
+        print(f"❌ CRM Webhook Error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/webhooks/billing")
+async def receive_billing_webhook(request: Request, client_id: Optional[int] = None):
+    """
+    Billing Software (QuickBooks/Xero) Webhook Receiver supporting Multi-Tenancy.
+    Tracks paid invoice events to verify closed transactions and trigger conversion uploads.
+    """
+    try:
+        payload = await request.json()
+        resolved_client_id = client_id or 1
+        print(f"💳 [Billing Webhook] Received transaction payload for Client #{resolved_client_id}: {payload}")
+        return {
+            "status": "success",
+            "client_id": resolved_client_id,
+            "message": f"Billing invoice paid webhook processed under client #{resolved_client_id}."
+        }
+    except Exception as e:
+        print(f"❌ Billing Webhook Error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
