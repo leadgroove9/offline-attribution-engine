@@ -350,6 +350,12 @@ def view_dashboard(client_id: Optional[int] = None):
         # Determine filtering
         selected_client_id = client_id if client_id is not None else 0 # 0 signifies "All Clients" (Agency Overview)
         
+        # Build Settings Button HTML
+        if selected_client_id == 0:
+            settings_btn_html = ''
+        else:
+            settings_btn_html = f'<a href="/dashboard/settings?client_id={selected_client_id}" class="btn-settings">⚙️ Client Settings</a>'
+        
         # 2. Query Dashboard Rows and Calculations
         if selected_client_id == 0:
             # Multi-Client (All Clients) View - Join with clients table to display client names
@@ -502,6 +508,9 @@ def view_dashboard(client_id: Optional[int] = None):
                 .btn-export:hover {{ filter: brightness(0.9); }}
                 .btn-add-client {{ display: inline-block; background-color: #1a237e; color: white; padding: 10px 18px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 14px; border: none; transition: background 0.2s; cursor: pointer; }}
                 .btn-add-client:hover {{ background-color: #0d1b2a; }}
+                .btn-settings { display: inline-block; background-color: #607d8b; color: white; padding: 10px 18px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 14px; border: none; transition: background 0.2s; cursor: pointer; }
+                .btn-settings:hover { background-color: #455a64; }
+
             </style>
         </head>
         <body>
@@ -519,6 +528,7 @@ def view_dashboard(client_id: Optional[int] = None):
                                 {dropdown_options}
                             </select>
                         </div>
+                        {settings_btn_html}
                         <a href="/dashboard/add-client" class="btn-add-client">➕ Onboard Client</a>
                     </div>
                 </header>
@@ -610,6 +620,575 @@ def view_dashboard(client_id: Optional[int] = None):
     </html>
     """
 
+
+
+class ClientUpdate(BaseModel):
+    id: int
+    name: str
+    callrail_company_id: str
+    google_ads_customer_id: str
+    facebook_ads_id: Optional[str] = ""
+    linkedin_ads_id: Optional[str] = ""
+    microsoft_ads_id: Optional[str] = ""
+    lead_gen_method: str
+    qualification_criteria: str
+    source_of_truth: str
+    email_provider: Optional[str] = ""
+    email_account: Optional[str] = ""
+    crm_deal_tags: Optional[str] = ""
+    crm_lead_tags: Optional[str] = ""
+    lead_count_rule: str
+    exclude_past_customers: str
+
+
+@app.get("/dashboard/settings", response_class=HTMLResponse)
+def view_settings(client_id: Optional[int] = None):
+    """Page to manage and update client account configuration settings."""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        # 1. Fetch All Available Clients for the dropdown selector
+        cursor.execute("SELECT id, name, google_ads_customer_id FROM clients ORDER BY name ASC")
+        all_clients = cursor.fetchall()
+        
+        if not all_clients:
+            conn.close()
+            return HTMLResponse("<script>alert('No clients found. Please onboard a client first!'); window.location.href='/dashboard/add-client';</script>")
+            
+        # Determine which client to edit
+        active_client_id = client_id if client_id is not None else all_clients[0][0]
+        
+        # 2. Fetch the specific client's settings
+        cursor.execute("SELECT * FROM clients WHERE id = ?", (active_client_id,))
+        client_row = cursor.fetchone()
+        
+        if not client_row:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Client not found")
+            
+        # Extract column names dynamically to map to fields easily
+        cursor.execute("PRAGMA table_info(clients)")
+        cols = [col[1] for col in cursor.fetchall()]
+        client_data = dict(zip(cols, client_row))
+        conn.close()
+    except Exception as e:
+        return f"<html><body><h3>❌ Database Error: {e}</h3></body></html>"
+
+    # Generate the Selector Dropdown Options for the Settings Header
+    dropdown_options = ""
+    for c_id, c_name, c_ads in all_clients:
+        is_selected = "selected" if active_client_id == c_id else ""
+        dropdown_options += f'<option value="{c_id}" {is_selected}>👤 {c_name} (Ads: {c_ads})</option>'
+
+    # Handle dropdown lists with pre-selected options
+    lead_gen_both_checked = "checked" if client_data.get("lead_gen_method") == "both" else ""
+    lead_gen_phone_checked = "checked" if client_data.get("lead_gen_method") == "phone" else ""
+    lead_gen_form_checked = "checked" if client_data.get("lead_gen_method") == "form" else ""
+
+    lead_count_all_checked = "checked" if client_data.get("lead_count_rule") == "all" else ""
+    lead_count_max_checked = "checked" if client_data.get("lead_count_rule") == "maximum_one" else ""
+
+    exclude_no_checked = "checked" if client_data.get("exclude_past_customers") == "NO" else ""
+    exclude_yes_checked = "checked" if client_data.get("exclude_past_customers") == "YES" else ""
+
+    # Qualification criteria dropdown helper
+    crit_options = ""
+    for code, label in CRITERIA_MAP.items():
+        is_sel = "selected" if client_data.get("qualification_criteria") == code else ""
+        crit_options += f'<option value="{code}" {is_sel}>Option {code}: {label}</option>'
+
+    # Source of Truth dropdown helper
+    sot_options = ""
+    for code, label in SOT_MAP.items():
+        is_sel = "selected" if client_data.get("source_of_truth") == code else ""
+        sot_options += f'<option value="{code}" {is_sel}>{label}</option>'
+
+    # Email provider selector helper
+    provider_options = ""
+    for code, label in [("gmail", "Google Gmail API"), ("outlook", "Microsoft Outlook 365"), ("custom_imap", "Custom IMAP (Secure Server)")]:
+        is_sel = "selected" if client_data.get("email_provider") == code else ""
+        provider_options += f'<option value="{code}" {is_sel}>{label}</option>'
+
+    # Setup the live Integration webhook variables to display on the page
+    # Since these are loaded in the browser, window.location.origin is perfect!
+    client_name = client_data.get("name", "")
+    
+    return f"""
+    <!DOCTYPE html>
+    <html>
+        <head>
+            <title>Client Settings ⚙️</title>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>
+                body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background-color: #f4f6f9; color: #333; margin: 0; padding: 20px; }}
+                .container {{ max-width: 1000px; margin: 20px auto; background: white; padding: 40px; border-radius: 12px; box-shadow: 0px 4px 15px rgba(0,0,0,0.05); }}
+                header {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eaeaea; padding-bottom: 20px; margin-bottom: 30px; flex-wrap: wrap; gap: 15px; }}
+                h1 {{ margin: 0; color: #1a237e; font-size: 24px; }}
+                .client-selector-container {{ display: flex; align-items: center; gap: 10px; background: #e8eaf6; padding: 10px 15px; border-radius: 8px; border: 1px solid #c5cae9; }}
+                .client-label {{ font-weight: bold; color: #1a237e; font-size: 14px; }}
+                .client-select {{ padding: 8px 12px; font-size: 14px; border-radius: 5px; border: 1px solid #9fa8da; outline: none; font-weight: 600; cursor: pointer; color: #1a237e; }}
+                
+                /* Layout */
+                .settings-layout {{ display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }}
+                @media (max-width: 768px) {{ .settings-layout {{ grid-template-columns: 1fr; }} }}
+                
+                .form-group {{ margin-bottom: 20px; }}
+                .form-row {{ display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }}
+                label {{ display: block; font-weight: 600; margin-bottom: 8px; font-size: 13px; color: #495057; }}
+                input[type="text"], select {{ width: 100%; padding: 10px 12px; border-radius: 6px; border: 1px solid #ced4da; box-sizing: border-box; font-size: 14px; outline: none; transition: border-color 0.2s; font-family: inherit; }}
+                input[type="text"]:focus, select:focus {{ border-color: #1a237e; }}
+                
+                .section-title {{ font-size: 16px; color: #1a237e; font-weight: bold; border-bottom: 1px solid #eaeaea; padding-bottom: 8px; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px; }}
+                
+                /* Card Radio Styles */
+                .card-radio-group {{ display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }}
+                .card-radio {{ display: flex; align-items: center; padding: 10px 15px; border: 2px solid #e0e0e0; border-radius: 8px; cursor: pointer; transition: all 0.2s; gap: 12px; position: relative; }}
+                .card-radio:hover {{ border-color: #b3e5fc; background-color: #f6fbfd; }}
+                .card-radio.selected {{ border-color: #1a237e; background-color: #e8eaf6; }}
+                .card-radio input[type="radio"] {{ position: absolute; opacity: 0; }}
+                .card-radio-label {{ font-size: 13px; font-weight: bold; color: #333; margin: 0; }}
+                .card-radio-sub {{ font-size: 11px; color: #666; margin-top: 3px; }}
+                
+                /* Webhook Card Box */
+                .webhook-card {{ background-color: #fafafa; border: 1px solid #eaeaea; border-left: 4px solid #1a237e; padding: 15px; border-radius: 0 6px 6px 0; margin-bottom: 15px; }}
+                .webhook-title {{ font-weight: bold; font-size: 13px; color: #1a237e; margin-bottom: 5px; }}
+                .webhook-desc {{ font-size: 11px; color: #666; margin-bottom: 10px; line-height: 1.4; }}
+                .webhook-input-group {{ display: flex; gap: 8px; }}
+                .webhook-input {{ flex: 1; padding: 8px 10px; border: 1px solid #ced4da; border-radius: 5px; font-family: monospace; font-size: 11px; background-color: #fff; outline: none; }}
+                
+                .btn-copy {{ background-color: #2e7d32; color: white; padding: 6px 12px; border: none; border-radius: 5px; font-weight: bold; font-size: 12px; cursor: pointer; transition: background 0.2s; white-space: nowrap; }}
+                .btn-copy:hover {{ background-color: #1b5e20; }}
+                
+                .btn-submit {{ background-color: #1a237e; color: white; padding: 12px 24px; border: none; border-radius: 6px; font-weight: bold; font-size: 15px; cursor: pointer; transition: background 0.2s; }}
+                .btn-submit:hover {{ background-color: #0d1b2a; }}
+                .btn-cancel {{ color: #666; text-decoration: none; font-size: 14px; font-weight: bold; }}
+                .btn-cancel:hover {{ color: #333; }}
+                
+                .alert {{ padding: 12px; border-radius: 6px; margin-bottom: 20px; display: none; font-size: 14px; font-weight: 600; }}
+                .alert-error {{ background-color: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }}
+                .alert-success {{ background-color: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }}
+                
+                .conditional-box {{ background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 15px; margin-top: 15px; display: none; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <header>
+                    <div>
+                        <h1>Client Configuration Settings ⚙️</h1>
+                        <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">Update dynamic rules, ad accounts, and system webhooks for <strong>{client_name}</strong></p>
+                    </div>
+                    
+                    <div class="client-selector-container">
+                        <span class="client-label">Editing Client:</span>
+                        <select class="client-select" onchange="window.location.href='/dashboard/settings?client_id='+this.value">
+                            {dropdown_options}
+                        </select>
+                    </div>
+                </header>
+
+                <div id="alert-box" class="alert"></div>
+                
+                <form id="settings-form" onsubmit="submitSettings(event)">
+                    <div class="settings-layout">
+                        
+                        <!-- LEFT COLUMN: Configurations -->
+                        <div>
+                            <!-- SECTION 1: Accounts -->
+                            <div class="section-title">🏢 Profile & Ad Accounts</div>
+                            
+                            <div class="form-group">
+                                <label for="name">Client Business Name</label>
+                                <input type="text" id="name" value="{client_name}" required>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="callrail_company_id">CallRail Company ID (or Account ID)</label>
+                                <input type="text" id="callrail_company_id" value="{client_data.get("callrail_company_id", "")}" required>
+                            </div>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="google_ads_customer_id">Google Ads Customer ID</label>
+                                    <input type="text" id="google_ads_customer_id" value="{client_data.get("google_ads_customer_id", "")}" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="facebook_ads_id">Facebook Ads Pixel ID</label>
+                                    <input type="text" id="facebook_ads_id" value="{client_data.get("facebook_ads_id", "") or ""}">
+                                </div>
+                            </div>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="linkedin_ads_id">LinkedIn Ads ID</label>
+                                    <input type="text" id="linkedin_ads_id" value="{client_data.get("linkedin_ads_id", "") or ""}">
+                                </div>
+                                <div class="form-group">
+                                    <label for="microsoft_ads_id">Microsoft Ads ID</label>
+                                    <input type="text" id="microsoft_ads_id" value="{client_data.get("microsoft_ads_id", "") or ""}">
+                                </div>
+                            </div>
+                            
+                            <!-- SECTION 2: Lead Gen & Qualification -->
+                            <div class="section-title">🧠 Lead Generation & AI Auditing</div>
+                            
+                            <div class="form-group">
+                                <label>How do you generate your leads?</label>
+                                <div class="card-radio-group">
+                                    <div class="card-radio {lead_gen_both_checked and 'selected'}" onclick="selectCardRadio('lead_gen_method', 'both', this)">
+                                        <input type="radio" name="lead_gen_method" value="both" {lead_gen_both_checked}>
+                                        <div>
+                                            <div class="card-radio-label">Both Phone Calls & Web Forms</div>
+                                        </div>
+                                    </div>
+                                    <div class="card-radio {lead_gen_phone_checked and 'selected'}" onclick="selectCardRadio('lead_gen_method', 'phone', this)">
+                                        <input type="radio" name="lead_gen_method" value="phone" {lead_gen_phone_checked}>
+                                        <div>
+                                            <div class="card-radio-label">Phone Calls Only</div>
+                                        </div>
+                                    </div>
+                                    <div class="card-radio {lead_gen_form_checked and 'selected'}" onclick="selectCardRadio('lead_gen_method', 'form', this)">
+                                        <input type="radio" name="lead_gen_method" value="form" {lead_gen_form_checked}>
+                                        <div>
+                                            <div class="card-radio-label">Form Submissions Only</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="qualification_criteria">How do you qualify a lead?</label>
+                                <select id="qualification_criteria">
+                                    {crit_options}
+                                </select>
+                            </div>
+                            
+                            <!-- SECTION 4: Smart Deduplication -->
+                            <div class="section-title">💰 Smart Conversion Controls</div>
+                            
+                            <div class="form-group">
+                                <label>How should we track multiple leads from the same customer?</label>
+                                <div class="card-radio-group">
+                                    <div class="card-radio {lead_count_all_checked and 'selected'}" onclick="selectCardRadio('lead_count_rule', 'all', this)">
+                                        <input type="radio" name="lead_count_rule" value="all" {lead_count_all_checked}>
+                                        <div>
+                                            <div class="card-radio-label">Count Every Lead Session</div>
+                                        </div>
+                                    </div>
+                                    <div class="card-radio {lead_count_max_checked and 'selected'}" onclick="selectCardRadio('lead_count_rule', 'maximum_one', this)">
+                                        <input type="radio" name="lead_count_rule" value="maximum_one" {lead_count_max_checked}>
+                                        <div>
+                                            <div class="card-radio-label">Maximum of One Conversion Each</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Exclude past customers as eligible lead conversions?</label>
+                                <div class="card-radio-group">
+                                    <div class="card-radio {exclude_no_checked and 'selected'}" onclick="selectCardRadio('exclude_past_customers', 'NO', this)">
+                                        <input type="radio" name="exclude_past_customers" value="NO" {exclude_no_checked}>
+                                        <div>
+                                            <div class="card-radio-label">No, allow past customers</div>
+                                        </div>
+                                    </div>
+                                    <div class="card-radio {exclude_yes_checked and 'selected'}" onclick="selectCardRadio('exclude_past_customers', 'YES', this)">
+                                        <input type="radio" name="exclude_past_customers" value="YES" {exclude_yes_checked}>
+                                        <div>
+                                            <div class="card-radio-label">Yes, exclude past customers</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- RIGHT COLUMN: Webhooks & SOT Integration -->
+                        <div>
+                            <!-- SECTION 3: SOT Integration -->
+                            <div class="section-title">🔌 Single Source of Truth Settings</div>
+                            
+                            <div class="form-group">
+                                <label for="source_of_truth">Single Source of Truth Platform</label>
+                                <select id="source_of_truth" onchange="toggleSOTFields()">
+                                    {sot_options}
+                                </select>
+                            </div>
+                            
+                            <!-- CONDITIONAL: CRM Deal status tags -->
+                            <div id="sot-deal-tags-box" class="conditional-box">
+                                <label for="crm_deal_tags">Which statuses under <strong>Deals</strong> signify a qualified/won conversion?</label>
+                                <input type="text" id="crm_deal_tags" value="{client_data.get("crm_deal_tags", "") or ""}" placeholder="e.g. closed-won, estimate-approved">
+                            </div>
+                            
+                            <!-- CONDITIONAL: CRM Lead status tags -->
+                            <div id="sot-lead-tags-box" class="conditional-box">
+                                <label for="crm_lead_tags">Which statuses under <strong>Leads</strong> signify qualification?</label>
+                                <input type="text" id="crm_lead_tags" value="{client_data.get("crm_lead_tags", "") or ""}" placeholder="e.g. job-booked, estimate-given">
+                            </div>
+                            
+                            <!-- CONDITIONAL: Email settings fallback -->
+                            <div id="sot-email-box" class="conditional-box">
+                                <div class="form-group">
+                                    <label for="email_provider">Email Provider</label>
+                                    <select id="email_provider">
+                                        {provider_options}
+                                    </select>
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label for="email_account">Onboarding Integration Email Account</label>
+                                    <input type="text" id="email_account" value="{client_data.get("email_account", "") or ""}" placeholder="e.g. bookings@clientcompany.com">
+                                </div>
+                            </div>
+                            
+                            <!-- SECTION 5: Active Webhooks read-only deck -->
+                            <div class="section-title" style="margin-top: 30px;">🔑 Live Webhooks & Integration URLs</div>
+                            
+                            <!-- CallRail webhook (Always active) -->
+                            <div class="webhook-card">
+                                <div class="webhook-title">📞 CallRail CallCompleted Webhook</div>
+                                <div class="webhook-desc">Paste this dynamic endpoint into CallRail Integration Settings to sync automated call recordings and transcripts:</div>
+                                <div class="webhook-input-group">
+                                    <input type="text" class="webhook-input" id="callrail-webhook" readonly value="" data-suffix="/webhooks/callrail?client_id={active_client_id}">
+                                    <button type="button" onclick="copyText('callrail-webhook', 'cr-copy-btn')" id="cr-copy-btn" class="btn-copy">📋 Copy</button>
+                                </div>
+                            </div>
+                            
+                            <!-- CRM webhook (Available if CRM active) -->
+                            <div class="webhook-card" id="crm-webhook-card">
+                                <div class="webhook-title">⚙️ CRM Deal/Lead Webhook</div>
+                                <div class="webhook-desc">Use this URL inside Zapier or your CRM's developer workspace to push offline lead status updates back to our platform:</div>
+                                <div class="webhook-input-group">
+                                    <input type="text" class="webhook-input" id="crm-webhook" readonly value="" data-suffix="/webhooks/crm?client_id={active_client_id}">
+                                    <button type="button" onclick="copyText('crm-webhook', 'crm-copy-btn')" id="crm-copy-btn" class="btn-copy">📋 Copy</button>
+                                </div>
+                            </div>
+                            
+                            <!-- Billing webhook (Available if Accounting active) -->
+                            <div class="webhook-card" id="billing-webhook-card">
+                                <div class="webhook-title">💳 QuickBooks / Xero Billing Webhook</div>
+                                <div class="webhook-desc">Link your paid transaction updates directly using this endpoint to register closed invoice values:</div>
+                                <div class="webhook-input-group">
+                                    <input type="text" class="webhook-input" id="billing-webhook" readonly value="" data-suffix="/webhooks/billing?client_id={active_client_id}">
+                                    <button type="button" onclick="copyText('billing-webhook', 'billing-copy-btn')" id="billing-copy-btn" class="btn-copy">📋 Copy</button>
+                                </div>
+                            </div>
+                            
+                            <!-- Email Forwarder (Available if Email active) -->
+                            <div class="webhook-card" id="email-webhook-card">
+                                <div class="webhook-title">📧 Inbound Invoice & Booking Email</div>
+                                <div class="webhook-desc">Set up auto-forwarding from your email inbox to send receipts or booking alerts directly to our system for Claude to audit:</div>
+                                <div class="webhook-input-group">
+                                    <input type="text" class="webhook-input" id="email-webhook" readonly value="" data-suffix="conversions-{active_client_id}@your-agency-app.com">
+                                    <button type="button" onclick="copyText('email-webhook', 'em-copy-btn')" id="em-copy-btn" class="btn-copy">📋 Copy</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Form Buttons -->
+                    <div style="display:flex; justify-content: space-between; align-items: center; margin-top: 40px; border-top: 1px solid #eaeaea; padding-top: 20px;">
+                        <a href="/dashboard?client_id={active_client_id}" class="btn-cancel">⬅️ Return to Dashboard</a>
+                        <button type="submit" class="btn-submit">💾 Save Configuration Changes</button>
+                    </div>
+                </form>
+            </div>
+            
+            <script>
+                // Auto-populate the active hostname into webhook input fields
+                window.addEventListener('DOMContentLoaded', () => {{
+                    const origin = window.location.origin;
+                    document.querySelectorAll('.webhook-input').forEach(input => {{
+                        const suffix = input.getAttribute('data-suffix');
+                        if (suffix.startsWith('conversions-')) {{
+                            // Email address, omit origin prefix
+                            input.value = suffix;
+                        }} else {{
+                            input.value = origin + suffix;
+                        }}
+                    }});
+                    
+                    toggleSOTFields();
+                }});
+                
+                function selectCardRadio(name, value, element) {{
+                    element.parentNode.querySelectorAll('.card-radio').forEach(card => {{
+                        card.classList.remove('selected');
+                    }});
+                    element.classList.add('selected');
+                    element.querySelector('input[type="radio"]').checked = true;
+                }}
+                
+                function toggleSOTFields() {{
+                    const sot = document.getElementById('source_of_truth').value;
+                    
+                    const dealBox = document.getElementById('sot-deal-tags-box');
+                    const leadBox = document.getElementById('sot-lead-tags-box');
+                    const emailBox = document.getElementById('sot-email-box');
+                    
+                    const crmCard = document.getElementById('crm-webhook-card');
+                    const billingCard = document.getElementById('billing-webhook-card');
+                    const emailCard = document.getElementById('email-webhook-card');
+                    
+                    // Hide all by default
+                    dealBox.style.display = 'none';
+                    leadBox.style.display = 'none';
+                    emailBox.style.display = 'none';
+                    
+                    crmCard.style.display = 'none';
+                    billingCard.style.display = 'none';
+                    emailCard.style.display = 'none';
+                    
+                    if (['hubspot', 'salesforce', 'zoho'].includes(sot)) {{
+                        dealBox.style.display = 'block';
+                        crmCard.style.display = 'block';
+                    }} else if (['servicetitan', 'housecallpro'].includes(sot)) {{
+                        leadBox.style.display = 'block';
+                        crmCard.style.display = 'block';
+                    }} else if (['quickbooks', 'xero'].includes(sot)) {{
+                        billingCard.style.display = 'block';
+                    }} else if (sot === 'email') {{
+                        emailBox.style.display = 'block';
+                        emailCard.style.display = 'block';
+                    }}
+                }}
+                
+                function copyText(id, btnId) {{
+                    const copyText = document.getElementById(id);
+                    copyText.select();
+                    copyText.setSelectionRange(0, 99999);
+                    navigator.clipboard.writeText(copyText.value);
+                    
+                    const copyBtn = document.getElementById(btnId);
+                    copyBtn.innerText = "Copied!";
+                    copyBtn.style.backgroundColor = "#1b5e20";
+                    setTimeout(() => {{
+                        copyBtn.innerText = "📋 Copy";
+                        copyBtn.style.backgroundColor = "#2e7d32";
+                    }}, 2000);
+                }}
+                
+                async function submitSettings(event) {{
+                    event.preventDefault();
+                    const alertBox = document.getElementById('alert-box');
+                    const btnSubmit = document.querySelector('.btn-submit');
+                    
+                    alertBox.style.display = 'none';
+                    btnSubmit.disabled = true;
+                    btnSubmit.innerText = 'Saving changes...';
+                    
+                    const payload = {{
+                        id: {active_client_id},
+                        name: document.getElementById('name').value.trim(),
+                        callrail_company_id: document.getElementById('callrail_company_id').value.trim(),
+                        google_ads_customer_id: document.getElementById('google_ads_customer_id').value.trim(),
+                        facebook_ads_id: document.getElementById('facebook_ads_id').value.trim(),
+                        linkedin_ads_id: document.getElementById('linkedin_ads_id').value.trim(),
+                        microsoft_ads_id: document.getElementById('microsoft_ads_id').value.trim(),
+                        lead_gen_method: document.querySelector('input[name="lead_gen_method"]:checked').value,
+                        qualification_criteria: document.getElementById('qualification_criteria').value,
+                        source_of_truth: document.getElementById('source_of_truth').value,
+                        email_provider: document.getElementById('email_provider').value,
+                        email_account: document.getElementById('email_account').value.trim(),
+                        crm_deal_tags: document.getElementById('crm_deal_tags').value.trim(),
+                        crm_lead_tags: document.getElementById('crm_lead_tags').value.trim(),
+                        lead_count_rule: document.querySelector('input[name="lead_count_rule"]:checked').value,
+                        exclude_past_customers: document.querySelector('input[name="exclude_past_customers"]:checked').value
+                    }};
+                    
+                    try {{
+                        const response = await fetch('/dashboard/settings', {{
+                            method: 'POST',
+                            headers: {{
+                                'Content-Type': 'application/json'
+                            }},
+                            body: JSON.stringify(payload)
+                        }});
+                        
+                        const data = await response.json();
+                        
+                        if (response.ok) {{
+                            alertBox.innerText = `Success! Configuration settings for "${{payload.name}}" saved successfully.`;
+                            alertBox.className = 'alert alert-success';
+                            alertBox.style.display = 'block';
+                            btnSubmit.disabled = false;
+                            btnSubmit.innerText = '💾 Save Configuration Changes';
+                            window.scrollTo({{ top: 0, behavior: 'smooth' }});
+                        }} else {{
+                            throw new Error(data.detail || 'An unexpected error occurred.');
+                        }}
+                    }} catch (error) {{
+                        alertBox.innerText = 'Error: ' + error.message;
+                        alertBox.className = 'alert alert-error';
+                        alertBox.style.display = 'block';
+                        btnSubmit.disabled = false;
+                        btnSubmit.innerText = '💾 Save Configuration Changes';
+                        window.scrollTo({{ top: 0, behavior: 'smooth' }});
+                    }}
+                }}
+            </script>
+        </body>
+    </html>
+    """
+
+
+@app.post("/dashboard/settings")
+def update_client_settings(client: ClientUpdate):
+    """Endpoint to handle questionnaire form settings update."""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        # Verify client exists
+        cursor.execute("SELECT id FROM clients WHERE id = ?", (client.id,))
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Client not found")
+            
+        # Update settings
+        cursor.execute("""
+            UPDATE clients SET
+                name = ?,
+                callrail_company_id = ?,
+                google_ads_customer_id = ?,
+                facebook_ads_id = ?,
+                linkedin_ads_id = ?,
+                microsoft_ads_id = ?,
+                lead_gen_method = ?,
+                qualification_criteria = ?,
+                source_of_truth = ?,
+                email_provider = ?,
+                email_account = ?,
+                crm_deal_tags = ?,
+                crm_lead_tags = ?,
+                lead_count_rule = ?,
+                exclude_past_customers = ?
+            WHERE id = ?
+        """, (
+            client.name,
+            client.callrail_company_id,
+            client.google_ads_customer_id,
+            client.facebook_ads_id,
+            client.linkedin_ads_id,
+            client.microsoft_ads_id,
+            client.lead_gen_method,
+            client.qualification_criteria,
+            client.source_of_truth,
+            client.email_provider,
+            client.email_account,
+            client.crm_deal_tags,
+            client.crm_lead_tags,
+            client.lead_count_rule,
+            client.exclude_past_customers,
+            client.id
+        ))
+        
+        conn.commit()
+        conn.close()
+        return {"status": "success", "message": f"Settings for '{client.name}' updated successfully!"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database update error: {str(e)}")
 
 @app.get("/dashboard/add-client", response_class=HTMLResponse)
 def add_client_page():
