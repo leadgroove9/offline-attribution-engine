@@ -839,6 +839,17 @@ def view_settings(client_id: Optional[int] = None):
                 .alert-success {{ background-color: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }}
                 
                 .conditional-box {{ background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 15px; margin-top: 15px; display: none; }}
+                @keyframes pulseHighlight {{
+                    0% {{ transform: scale(1); box-shadow: 0 0 0 0 rgba(46, 125, 50, 0.7); background-color: #2e7d32; }}
+                    50% {{ transform: scale(1.04); box-shadow: 0 0 0 12px rgba(46, 125, 50, 0); background-color: #1b5e20; }}
+                    100% {{ transform: scale(1); box-shadow: 0 0 0 0 rgba(46, 125, 50, 0); background-color: #2e7d32; }}
+                }}
+                .btn-pulse-save {{
+                    animation: pulseHighlight 2s infinite !important;
+                    background-color: #2e7d32 !important;
+                    border-color: #1b5e20 !important;
+                    color: white !important;
+                }}
 
                 /* Tooltip styling */
                 .tooltip {{
@@ -1156,7 +1167,7 @@ def view_settings(client_id: Optional[int] = None):
                     <!-- Form Buttons -->
                     <div style="display:flex; justify-content: space-between; align-items: center; margin-top: 40px; border-top: 1px solid #eaeaea; padding-top: 20px;">
                         <a href="/dashboard?client_id={active_client_id}" class="btn-cancel">⬅️ Return to Dashboard</a>
-                        <button type="submit" class="btn-submit">💾 Save Configuration Changes</button>
+                        <button type="submit" id="btn-settings-submit" class="btn-submit">💾 Save Configuration Changes</button>
                     </div>
                 </form>
             </div>
@@ -1184,6 +1195,26 @@ def view_settings(client_id: Optional[int] = None):
                     }});
                     element.classList.add('selected');
                     element.querySelector('input[type="radio"]').checked = true;
+                    
+                    if (name === 'exclude_past_customers') {{
+                        const uploadBox = document.getElementById('exclusion-upload-box');
+                        const msgBox = document.getElementById('existing-exclusions-msg');
+                        if (value === 'YES') {{
+                            uploadBox.style.display = 'block';
+                            if (msgBox) msgBox.style.display = 'block';
+                        }} else {{
+                            uploadBox.style.display = 'none';
+                            if (msgBox) msgBox.style.display = 'none';
+                            
+                            // Reset submit button if disabled exclusions
+                            const btnSubmit = document.getElementById('btn-settings-submit');
+                            if (btnSubmit) {{
+                                btnSubmit.classList.remove('btn-pulse-save');
+                                btnSubmit.innerHTML = '💾 Save Configuration Changes';
+                            }}
+                            parsedExclusions = [];
+                        }}
+                    }}
                 }}
                 
                 function toggleSOTFields() {{
@@ -1218,6 +1249,123 @@ def view_settings(client_id: Optional[int] = None):
                         emailBox.style.display = 'block';
                         emailCard.style.display = 'block';
                     }}
+                }}
+
+                let parsedExclusions = [];
+
+                function handleExclusionFileUpload(event) {{
+                    const file = event.target.files[0];
+                    if (!file) return;
+                    
+                    const reader = new FileReader();
+                    reader.onload = function(e) {{
+                        const text = e.target.result;
+                        parseCSVToExclusions(text, file.name);
+                    }};
+                    reader.readAsText(file);
+                }}
+
+                function parseCSVToExclusions(text, filename) {{
+                    const lines = text.split(/\r\n|\n/);
+                    if (lines.length === 0) {{
+                        showUploadStatus('Error: The file is empty.', 'error');
+                        return;
+                    }}
+                    
+                    function parseCSVLine(line) {{
+                        let arr = [];
+                        let quote = false;
+                        let cell = "";
+                        for (let i = 0; i < line.length; i++) {{
+                            let char = line[i];
+                            if (char === '"') {{
+                                quote = !quote;
+                            }} else if (char === ',' && !quote) {{
+                                arr.push(cell.trim());
+                                cell = "";
+                            }} else {{
+                                cell += char;
+                            }}
+                        }}
+                        arr.push(cell.trim());
+                        return arr;
+                    }}
+                    
+                    const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().replace(/[^a-z0-9]/g, ''));
+                    if (headers.length === 0 || headers.join('').trim() === '') {{
+                        showUploadStatus('Error: Could not read headers from the first row of your CSV file.', 'error');
+                        return;
+                    }}
+                    
+                    let fnIdx = headers.findIndex(h => h.includes('firstname') || h.includes('first'));
+                    let lnIdx = headers.findIndex(h => h.includes('lastname') || h.includes('last'));
+                    let emailIdx = headers.findIndex(h => h.includes('email') || h.includes('mail'));
+                    let phoneIdx = headers.findIndex(h => h.includes('phone') || h.includes('tel') || h.includes('mobile'));
+                    let compIdx = headers.findIndex(h => h.includes('company') || h.includes('business'));
+                    
+                    if (fnIdx === -1 && lnIdx === -1 && emailIdx === -1 && phoneIdx === -1 && compIdx === -1) {{
+                        fnIdx = 0; lnIdx = 1; emailIdx = 2; phoneIdx = 3; compIdx = 4;
+                    }}
+                    
+                    let list = [];
+                    for (let i = 1; i < lines.length; i++) {{
+                        const line = lines[i].trim();
+                        if (!line) continue;
+                        
+                        const row = parseCSVLine(line);
+                        if (row.length === 0 || row.join('').trim() === '') continue;
+                        
+                        const cust = {{
+                            first_name: fnIdx !== -1 && row[fnIdx] ? row[fnIdx] : "",
+                            last_name: lnIdx !== -1 && row[lnIdx] ? row[lnIdx] : "",
+                            email: emailIdx !== -1 && row[emailIdx] ? row[emailIdx] : "",
+                            phone: phoneIdx !== -1 && row[phoneIdx] ? row[phoneIdx] : "",
+                            company_name: compIdx !== -1 && row[compIdx] ? row[compIdx] : ""
+                        }};
+                        
+                        if (cust.first_name || cust.last_name || cust.email || cust.phone || cust.company_name) {{
+                            list.push(cust);
+                        }}
+                    }}
+                    
+                    parsedExclusions = list;
+                    showUploadStatus(`✓ Loaded ${{list.length}} exclusions from "${{filename}}". Save changes to apply!`, 'success');
+                    
+                    // Option B: Visual Pulse & Highlight of settings submit button
+                    const btnSubmit = document.getElementById('btn-settings-submit');
+                    if (btnSubmit) {{
+                        btnSubmit.classList.add('btn-pulse-save');
+                        btnSubmit.innerHTML = `💾 Save Changes (Includes ${{list.length}} Uploaded Exclusions!)`;
+                    }}
+                }}
+
+                function showUploadStatus(message, type) {{
+                    const statusBox = document.getElementById('upload-status-box');
+                    if (statusBox) {{
+                        statusBox.innerText = message;
+                        statusBox.className = type === 'success' ? 'alert alert-success' : 'alert alert-error';
+                        statusBox.style.display = 'block';
+                    }}
+                }}
+
+                function triggerSampleSheetDownload() {{
+                    const headers = ["First Name", "Last Name", "Email", "Phone Number", "Company Name"];
+                    const sampleRows = [
+                        ["John", "Doe", "john.doe@example.com", "555-123-4567", "Doe Plumbing Inc"],
+                        ["Jane", "Smith", "jane@company.com", "555-987-6543", "Smith Solar Corp"]
+                    ];
+                    let csvContent = "data:text/csv;charset=utf-8,";
+                    csvContent += headers.join(",") + "\\n";
+                    sampleRows.forEach(row => {{
+                        csvContent += row.join(",") + "\\n";
+                    }});
+                    const encodedUri = encodeURI(csvContent);
+                    const link = document.createElement("a");
+                    link.setAttribute("href", encodedUri);
+                    link.setAttribute("download", "sample_customer_exclusions.csv");
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
                 }}
                 
                 function copyText(id, btnId) {{
@@ -1455,6 +1603,17 @@ def add_client_page():
                 
                 /* Helper classes */
                 .conditional-box { background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none; animation: slideDown 0.3s ease-out; }
+                @keyframes pulseHighlight {
+                    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(46, 125, 50, 0.7); background-color: #2e7d32; }
+                    50% { transform: scale(1.04); box-shadow: 0 0 0 12px rgba(46, 125, 50, 0); background-color: #1b5e20; }
+                    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(46, 125, 50, 0); background-color: #2e7d32; }
+                }
+                .btn-pulse-save {
+                    animation: pulseHighlight 2s infinite !important;
+                    background-color: #2e7d32 !important;
+                    border-color: #1b5e20 !important;
+                    color: white !important;
+                }
                 @keyframes slideDown {
                     from { opacity: 0; transform: translateY(-10px); }
                     to { opacity: 1; transform: translateY(0); }
@@ -1966,6 +2125,13 @@ def add_client_page():
                     
                     parsedExclusions = list;
                     showUploadStatus(`✓ Loaded ${{list.length}} exclusions from "${{filename}}". Save changes to apply!`, 'success');
+                    
+                    // Option B: Visual Pulse & Highlight of onboarding submit button
+                    const nextBtn = document.getElementById('next-btn');
+                    if (nextBtn) {{
+                        nextBtn.classList.add('btn-pulse-save');
+                        nextBtn.innerHTML = `🚀 Complete Onboarding (With ${{list.length}} Exclusions!)`;
+                    }}
                 }}
 
                 function showUploadStatus(message, type) {{
@@ -2011,6 +2177,16 @@ def add_client_page():
                         }} else {{
                             uploadBox.style.display = 'none';
                             if (msgBox) msgBox.style.display = 'none';
+                            
+                            // Reset submit button if disabled exclusions
+                            const nextBtn = document.getElementById('next-btn');
+                            if (nextBtn) {{
+                                nextBtn.classList.remove('btn-pulse-save');
+                                if (currentStep === totalSteps) {{
+                                    nextBtn.innerHTML = '🚀 Complete Onboarding';
+                                }}
+                            }}
+                            parsedExclusions = [];
                         }}
                     }}
                 }}
