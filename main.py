@@ -1610,6 +1610,11 @@ def add_client_page():
                 .btn-nav.success { background-color: #2e7d32; }
                 .btn-nav.success:hover { background-color: #1b5e20; }
                 
+                .btn-submit { display: inline-block; background-color: #1a237e; color: white !important; text-decoration: none; padding: 12px 24px; border: none; border-radius: 6px; font-weight: bold; font-size: 15px; cursor: pointer; transition: background 0.2s; }
+                .btn-submit:hover { background-color: #0d1b2a; }
+                .btn-cancel { color: #666 !important; text-decoration: none; font-size: 14px; font-weight: bold; }
+                .btn-cancel:hover { color: #333 !important; }
+                
                 .alert { padding: 12px; border-radius: 6px; margin-bottom: 20px; display: none; font-size: 14px; font-weight: 600; }
                 .alert-error { background-color: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
                 .alert-success { background-color: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
@@ -2003,7 +2008,7 @@ def add_client_page():
                         </div>
                     </div>
 
-                    <a href="/dashboard" class="btn-submit" style="display: block; text-decoration: none; text-align: center; line-height: 20px; background-color: #1a237e; margin-top: 30px;">📊 Proceed to Dashboard</a>
+                    <a href="/dashboard" class="btn-submit" style="display: block; text-decoration: none; text-align: center; line-height: 20px; background-color: #1a237e; color: white !important; margin-top: 30px;">📊 Proceed to Dashboard</a>
                 </div>
                 
                 <a href="/dashboard" class="btn-cancel" id="cancel-link">⬅️ Cancel and Return to Dashboard</a>
