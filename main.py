@@ -2046,8 +2046,20 @@ async def receive_callrail_webhook(request: Request, client_id: Optional[int] = 
     Also performs dynamic, regex-based URL query extraction to catch fbclid, li_fat_id, and msclkid.
     """
     try: 
-        # 1. Parse the incoming JSON data from CallRail
-        payload = await request.json()
+        # 1. Parse the incoming JSON or Form data from CallRail safely
+        content_type = request.headers.get("content-type", "")
+        if "application/json" in content_type:
+            payload = await request.json()
+        else:
+            try:
+                form_data = await request.form()
+                payload = dict(form_data)
+            except Exception:
+                payload = {}
+                
+        # Ensure payload is a dictionary
+        if not isinstance(payload, dict):
+            payload = {}
         
         # Resolve Multi-Tenant Client Mapping
         resolved_client_id = 1  # Default fallback
@@ -2065,15 +2077,19 @@ async def receive_callrail_webhook(request: Request, client_id: Optional[int] = 
                     resolved_client_id = match[0]
                 conn.close()
         
-        # 2. Extract Webhook Variables
-        gclid = payload.get('google_click_id') or payload.get('referrer', {}).get('gclid') or payload.get('gclid')
-        fbclid = payload.get('facebook_click_id') or payload.get('fbclid') or payload.get('referrer', {}).get('fbclid')
-        li_fat_id = payload.get('linkedin_click_id') or payload.get('li_fat_id') or payload.get('referrer', {}).get('li_fat_id')
-        msclkid = payload.get('microsoft_click_id') or payload.get('msclkid') or payload.get('referrer', {}).get('msclkid')
+        # Safely extract 'referrer' if it's a dict, otherwise fallback to empty dict
+        referrer_data = payload.get('referrer')
+        referrer_dict = referrer_data if isinstance(referrer_data, dict) else {}
+        
+        # 2. Extract Webhook Variables safely
+        gclid = payload.get('google_click_id') or payload.get('gclid') or referrer_dict.get('gclid')
+        fbclid = payload.get('facebook_click_id') or payload.get('fbclid') or referrer_dict.get('fbclid')
+        li_fat_id = payload.get('linkedin_click_id') or payload.get('li_fat_id') or referrer_dict.get('li_fat_id')
+        msclkid = payload.get('microsoft_click_id') or payload.get('msclkid') or referrer_dict.get('msclkid')
         
         # Advanced dynamic regex URL extraction (for redundancy / fallback)
-        landing_page = payload.get('landing_page_url') or payload.get('referrer', {}).get('landing_page_url') or ""
-        referrer_url = payload.get('referrer_url') or payload.get('referrer', {}).get('referrer_url') or ""
+        landing_page = payload.get('landing_page_url') or referrer_dict.get('landing_page_url') or ""
+        referrer_url = payload.get('referrer_url') or referrer_dict.get('referrer_url') or ""
         
         if not gclid:
             gclid = extract_param_from_url(landing_page, 'gclid') or extract_param_from_url(referrer_url, 'gclid')
