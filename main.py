@@ -14,7 +14,7 @@ from anthropic import Anthropic
 app = FastAPI(
     title="Offline Attribution Engine (Multi-Tenant Multi-Channel)",
     description="Multi-tenant agency platform for tracking offline leads/sales and AI audits across Google, Meta, LinkedIn, and Microsoft",
-    version="13.0.0"
+    version="15.0.0"
 )
 
 # ---------------------------------------------------------
@@ -27,7 +27,24 @@ def init_db():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
-    # 1. Create Clients Table with complete questionnaire fields
+    # 1. Create Excluded Customers Table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS excluded_customers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            client_id INTEGER NOT NULL,
+            first_name TEXT,
+            last_name TEXT,
+            email TEXT,
+            phone TEXT,
+            company_name TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (client_id) REFERENCES clients (id)
+        )
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_excluded_customers_client_phone ON excluded_customers(client_id, phone);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_excluded_customers_client_email ON excluded_customers(client_id, email);")
+
+    # 2. Create Clients Table with complete questionnaire fields
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS clients (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -221,6 +238,41 @@ def analyze_transcript_with_claude(transcript: str, qualification_criteria_desc:
 # ---------------------------------------------------------
 # HELPERS & CONVERTERS
 # ---------------------------------------------------------
+def check_is_excluded_customer(client_id: int, phone: str = "", email: str = "") -> Optional[str]:
+    """
+    Checks if a phone or email matches any record in the excluded_customers table for the given client_id.
+    Returns the match reason (e.g. 'Phone Match' or 'Email Match') if excluded, else None.
+    """
+    if not phone and not email:
+        return None
+        
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        # Check phone
+        if phone:
+            normalized_p = normalize_phone(phone)
+            if normalized_p:
+                cursor.execute("SELECT id FROM excluded_customers WHERE client_id = ? AND phone = ?", (client_id, normalized_p))
+                if cursor.fetchone():
+                    conn.close()
+                    return "Phone Match"
+                    
+        # Check email
+        if email:
+            clean_e = email.strip().lower()
+            if clean_e:
+                cursor.execute("SELECT id FROM excluded_customers WHERE client_id = ? AND email = ?", (client_id, clean_e))
+                if cursor.fetchone():
+                    conn.close()
+                    return "Email Match"
+                    
+        conn.close()
+    except Exception as e:
+        print(f"⚠️ Error checking customer exclusion: {e}")
+    return None
+
 def normalize_phone(phone_str: str) -> str:
     if not phone_str:
         return ""
@@ -273,6 +325,13 @@ class FormLead(BaseModel):
     msclkid: Optional[str] = None
 
 
+class ExcludedCustomer(BaseModel):
+    first_name: Optional[str] = ""
+    last_name: Optional[str] = ""
+    email: Optional[str] = ""
+    phone: Optional[str] = ""
+    company_name: Optional[str] = ""
+
 class ClientCreate(BaseModel):
     name: str
     callrail_company_id: str
@@ -289,6 +348,7 @@ class ClientCreate(BaseModel):
     crm_lead_tags: Optional[str] = ""
     lead_count_rule: str
     exclude_past_customers: str
+    excluded_customers: Optional[list[ExcludedCustomer]] = None
 
 
 # ---------------------------------------------------------
@@ -639,6 +699,7 @@ class ClientUpdate(BaseModel):
     crm_lead_tags: Optional[str] = ""
     lead_count_rule: str
     exclude_past_customers: str
+    excluded_customers: Optional[list[ExcludedCustomer]] = None
 
 
 @app.get("/dashboard/settings", response_class=HTMLResponse)
@@ -671,6 +732,11 @@ def view_settings(client_id: Optional[int] = None):
         cursor.execute("PRAGMA table_info(clients)")
         cols = [col[1] for col in cursor.fetchall()]
         client_data = dict(zip(cols, client_row))
+        
+        # Query exclusions count for current client
+        cursor.execute("SELECT COUNT(*) FROM excluded_customers WHERE client_id = ?", (active_client_id,))
+        exclusion_count = cursor.fetchone()[0]
+        
         conn.close()
     except Exception as e:
         return f"<html><body><h3>❌ Database Error: {e}</h3></body></html>"
@@ -955,6 +1021,23 @@ def view_settings(client_id: Optional[int] = None):
                                     </div>
                                 </div>
                             </div>
+                            
+                            <!-- EXCLUSION UPLOAD PANEL -->
+                            <p id="existing-exclusions-msg" style="font-size: 11px; color: #1b5e20; font-weight: bold; margin-top: 10px; margin-bottom: 10px; display: {'block' if client_data.get('exclude_past_customers') == 'YES' else 'none'};">
+                                ℹ️ This client currently has <strong>{exclusion_count}</strong> active excluded customer records stored. Uploading a new CSV will replace this list.
+                            </p>
+                            <div id="exclusion-upload-box" class="conditional-box" style="display: {'block' if client_data.get('exclude_past_customers') == 'YES' else 'none'}; padding: 15px; margin-top: 10px;">
+                                <div class="instructions" style="background-color: #f1f8e9; border-left-color: #2e7d32; color: #2e7d32; margin-bottom: 15px; font-size: 12px; line-height: 1.5; padding: 12px;">
+                                    📂 <strong>Upload Past Customers to Ignore:</strong><br>
+                                    Upload your list of customers, to use to ignore future conversion triggering. Only one piece of information is needed for each user in order to do this, but more data points for each user is best, for higher match rates. Here is a sample sheet that you can use to fill in, or you can provide your own sheet that have "first name, last name, email, phone number, company name" as the column headers.
+                                </div>
+                                <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 15px; flex-wrap: wrap;">
+                                    <button type="button" onclick="triggerSampleSheetDownload()" class="btn-copy" style="background-color: #1a237e; padding: 8px 12px; font-size: 11px;">📥 Download Sample Sheet (.CSV)</button>
+                                    <input type="file" id="exclusion-file-input" accept=".csv" onchange="handleExclusionFileUpload(event)" style="display: none;">
+                                    <button type="button" onclick="document.getElementById('exclusion-file-input').click()" class="btn-copy" style="background-color: #2e7d32; padding: 8px 12px; font-size: 11px;">📤 Choose File & Upload (.CSV)</button>
+                                </div>
+                                <div id="upload-status-box" class="alert alert-success" style="display: none; margin-bottom: 0; font-size: 11px; padding: 10px;"></div>
+                            </div>
                         </div>
                         
                         <!-- RIGHT COLUMN: Webhooks & SOT Integration -->
@@ -1235,6 +1318,23 @@ def update_client_settings(client: ClientUpdate):
             client.exclude_past_customers,
             client.id
         ))
+        
+        # Handle excluded customers updates if a new list was uploaded
+        if client.excluded_customers is not None and len(client.excluded_customers) > 0:
+            cursor.execute("DELETE FROM excluded_customers WHERE client_id = ?", (client.id,))
+            for cust in client.excluded_customers:
+                normalized_p = normalize_phone(cust.phone)
+                cursor.execute("""
+                    INSERT INTO excluded_customers (client_id, first_name, last_name, email, phone, company_name)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (
+                    client.id,
+                    cust.first_name,
+                    cust.last_name,
+                    cust.email.strip().lower() if cust.email else "",
+                    normalized_p,
+                    cust.company_name
+                ))
         
         conn.commit()
         conn.close()
@@ -1573,6 +1673,20 @@ def add_client_page():
                                 </div>
                             </div>
                         </div>
+                        
+                        <!-- EXCLUSION UPLOAD PANEL -->
+                        <div id="exclusion-upload-box" class="conditional-box" style="display: none; padding: 20px; margin-top: 15px;">
+                            <div class="instructions" style="background-color: #f1f8e9; border-left-color: #2e7d32; color: #2e7d32; margin-bottom: 15px; font-size: 13px; line-height: 1.5; padding: 15px;">
+                                📂 <strong>Upload Past Customers to Ignore:</strong><br>
+                                Upload your list of customers, to use to ignore future conversion triggering. Only one piece of information is needed for each user in order to do this, but more data points for each user is best, for higher match rates. Here is a sample sheet that you can use to fill in, or you can provide your own sheet that have "first name, last name, email, phone number, company name" as the column headers.
+                            </div>
+                            <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 15px; flex-wrap: wrap;">
+                                <button type="button" onclick="triggerSampleSheetDownload()" class="btn-copy" style="background-color: #1a237e; padding: 8px 15px; font-size: 12px; cursor: pointer;">📥 Download Sample Sheet (.CSV)</button>
+                                <input type="file" id="exclusion-file-input" accept=".csv" onchange="handleExclusionFileUpload(event)" style="display: none;">
+                                <button type="button" onclick="document.getElementById('exclusion-file-input').click()" class="btn-copy" style="background-color: #2e7d32; padding: 8px 15px; font-size: 12px; cursor: pointer;">📤 Choose File & Upload (.CSV)</button>
+                            </div>
+                            <div id="upload-status-box" class="alert alert-success" style="display: none; margin-bottom: 0; font-size: 12px; padding: 12px;"></div>
+                        </div>
                     </div>
                     
                     <!-- Navigation Panel -->
@@ -1694,13 +1808,133 @@ def add_client_page():
                     hideErrorAlert();
                 }
                 
-                function selectCardRadio(name, value, element) {
-                    element.parentNode.querySelectorAll('.card-radio').forEach(card => {
+                let parsedExclusions = [];
+
+                function handleExclusionFileUpload(event) {{
+                    const file = event.target.files[0];
+                    if (!file) return;
+                    
+                    const reader = new FileReader();
+                    reader.onload = function(e) {{
+                        const text = e.target.result;
+                        parseCSVToExclusions(text, file.name);
+                    }};
+                    reader.readAsText(file);
+                }}
+
+                function parseCSVToExclusions(text, filename) {{
+                    const lines = text.split(/\r\n|\n/);
+                    if (lines.length === 0) {{
+                        showUploadStatus('Error: The file is empty.', 'error');
+                        return;
+                    }}
+                    
+                    function parseCSVLine(line) {{
+                        let arr = [];
+                        let quote = false;
+                        let cell = "";
+                        for (let i = 0; i < line.length; i++) {{
+                            let char = line[i];
+                            if (char === '"') {{
+                                quote = !quote;
+                            }} else if (char === ',' && !quote) {{
+                                arr.push(cell.trim());
+                                cell = "";
+                            }} else {{
+                                cell += char;
+                            }}
+                        }}
+                        arr.push(cell.trim());
+                        return arr;
+                    }}
+                    
+                    const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().replace(/[^a-z0-9]/g, ''));
+                    if (headers.length === 0 || headers.join('').trim() === '') {{
+                        showUploadStatus('Error: Could not read headers from the first row of your CSV file.', 'error');
+                        return;
+                    }}
+                    
+                    let fnIdx = headers.findIndex(h => h.includes('firstname') || h.includes('first'));
+                    let lnIdx = headers.findIndex(h => h.includes('lastname') || h.includes('last'));
+                    let emailIdx = headers.findIndex(h => h.includes('email') || h.includes('mail'));
+                    let phoneIdx = headers.findIndex(h => h.includes('phone') || h.includes('tel') || h.includes('mobile'));
+                    let compIdx = headers.findIndex(h => h.includes('company') || h.includes('business'));
+                    
+                    if (fnIdx === -1 && lnIdx === -1 && emailIdx === -1 && phoneIdx === -1 && compIdx === -1) {{
+                        fnIdx = 0; lnIdx = 1; emailIdx = 2; phoneIdx = 3; compIdx = 4;
+                    }}
+                    
+                    let list = [];
+                    for (let i = 1; i < lines.length; i++) {{
+                        const line = lines[i].trim();
+                        if (!line) continue;
+                        
+                        const row = parseCSVLine(line);
+                        if (row.length === 0 || row.join('').trim() === '') continue;
+                        
+                        const cust = {{
+                            first_name: fnIdx !== -1 && row[fnIdx] ? row[fnIdx] : "",
+                            last_name: lnIdx !== -1 && row[lnIdx] ? row[lnIdx] : "",
+                            email: emailIdx !== -1 && row[emailIdx] ? row[emailIdx] : "",
+                            phone: phoneIdx !== -1 && row[phoneIdx] ? row[phoneIdx] : "",
+                            company_name: compIdx !== -1 && row[compIdx] ? row[compIdx] : ""
+                        }};
+                        
+                        if (cust.first_name || cust.last_name || cust.email || cust.phone || cust.company_name) {{
+                            list.push(cust);
+                        }}
+                    }}
+                    
+                    parsedExclusions = list;
+                    showUploadStatus(`✓ Loaded ${{list.length}} exclusions from "${{filename}}". Save changes to apply!`, 'success');
+                }}
+
+                function showUploadStatus(message, type) {{
+                    const statusBox = document.getElementById('upload-status-box');
+                    statusBox.innerText = message;
+                    statusBox.className = type === 'success' ? 'alert alert-success' : 'alert alert-error';
+                    statusBox.style.display = 'block';
+                }}
+
+                function triggerSampleSheetDownload() {{
+                    const headers = ["First Name", "Last Name", "Email", "Phone Number", "Company Name"];
+                    const sampleRows = [
+                        ["John", "Doe", "john.doe@example.com", "555-123-4567", "Doe Plumbing Inc"],
+                        ["Jane", "Smith", "jane@company.com", "555-987-6543", "Smith Solar Corp"]
+                    ];
+                    let csvContent = "data:text/csv;charset=utf-8,";
+                    csvContent += headers.join(",") + "\n";
+                    sampleRows.forEach(row => {{
+                        csvContent += row.join(",") + "\n";
+                    }});
+                    const encodedUri = encodeURI(csvContent);
+                    const link = document.createElement("a");
+                    link.setAttribute("href", encodedUri);
+                    link.setAttribute("download", "sample_customer_exclusions.csv");
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                }}
+
+                function selectCardRadio(name, value, element) {{
+                    element.parentNode.querySelectorAll('.card-radio').forEach(card => {{
                         card.classList.remove('selected');
-                    });
+                    }});
                     element.classList.add('selected');
                     element.querySelector('input[type="radio"]').checked = true;
-                }
+                    
+                    if (name === 'exclude_past_customers') {{
+                        const uploadBox = document.getElementById('exclusion-upload-box');
+                        const msgBox = document.getElementById('existing-exclusions-msg');
+                        if (value === 'YES') {{
+                            uploadBox.style.display = 'block';
+                            if (msgBox) msgBox.style.display = 'block';
+                        }} else {{
+                            uploadBox.style.display = 'none';
+                            if (msgBox) msgBox.style.display = 'none';
+                        }}
+                    }}
+                }}
                 
                 function toggleSOTFields() {
                     const sot = document.getElementById('source_of_truth').value;
@@ -1748,6 +1982,7 @@ def add_client_page():
                     
                     const payload = {
                         name: document.getElementById('name').value.trim(),
+                        excluded_customers: parsedExclusions,
                         callrail_company_id: document.getElementById('callrail_company_id').value.trim(),
                         google_ads_customer_id: document.getElementById('google_ads_customer_id').value.trim(),
                         facebook_ads_id: document.getElementById('facebook_ads_id').value.trim(),
@@ -2232,7 +2467,23 @@ async def receive_callrail_webhook(request: Request, client_id: Optional[int] = 
             criteria_code = client_info[1]
             qualification_definition_desc = CRITERIA_MAP.get(criteria_code, qualification_definition_desc)
             
-        if transcript.strip():
+        # Check if client has exclusion enabled and if caller matches the exclusion list
+        is_excluded = False
+        exclusion_reason = ""
+        if client_info and client_info[3] == "YES":
+            match_type = check_is_excluded_customer(resolved_client_id, phone=normalized_phone)
+            if match_type:
+                is_excluded = True
+                exclusion_reason = f"Session ignored: Caller phone matches your uploaded past customer list ({match_type})." 
+            
+        if is_excluded:
+            ai_qualified = "NO"
+            ai_sale_closed = "NO"
+            ai_value = 0.0
+            ai_reason = exclusion_reason
+            model_name = "None"
+            print(f"🚫 [Exclusion Match] Resolved Client #{resolved_client_id}: {exclusion_reason}")
+        elif transcript.strip():
             print(f"🧠 [Client #{resolved_client_id}] Transcript detected for {caller_name}. Custom Threshold: {qualification_definition_desc}. Auditing...")
             ai_result = analyze_transcript_with_claude(transcript, qualification_definition_desc)
             ai_qualified = ai_result.get("qualified", "NO")
@@ -2304,12 +2555,32 @@ async def receive_form_lead(lead: FormLead, client_id: Optional[int] = None):
         normalized_phone = normalize_phone(lead.phone)
         email_clean = lead.email.strip().lower()
         
+        # Check if client has exclusion enabled
+        is_excluded = False
+        exclusion_reason = None
+        
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT exclude_past_customers FROM clients WHERE id = ?", (resolved_client_id,))
+        client_row = cursor.fetchone()
+        conn.close()
+        
+        if client_row and client_row[0] == "YES":
+            match_type = check_is_excluded_customer(resolved_client_id, phone=normalized_phone, email=email_clean)
+            if match_type:
+                is_excluded = True
+                exclusion_reason = f"Form submission ignored: matches your uploaded past customer list ({match_type})."
+        
+        qualified_val = "YES" if not is_excluded else "NO"
+        sale_closed_val = "NO"
+        reason_val = None if not is_excluded else exclusion_reason
+
         # 2. Save to SQLite
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO sessions (client_id, phone, email, name, company, gclid, fbclid, li_fat_id, msclkid, source)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO sessions (client_id, phone, email, name, company, gclid, fbclid, li_fat_id, msclkid, source, qualified, sale_closed, reason)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             resolved_client_id, 
             normalized_phone, 
@@ -2320,7 +2591,10 @@ async def receive_form_lead(lead: FormLead, client_id: Optional[int] = None):
             lead.fbclid, 
             lead.li_fat_id, 
             lead.msclkid, 
-            "form"
+            "form",
+            qualified_val,
+            sale_closed_val,
+            reason_val
         ))
         conn.commit()
         conn.close()
