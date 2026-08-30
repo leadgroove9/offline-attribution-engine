@@ -1033,6 +1033,7 @@ def view_settings(client_id: Optional[int] = None):
                                 </div>
                                 <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 15px; flex-wrap: wrap;">
                                     <button type="button" onclick="triggerSampleSheetDownload()" class="btn-copy" style="background-color: #1a237e; padding: 8px 12px; font-size: 11px;">📥 Download Sample Sheet (.CSV)</button>
+                                    <a href="/dashboard/export/exclusions?client_id={active_client_id}" id="btn-download-exclusions" class="btn-copy" style="background-color: #607d8b; padding: 8px 12px; font-size: 11px; text-decoration: none; display: {'inline-block' if exclusion_count > 0 else 'none'};">📥 Download Current Exclusions ({exclusion_count})</a>
                                     <input type="file" id="exclusion-file-input" accept=".csv" onchange="handleExclusionFileUpload(event)" style="display: none;">
                                     <button type="button" onclick="document.getElementById('exclusion-file-input').click()" class="btn-copy" style="background-color: #2e7d32; padding: 8px 12px; font-size: 11px;">📤 Choose File & Upload (.CSV)</button>
                                 </div>
@@ -2372,6 +2373,55 @@ def export_microsoft_conversions(client_id: int):
     
     headers = {
         'Content-Disposition': f'attachment; filename="microsoft_conversions_{safe_filename}.csv"',
+        'Content-Type': 'text/csv'
+    }
+    return StreamingResponse(output, headers=headers)
+
+
+@app.get("/dashboard/export/exclusions")
+def export_client_exclusions(client_id: int):
+    """
+    Exports the current active exclusion list for a client as a CSV file.
+    """
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        # Verify client exists
+        cursor.execute("SELECT name FROM clients WHERE id = ?", (client_id,))
+        client_row = cursor.fetchone()
+        if not client_row:
+            raise HTTPException(status_code=400, detail="Invalid client ID")
+        
+        client_name = client_row[0]
+        
+        # Pull excluded customers belonging to this client
+        cursor.execute("""
+            SELECT first_name, last_name, email, phone, company_name
+            FROM excluded_customers
+            WHERE client_id = ?
+            ORDER BY id ASC
+        """, (client_id,))
+        rows = cursor.fetchall()
+        conn.close()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+    # Generate CSV in memory
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Standard headers that match our sample sheet
+    writer.writerow(["first name", "last name", "email", "phone number", "company name"])
+    
+    for r in rows:
+        writer.writerow(r)
+            
+    output.seek(0)
+    safe_filename = re.sub(r'\\s+', '-', client_name.strip().lower())
+    
+    headers = {
+        'Content-Disposition': f'attachment; filename="exclusions_{safe_filename}.csv"',
         'Content-Type': 'text/csv'
     }
     return StreamingResponse(output, headers=headers)
