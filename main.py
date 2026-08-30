@@ -3350,3 +3350,64 @@ async def receive_billing_webhook(request: Request, client_id: Optional[int] = N
     except Exception as e:
         print(f"❌ Billing Webhook Error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
+
+# ---------------------------------------------------------
+# SECURE NIGHTLY CRON SYNCRONIZATION TRIGGER
+# ---------------------------------------------------------
+@app.post("/tasks/daily-sync")
+async def trigger_daily_sync(request: Request):
+    """
+    Secure endpoint that lets Render's Cron Job trigger the nightly CallRail sync
+    directly on the web container where the SQLite database lives.
+    """
+    import importlib.util
+    import sys
+    
+    # 1. Resolve Authorization Token
+    secret_token = os.environ.get("SYNC_TOKEN", "default_secure_sync_token_123")
+    
+    # Try Header
+    auth_header = request.headers.get("authorization")
+    if not auth_header:
+        # Fallback to query parameter for simpler testing
+        token_param = request.query_params.get("token")
+        if token_param:
+            auth_header = f"Bearer {token_param}"
+            
+    if auth_header != f"Bearer {secret_token}":
+        raise HTTPException(status_code=401, detail="Unauthorized sync request.")
+        
+    try:
+        module_name = "daily_callrail_sync"
+        
+        # Check standard filenames first
+        target_files = ["daily-callrail-sync.py", "daily-callrail-sync", "daily_callrail_sync.py", "daily_callrail_sync"]
+        imported = False
+        
+        for fname in target_files:
+            if os.path.exists(fname):
+                spec = importlib.util.spec_from_file_location(module_name, fname)
+                module = importlib.util.module_from_spec(spec)
+                sys.modules[module_name] = module
+                spec.loader.exec_module(module)
+                module.execute_daily_sync()
+                imported = True
+                break
+                
+        if not imported:
+            # Try a direct import if it's already in python path
+            try:
+                import daily_callrail_sync
+                daily_callrail_sync.execute_daily_sync()
+                imported = True
+            except ImportError:
+                pass
+                
+        if not imported:
+            raise FileNotFoundError("Could not locate daily-callrail-sync.py or daily_callrail_sync.py in the running directory.")
+            
+        return {"status": "success", "message": "Daily CallRail database sync executed successfully."}
+        
+    except Exception as e:
+        print(f"❌ Cron Trigger Sync Exception: {e}")
+        raise HTTPException(status_code=500, detail=f"Sync execution failed: {str(e)}")
