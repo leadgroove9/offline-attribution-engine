@@ -60,6 +60,7 @@ def init_db():
             email_provider TEXT,
             email_account TEXT,
             crm_deal_tags TEXT,
+            crm_won_deal_tags TEXT,
             crm_lead_tags TEXT,
             lead_count_rule TEXT,
             exclude_past_customers TEXT,
@@ -81,6 +82,7 @@ def init_db():
         ("email_provider", "TEXT"),
         ("email_account", "TEXT"),
         ("crm_deal_tags", "TEXT"),
+        ("crm_won_deal_tags", "TEXT"),
         ("crm_lead_tags", "TEXT"),
         ("lead_count_rule", "TEXT"),
         ("exclude_past_customers", "TEXT")
@@ -132,17 +134,17 @@ def init_db():
     cursor.execute("SELECT COUNT(*) FROM clients")
     if cursor.fetchone()[0] == 0:
         mock_clients = [
-            ("Priority Plumbing", "comp_plumbing", "123-456-7890", "fb_plumb_99", "", "", "both", "C", "hubspot", "", "", "closed-won", "", "all", "NO"),
-            ("Apex HVAC & Air", "comp_hvac", "987-654-3210", "", "", "ms_hvac_88", "both", "E", "servicetitan", "", "", "", "completed-lead", "all", "NO"),
-            ("Metro Dental Care", "comp_dental", "555-123-4567", "", "li_dental_77", "", "both", "C", "email", "gmail", "bookings@metrodental.com", "", "", "maximum_one", "YES")
+            ("Priority Plumbing", "comp_plumbing", "123-456-7890", "fb_plumb_99", "", "", "both", "C", "hubspot", "", "", "appointment-booked", "closed-won", "", "all", "NO"),
+            ("Apex HVAC & Air", "comp_hvac", "987-654-3210", "", "", "ms_hvac_88", "both", "E", "servicetitan", "", "", "", "", "completed-lead", "all", "NO"),
+            ("Metro Dental Care", "comp_dental", "555-123-4567", "", "li_dental_77", "", "both", "C", "email", "gmail", "bookings@metrodental.com", "", "", "", "maximum_one", "YES")
         ]
         cursor.executemany("""
             INSERT INTO clients (
                 name, callrail_company_id, google_ads_customer_id, facebook_ads_id, linkedin_ads_id, microsoft_ads_id,
                 lead_gen_method, qualification_criteria, source_of_truth, email_provider, email_account,
-                crm_deal_tags, crm_lead_tags, lead_count_rule, exclude_past_customers
+                crm_deal_tags, crm_won_deal_tags, crm_lead_tags, lead_count_rule, exclude_past_customers
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, mock_clients)
         print("Seeded 3 mock agency clients successfully!")
     
@@ -345,6 +347,7 @@ class ClientCreate(BaseModel):
     email_provider: Optional[str] = ""
     email_account: Optional[str] = ""
     crm_deal_tags: Optional[str] = ""
+    crm_won_deal_tags: Optional[str] = ""
     crm_lead_tags: Optional[str] = ""
     lead_count_rule: str
     exclude_past_customers: str
@@ -697,6 +700,7 @@ class ClientUpdate(BaseModel):
     email_provider: Optional[str] = ""
     email_account: Optional[str] = ""
     crm_deal_tags: Optional[str] = ""
+    crm_won_deal_tags: Optional[str] = ""
     crm_lead_tags: Optional[str] = ""
     lead_count_rule: str
     exclude_past_customers: str
@@ -1095,8 +1099,14 @@ def view_settings(client_id: Optional[int] = None):
                             
                             <!-- CONDITIONAL: CRM Deal status tags -->
                             <div id="sot-deal-tags-box" class="conditional-box">
-                                <label for="crm_deal_tags">Which statuses under <strong>Deals</strong> signify a qualified/won conversion?</label>
-                                <input type="text" id="crm_deal_tags" value="{client_data.get("crm_deal_tags", "") or ""}" placeholder="e.g. closed-won, estimate-approved">
+                                <div style="margin-bottom: 15px;">
+                                    <label for="crm_deal_tags">Which tags/statuses under <strong>Deals</strong> signify a qualified conversion?</label>
+                                    <input type="text" id="crm_deal_tags" value="{client_data.get("crm_deal_tags", "") or ""}" placeholder="e.g. appointment-booked, estimate-approved">
+                                </div>
+                                <div>
+                                    <label for="crm_won_deal_tags">Which tags/statuses under <strong>Deals</strong> signify a won deal conversion?</label>
+                                    <input type="text" id="crm_won_deal_tags" value="{client_data.get("crm_won_deal_tags", "") or ""}" placeholder="e.g. closed-won, job-completed">
+                                </div>
                             </div>
                             
                             <!-- CONDITIONAL: CRM Lead status tags -->
@@ -1409,6 +1419,7 @@ def view_settings(client_id: Optional[int] = None):
                         email_provider: document.getElementById('email_provider').value,
                         email_account: document.getElementById('email_account').value.trim(),
                         crm_deal_tags: document.getElementById('crm_deal_tags').value.trim(),
+                        crm_won_deal_tags: document.getElementById('crm_won_deal_tags').value.trim(),
                         crm_lead_tags: document.getElementById('crm_lead_tags').value.trim(),
                         lead_count_rule: document.querySelector('input[name="lead_count_rule"]:checked').value,
                         exclude_past_customers: document.querySelector('input[name="exclude_past_customers"]:checked').value,
@@ -1479,6 +1490,7 @@ def update_client_settings(client: ClientUpdate):
                 email_provider = ?,
                 email_account = ?,
                 crm_deal_tags = ?,
+                crm_won_deal_tags = ?,
                 crm_lead_tags = ?,
                 lead_count_rule = ?,
                 exclude_past_customers = ?
@@ -1496,6 +1508,7 @@ def update_client_settings(client: ClientUpdate):
             client.email_provider,
             client.email_account,
             client.crm_deal_tags,
+            client.crm_won_deal_tags,
             client.crm_lead_tags,
             client.lead_count_rule,
             client.exclude_past_customers,
@@ -1806,11 +1819,20 @@ def add_client_page():
                         
                         <!-- CONDITIONAL INPUT: CRM Deal status tags (HubSpot, Salesforce, Zoho) -->
                         <div id="sot-deal-tags-box" class="conditional-box" style="display: block;">
-                            <label for="crm_deal_tags">Which tags/statuses under <strong>Deals</strong> signify a qualified/won conversion?</label>
-                            <input type="text" id="crm_deal_tags" placeholder="e.g. closed-won, scheduled, estimate-approved">
-                            <small style="color: #666; font-size: 11px; margin-top: 4px; display: block;">
-                                List comma-separated tags that trigger a successful offline sale upload.
-                            </small>
+                            <div style="margin-bottom: 15px;">
+                                <label for="crm_deal_tags">Which tags/statuses under <strong>Deals</strong> signify a qualified conversion?</label>
+                                <input type="text" id="crm_deal_tags" placeholder="e.g. appointment-booked, estimate-given">
+                                <small style="color: #666; font-size: 11px; margin-top: 4px; display: block;">
+                                    List comma-separated tags that trigger a qualified lead conversion.
+                                </small>
+                            </div>
+                            <div>
+                                <label for="crm_won_deal_tags">Which tags/statuses under <strong>Deals</strong> signify a won deal conversion?</label>
+                                <input type="text" id="crm_won_deal_tags" placeholder="e.g. closed-won, job-completed">
+                                <small style="color: #666; font-size: 11px; margin-top: 4px; display: block;">
+                                    List comma-separated tags that trigger a won deal conversion.
+                                </small>
+                            </div>
                         </div>
                         
                         <!-- CONDITIONAL INPUT: CRM Lead status tags (ServiceTitan, Housecall Pro) -->
@@ -2253,6 +2275,7 @@ def add_client_page():
                         email_provider: document.getElementById('email_provider').value,
                         email_account: document.getElementById('email_account').value.trim(),
                         crm_deal_tags: document.getElementById('crm_deal_tags').value.trim(),
+                        crm_won_deal_tags: document.getElementById('crm_won_deal_tags').value.trim(),
                         crm_lead_tags: document.getElementById('crm_lead_tags').value.trim(),
                         lead_count_rule: document.querySelector('input[name="lead_count_rule"]:checked').value,
                         exclude_past_customers: document.querySelector('input[name="exclude_past_customers"]:checked').value
@@ -2369,9 +2392,9 @@ def create_client(client: ClientCreate):
             INSERT INTO clients (
                 name, callrail_company_id, google_ads_customer_id, facebook_ads_id, linkedin_ads_id, microsoft_ads_id,
                 lead_gen_method, qualification_criteria, source_of_truth, email_provider, email_account,
-                crm_deal_tags, crm_lead_tags, lead_count_rule, exclude_past_customers
+                crm_deal_tags, crm_won_deal_tags, crm_lead_tags, lead_count_rule, exclude_past_customers
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             client.name, 
             client.callrail_company_id, 
@@ -2385,6 +2408,7 @@ def create_client(client: ClientCreate):
             client.email_provider,
             client.email_account,
             client.crm_deal_tags,
+            client.crm_won_deal_tags,
             client.crm_lead_tags,
             client.lead_count_rule,
             client.exclude_past_customers
