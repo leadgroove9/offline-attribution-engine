@@ -195,14 +195,14 @@ def analyze_transcript_with_claude(transcript: str, criteria_desc: str) -> Dict[
 # CALLRAIL API SYNC SCRAPER
 # ---------------------------------------------------------
 
-def fetch_callrail_logs_for_client(client_id: int, company_id: str, start_date: str, end_date: str) -> List[Dict[str, Any]]:
+def fetch_callrail_logs_for_client(client_id: int, company_id: str, start_date: str, end_date: str, client_account_id: Optional[str] = None) -> List[Dict[str, Any]]:
     """
     Queries CallRail's live REST API for completed calls within the timeframe.
     If no CALLRAIL_API_KEY environment variable is configured, falls back 
     to generating realistic daily mock logs for testing.
     """
     api_key = os.environ.get("CALLRAIL_API_KEY")
-    account_id = os.environ.get("CALLRAIL_ACCOUNT_ID")
+    account_id = client_account_id or os.environ.get("CALLRAIL_ACCOUNT_ID")
     
     if not api_key or not account_id:
         print(f"   ℹ️ [Mock Mode] Generating mock API logs for Client #{client_id} (No API key found)")
@@ -295,7 +295,7 @@ def execute_daily_sync():
     
     # 1. Fetch All Active Clients who use CallRail tracking
     cursor.execute("""
-        SELECT id, name, callrail_company_id, qualification_criteria, source_of_truth, exclude_past_customers 
+        SELECT id, name, callrail_company_id, qualification_criteria, source_of_truth, exclude_past_customers, callrail_account_id 
         FROM clients 
         WHERE callrail_company_id IS NOT NULL AND callrail_company_id != ''
     """)
@@ -318,14 +318,14 @@ def execute_daily_sync():
     duplicate_records_count = 0
     
     for client_row in clients:
-        client_id, name, company_id, crit_code, sot, exclude_past, = client_row
+        client_id, name, company_id, crit_code, sot, exclude_past, client_account_id = client_row
         print(f"\n⚡ Processing Client #{client_id}: '{name}' (CallRail: {company_id})")
         
         # Get custom criteria wording
         criteria_wording = CRITERIA_MAP.get(crit_code, "Someone who books an appointment")
         
         # Fetch calls
-        calls = fetch_callrail_logs_for_client(client_id, company_id, start_date, end_date)
+        calls = fetch_callrail_logs_for_client(client_id, company_id, start_date, end_date, client_account_id)
         print(f"   ✓ Fetched {len(calls)} potential logs for processing.")
         
         for call in calls:

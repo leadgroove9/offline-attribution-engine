@@ -49,6 +49,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS clients (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
+            callrail_account_id TEXT,
             callrail_company_id TEXT UNIQUE,
             google_ads_customer_id TEXT,
             facebook_ads_id TEXT,
@@ -85,7 +86,8 @@ def init_db():
         ("crm_won_deal_tags", "TEXT"),
         ("crm_lead_tags", "TEXT"),
         ("lead_count_rule", "TEXT"),
-        ("exclude_past_customers", "TEXT")
+        ("exclude_past_customers", "TEXT"),
+        ("callrail_account_id", "TEXT")
     ]
     for col_name, col_type in cols_to_verify:
         if col_name not in existing_cols:
@@ -337,6 +339,7 @@ class ExcludedCustomer(BaseModel):
 
 class ClientCreate(BaseModel):
     name: str
+    callrail_account_id: Optional[str] = ""
     callrail_company_id: str
     google_ads_customer_id: str
     facebook_ads_id: Optional[str] = ""
@@ -690,6 +693,7 @@ def view_dashboard(client_id: Optional[int] = None):
 class ClientUpdate(BaseModel):
     id: int
     name: str
+    callrail_account_id: Optional[str] = ""
     callrail_company_id: str
     google_ads_customer_id: str
     facebook_ads_id: Optional[str] = ""
@@ -935,9 +939,15 @@ def view_settings(client_id: Optional[int] = None):
                                 <input type="text" id="name" value="{client_name}" required>
                             </div>
                             
-                            <div class="form-group">
-                                <label for="callrail_company_id">CallRail Company ID (or Account ID)</label>
-                                <input type="text" id="callrail_company_id" value="{client_data.get("callrail_company_id", "")}" required>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="callrail_account_id">CallRail Account ID</label>
+                                    <input type="text" id="callrail_account_id" value="{client_data.get("callrail_account_id", "") or ""}" placeholder="e.g. 123456789">
+                                </div>
+                                <div class="form-group">
+                                    <label for="callrail_company_id">CallRail Company ID</label>
+                                    <input type="text" id="callrail_company_id" value="{client_data.get("callrail_company_id", "")}" required>
+                                </div>
                             </div>
                             
                             <div class="form-row">
@@ -1409,6 +1419,7 @@ def view_settings(client_id: Optional[int] = None):
                     const payload = {{
                         id: {active_client_id},
                         name: document.getElementById('name').value.trim(),
+                        callrail_account_id: document.getElementById('callrail_account_id').value.trim(),
                         callrail_company_id: document.getElementById('callrail_company_id').value.trim(),
                         google_ads_customer_id: document.getElementById('google_ads_customer_id').value.trim(),
                         facebook_ads_id: document.getElementById('facebook_ads_id').value.trim(),
@@ -1480,6 +1491,7 @@ def update_client_settings(client: ClientUpdate):
         cursor.execute("""
             UPDATE clients SET
                 name = ?,
+                callrail_account_id = ?,
                 callrail_company_id = ?,
                 google_ads_customer_id = ?,
                 facebook_ads_id = ?,
@@ -1498,6 +1510,7 @@ def update_client_settings(client: ClientUpdate):
             WHERE id = ?
         """, (
             client.name,
+            client.callrail_account_id,
             client.callrail_company_id,
             client.google_ads_customer_id,
             client.facebook_ads_id,
@@ -1717,9 +1730,15 @@ def add_client_page():
                             <input type="text" id="name" required placeholder="e.g. Priority Plumbing">
                         </div>
                         
-                        <div class="form-group">
-                            <label for="callrail_company_id">CallRail Company ID (or Account ID)</label>
-                            <input type="text" id="callrail_company_id" required placeholder="e.g. comp_plumbing">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="callrail_account_id">CallRail Account ID</label>
+                                <input type="text" id="callrail_account_id" placeholder="e.g. 123456789">
+                            </div>
+                            <div class="form-group">
+                                <label for="callrail_company_id">CallRail Company ID</label>
+                                <input type="text" id="callrail_company_id" required placeholder="e.g. 987654321">
+                            </div>
                         </div>
                         
                         <div class="form-row">
@@ -2271,6 +2290,7 @@ def add_client_page():
                         name: document.getElementById('name').value.trim(),
                         excluded_customers: parsedExclusions,
                         exclusion_action: exclusionActionValue,
+                        callrail_account_id: document.getElementById('callrail_account_id').value.trim(),
                         callrail_company_id: document.getElementById('callrail_company_id').value.trim(),
                         google_ads_customer_id: document.getElementById('google_ads_customer_id').value.trim(),
                         facebook_ads_id: document.getElementById('facebook_ads_id').value.trim(),
@@ -2599,13 +2619,14 @@ def create_client(client: ClientCreate):
             
         cursor.execute("""
             INSERT INTO clients (
-                name, callrail_company_id, google_ads_customer_id, facebook_ads_id, linkedin_ads_id, microsoft_ads_id,
+                name, callrail_account_id, callrail_company_id, google_ads_customer_id, facebook_ads_id, linkedin_ads_id, microsoft_ads_id,
                 lead_gen_method, qualification_criteria, source_of_truth, email_provider, email_account,
                 crm_deal_tags, crm_won_deal_tags, crm_lead_tags, lead_count_rule, exclude_past_customers
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             client.name, 
+            client.callrail_account_id,
             client.callrail_company_id, 
             client.google_ads_customer_id, 
             client.facebook_ads_id,
@@ -3350,3 +3371,64 @@ async def receive_billing_webhook(request: Request, client_id: Optional[int] = N
     except Exception as e:
         print(f"❌ Billing Webhook Error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
+
+# ---------------------------------------------------------
+# SECURE NIGHTLY CRON SYNCRONIZATION TRIGGER
+# ---------------------------------------------------------
+@app.post("/tasks/daily-sync")
+async def trigger_daily_sync(request: Request):
+    """
+    Secure endpoint that lets Render's Cron Job trigger the nightly CallRail sync
+    directly on the web container where the SQLite database lives.
+    """
+    import importlib.util
+    import sys
+    
+    # 1. Resolve Authorization Token
+    secret_token = os.environ.get("SYNC_TOKEN", "default_secure_sync_token_123")
+    
+    # Try Header
+    auth_header = request.headers.get("authorization")
+    if not auth_header:
+        # Fallback to query parameter for simpler testing
+        token_param = request.query_params.get("token")
+        if token_param:
+            auth_header = f"Bearer {token_param}"
+            
+    if auth_header != f"Bearer {secret_token}":
+        raise HTTPException(status_code=401, detail="Unauthorized sync request.")
+        
+    try:
+        module_name = "daily_callrail_sync"
+        
+        # Check standard filenames first
+        target_files = ["daily-callrail-sync.py", "daily-callrail-sync", "daily_callrail_sync.py", "daily_callrail_sync"]
+        imported = False
+        
+        for fname in target_files:
+            if os.path.exists(fname):
+                spec = importlib.util.spec_from_file_location(module_name, fname)
+                module = importlib.util.module_from_spec(spec)
+                sys.modules[module_name] = module
+                spec.loader.exec_module(module)
+                module.execute_daily_sync()
+                imported = True
+                break
+                
+        if not imported:
+            # Try a direct import if it's already in python path
+            try:
+                import daily_callrail_sync
+                daily_callrail_sync.execute_daily_sync()
+                imported = True
+            except ImportError:
+                pass
+                
+        if not imported:
+            raise FileNotFoundError("Could not locate daily-callrail-sync.py or daily_callrail_sync.py in the running directory.")
+            
+        return {"status": "success", "message": "Daily CallRail database sync executed successfully."}
+        
+    except Exception as e:
+        print(f"❌ Cron Trigger Sync Exception: {e}")
+        raise HTTPException(status_code=500, detail=f"Sync execution failed: {str(e)}")
