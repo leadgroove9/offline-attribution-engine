@@ -1266,7 +1266,7 @@ def view_settings(client_id: Optional[int] = None):
                 }}
 
                 function parseCSVToExclusions(text, filename) {{
-                    const lines = text.split(/\r\n|\n/);
+                    const lines = text.split(/\\\\r\\\\n|\\\\n/);
                     if (lines.length === 0) {{
                         showUploadStatus('Error: The file is empty.', 'error');
                         return;
@@ -2061,7 +2061,7 @@ def add_client_page():
                 }
 
                 function parseCSVToExclusions(text, filename) {
-                    const lines = text.split(/\r\n|\n/);
+                    const lines = text.split(/\\\\r\\\\n|\\\\n/);
                     if (lines.length === 0) {
                         showUploadStatus('Error: The file is empty.', 'error');
                         return;
