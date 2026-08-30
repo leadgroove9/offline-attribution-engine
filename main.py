@@ -2711,7 +2711,7 @@ def export_google_conversions(client_id: int):
         conv_time = f"{created_at} +0000" if created_at else ""
         
         if sale_closed == 'YES':
-            conv_name = "Offline Sale"
+            conv_name = "Converted Lead"
             conv_value = float(value or 0.0)
         else:
             conv_name = "Qualified Lead"
