@@ -2048,49 +2048,49 @@ def add_client_page():
                 
                 let parsedExclusions = [];
 
-                function handleExclusionFileUpload(event) {{
+                function handleExclusionFileUpload(event) {
                     const file = event.target.files[0];
                     if (!file) return;
                     
                     const reader = new FileReader();
-                    reader.onload = function(e) {{
+                    reader.onload = function(e) {
                         const text = e.target.result;
                         parseCSVToExclusions(text, file.name);
-                    }};
+                    };
                     reader.readAsText(file);
-                }}
+                }
 
-                function parseCSVToExclusions(text, filename) {{
+                function parseCSVToExclusions(text, filename) {
                     const lines = text.split(/\r\n|\n/);
-                    if (lines.length === 0) {{
+                    if (lines.length === 0) {
                         showUploadStatus('Error: The file is empty.', 'error');
                         return;
-                    }}
+                    }
                     
-                    function parseCSVLine(line) {{
+                    function parseCSVLine(line) {
                         let arr = [];
                         let quote = false;
                         let cell = "";
-                        for (let i = 0; i < line.length; i++) {{
+                        for (let i = 0; i < line.length; i++) {
                             let char = line[i];
-                            if (char === '"') {{
+                            if (char === '"') {
                                 quote = !quote;
-                            }} else if (char === ',' && !quote) {{
+                            } else if (char === ',' && !quote) {
                                 arr.push(cell.trim());
                                 cell = "";
-                            }} else {{
+                            } else {
                                 cell += char;
-                            }}
-                        }}
+                            }
+                        }
                         arr.push(cell.trim());
                         return arr;
-                    }}
+                    }
                     
                     const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().replace(/[^a-z0-9]/g, ''));
-                    if (headers.length === 0 || headers.join('').trim() === '') {{
+                    if (headers.length === 0 || headers.join('').trim() === '') {
                         showUploadStatus('Error: Could not read headers from the first row of your CSV file.', 'error');
                         return;
-                    }}
+                    }
                     
                     let fnIdx = headers.findIndex(h => h.includes('firstname') || h.includes('first'));
                     let lnIdx = headers.findIndex(h => h.includes('lastname') || h.includes('last'));
@@ -2098,50 +2098,50 @@ def add_client_page():
                     let phoneIdx = headers.findIndex(h => h.includes('phone') || h.includes('tel') || h.includes('mobile'));
                     let compIdx = headers.findIndex(h => h.includes('company') || h.includes('business'));
                     
-                    if (fnIdx === -1 && lnIdx === -1 && emailIdx === -1 && phoneIdx === -1 && compIdx === -1) {{
+                    if (fnIdx === -1 && lnIdx === -1 && emailIdx === -1 && phoneIdx === -1 && compIdx === -1) {
                         fnIdx = 0; lnIdx = 1; emailIdx = 2; phoneIdx = 3; compIdx = 4;
-                    }}
+                    }
                     
                     let list = [];
-                    for (let i = 1; i < lines.length; i++) {{
+                    for (let i = 1; i < lines.length; i++) {
                         const line = lines[i].trim();
                         if (!line) continue;
                         
                         const row = parseCSVLine(line);
                         if (row.length === 0 || row.join('').trim() === '') continue;
                         
-                        const cust = {{
+                        const cust = {
                             first_name: fnIdx !== -1 && row[fnIdx] ? row[fnIdx] : "",
                             last_name: lnIdx !== -1 && row[lnIdx] ? row[lnIdx] : "",
                             email: emailIdx !== -1 && row[emailIdx] ? row[emailIdx] : "",
                             phone: phoneIdx !== -1 && row[phoneIdx] ? row[phoneIdx] : "",
                             company_name: compIdx !== -1 && row[compIdx] ? row[compIdx] : ""
-                        }};
+                        };
                         
-                        if (cust.first_name || cust.last_name || cust.email || cust.phone || cust.company_name) {{
+                        if (cust.first_name || cust.last_name || cust.email || cust.phone || cust.company_name) {
                             list.push(cust);
-                        }}
-                    }}
+                        }
+                    }
                     
                     parsedExclusions = list;
-                    showUploadStatus(`✓ Loaded ${{list.length}} exclusions from "${{filename}}". Save changes to apply!`, 'success');
+                    showUploadStatus(`✓ Loaded ${list.length} exclusions from "${filename}". Save changes to apply!`, 'success');
                     
                     // Option B: Visual Pulse & Highlight of onboarding submit button
                     const nextBtn = document.getElementById('next-btn');
-                    if (nextBtn) {{
+                    if (nextBtn) {
                         nextBtn.classList.add('btn-pulse-save');
-                        nextBtn.innerHTML = `🚀 Complete Onboarding (With ${{list.length}} Exclusions!)`;
-                    }}
-                }}
+                        nextBtn.innerHTML = `🚀 Complete Onboarding (With ${list.length} Exclusions!)`;
+                    }
+                }
 
-                function showUploadStatus(message, type) {{
+                function showUploadStatus(message, type) {
                     const statusBox = document.getElementById('upload-status-box');
                     statusBox.innerText = message;
                     statusBox.className = type === 'success' ? 'alert alert-success' : 'alert alert-error';
                     statusBox.style.display = 'block';
-                }}
+                }
 
-                function triggerSampleSheetDownload() {{
+                function triggerSampleSheetDownload() {
                     const headers = ["First Name", "Last Name", "Email", "Phone Number", "Company Name"];
                     const sampleRows = [
                         ["John", "Doe", "john.doe@example.com", "555-123-4567", "Doe Plumbing Inc"],
@@ -2149,9 +2149,9 @@ def add_client_page():
                     ];
                     let csvContent = "data:text/csv;charset=utf-8,";
                     csvContent += headers.join(",") + "\n";
-                    sampleRows.forEach(row => {{
+                    sampleRows.forEach(row => {
                         csvContent += row.join(",") + "\n";
-                    }});
+                    });
                     const encodedUri = encodeURI(csvContent);
                     const link = document.createElement("a");
                     link.setAttribute("href", encodedUri);
@@ -2159,37 +2159,37 @@ def add_client_page():
                     document.body.appendChild(link);
                     link.click();
                     document.body.removeChild(link);
-                }}
+                }
 
-                function selectCardRadio(name, value, element) {{
-                    element.parentNode.querySelectorAll('.card-radio').forEach(card => {{
+                function selectCardRadio(name, value, element) {
+                    element.parentNode.querySelectorAll('.card-radio').forEach(card => {
                         card.classList.remove('selected');
-                    }});
+                    });
                     element.classList.add('selected');
                     element.querySelector('input[type="radio"]').checked = true;
                     
-                    if (name === 'exclude_past_customers') {{
+                    if (name === 'exclude_past_customers') {
                         const uploadBox = document.getElementById('exclusion-upload-box');
                         const msgBox = document.getElementById('existing-exclusions-msg');
-                        if (value === 'YES') {{
+                        if (value === 'YES') {
                             uploadBox.style.display = 'block';
                             if (msgBox) msgBox.style.display = 'block';
-                        }} else {{
+                        } else {
                             uploadBox.style.display = 'none';
                             if (msgBox) msgBox.style.display = 'none';
                             
                             // Reset submit button if disabled exclusions
                             const nextBtn = document.getElementById('next-btn');
-                            if (nextBtn) {{
+                            if (nextBtn) {
                                 nextBtn.classList.remove('btn-pulse-save');
-                                if (currentStep === totalSteps) {{
+                                if (currentStep === totalSteps) {
                                     nextBtn.innerHTML = '🚀 Complete Onboarding';
-                                }}
-                            }}
+                                }
+                            }
                             parsedExclusions = [];
-                        }}
-                    }}
-                }}
+                        }
+                    }
+                }
                 
                 function toggleSOTFields() {
                     const sot = document.getElementById('source_of_truth').value;
