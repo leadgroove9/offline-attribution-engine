@@ -771,6 +771,53 @@ def view_settings(client_id: Optional[int] = None):
                 .alert-success {{ background-color: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }}
                 
                 .conditional-box {{ background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 15px; margin-top: 15px; display: none; }}
+
+                /* Tooltip styling */
+                .tooltip {{
+                    position: relative;
+                    display: inline-flex;
+                    align-items: center;
+                    cursor: pointer;
+                    margin-left: 5px;
+                    color: #1a237e;
+                    font-size: 14px;
+                    vertical-align: middle;
+                }}
+                .tooltip .tooltiptext {{
+                    visibility: hidden;
+                    width: 250px;
+                    background-color: #333;
+                    color: #fff;
+                    text-align: left;
+                    border-radius: 6px;
+                    padding: 10px;
+                    position: absolute;
+                    z-index: 100;
+                    bottom: 125%; /* Position above the text */
+                    left: 50%;
+                    margin-left: -125px;
+                    opacity: 0;
+                    transition: opacity 0.3s;
+                    font-size: 11px;
+                    font-weight: normal;
+                    line-height: 1.4;
+                    box-shadow: 0px 4px 10px rgba(0,0,0,0.15);
+                    white-space: normal;
+                }}
+                .tooltip .tooltiptext::after {{
+                    content: "";
+                    position: absolute;
+                    top: 100%; /* At the bottom of the tooltip */
+                    left: 50%;
+                    margin-left: -5px;
+                    border-width: 5px;
+                    border-style: solid;
+                    border-color: #333 transparent transparent transparent;
+                }}
+                .tooltip:hover .tooltiptext {{
+                    visibility: visible;
+                    opacity: 1;
+                }}
             </style>
         </head>
         <body>
@@ -859,7 +906,12 @@ def view_settings(client_id: Optional[int] = None):
                             </div>
                             
                             <div class="form-group">
-                                <label for="qualification_criteria">How do you qualify a lead?</label>
+                                <label for="qualification_criteria" style="display: inline-flex; align-items: center; gap: 5px;">
+                                    How do you qualify a lead?
+                                    <span class="tooltip">💬
+                                        <span class="tooltiptext">Define a lead stage that is &quot;good enough&quot;, and would be happy with paying for all day long from your Ads. This is the minimum standard the system will go for when optimizing your Ads.</span>
+                                    </span>
+                                </label>
                                 <select id="qualification_criteria">
                                     {crit_options}
                                 </select>
@@ -1254,6 +1306,53 @@ def add_client_page():
                     from { opacity: 0; transform: translateY(-10px); }
                     to { opacity: 1; transform: translateY(0); }
                 }
+            
+                /* Tooltip styling */
+                .tooltip {
+                    position: relative;
+                    display: inline-flex;
+                    align-items: center;
+                    cursor: pointer;
+                    margin-left: 5px;
+                    color: #1a237e;
+                    font-size: 14px;
+                    vertical-align: middle;
+                }
+                .tooltip .tooltiptext {
+                    visibility: hidden;
+                    width: 250px;
+                    background-color: #333;
+                    color: #fff;
+                    text-align: left;
+                    border-radius: 6px;
+                    padding: 10px;
+                    position: absolute;
+                    z-index: 100;
+                    bottom: 125%; /* Position above the text */
+                    left: 50%;
+                    margin-left: -125px;
+                    opacity: 0;
+                    transition: opacity 0.3s;
+                    font-size: 11px;
+                    font-weight: normal;
+                    line-height: 1.4;
+                    box-shadow: 0px 4px 10px rgba(0,0,0,0.15);
+                    white-space: normal;
+                }
+                .tooltip .tooltiptext::after {
+                    content: "";
+                    position: absolute;
+                    top: 100%; /* At the bottom of the tooltip */
+                    left: 50%;
+                    margin-left: -5px;
+                    border-width: 5px;
+                    border-style: solid;
+                    border-color: #333 transparent transparent transparent;
+                }
+                .tooltip:hover .tooltiptext {
+                    visibility: visible;
+                    opacity: 1;
+                }
             </style>
         </head>
         <body>
@@ -1350,7 +1449,12 @@ def add_client_page():
                         </div>
                         
                         <div class="form-group">
-                            <label for="qualification_criteria">How do you qualify a lead?</label>
+                            <label for="qualification_criteria" style="display: inline-flex; align-items: center; gap: 5px;">
+                                How do you qualify a lead?
+                                <span class="tooltip">💬
+                                    <span class="tooltiptext">Define a lead stage that is &quot;good enough&quot;, and would be happy with paying for all day long from your Ads. This is the minimum standard the system will go for when optimizing your Ads.</span>
+                                </span>
+                            </label>
                             <select id="qualification_criteria">
                                 <option value="C">👤 Option C: Someone who books an appointment (Local Services Default)</option>
                                 <option value="A">👤 Option A: Someone that I have a conversation with</option>
