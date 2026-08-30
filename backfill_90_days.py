@@ -129,14 +129,47 @@ def run_historical_backfill(client_id: int):
             duplicate_records_count += 1
             continue
             
-        # 5. Extract click IDs
+        # 5. Extract click IDs (with robust Milestones block lookup)
         gclid = call.get("google_click_id") or call.get("gclid")
         fbclid = call.get("facebook_click_id") or call.get("fbclid")
         li_fat_id = call.get("linkedin_click_id") or call.get("li_fat_id")
         msclkid = call.get("microsoft_click_id") or call.get("msclkid")
         
         landing_url = call.get("landing_page_url") or ""
-        referrer_url = call.get("referrer_url") or ""
+        referrer_url = call.get("referrer_url") or call.get("referring_url") or ""
+        
+        # Fallback to milestones block if top-level fields are missing
+        milestones = call.get("milestones")
+        if isinstance(milestones, dict):
+            for m_key, m_data in milestones.items():
+                if isinstance(m_data, dict):
+                    if not gclid:
+                        gclid = m_data.get("gclid") or m_data.get("google_click_id")
+                    if not fbclid:
+                        fbclid = m_data.get("fbclid") or m_data.get("facebook_click_id")
+                    if not li_fat_id:
+                        li_fat_id = m_data.get("li_fat_id") or m_data.get("linkedin_click_id")
+                    if not msclkid:
+                        msclkid = m_data.get("msclkid") or m_data.get("microsoft_click_id")
+                    if not landing_url:
+                        landing_url = m_data.get("landing_page_url") or ""
+                    if not referrer_url:
+                        referrer_url = m_data.get("referring_url") or m_data.get("referrer_url") or ""
+        elif isinstance(milestones, list):
+            for m_data in milestones:
+                if isinstance(m_data, dict):
+                    if not gclid:
+                        gclid = m_data.get("gclid") or m_data.get("google_click_id")
+                    if not fbclid:
+                        fbclid = m_data.get("fbclid") or m_data.get("facebook_click_id")
+                    if not li_fat_id:
+                        li_fat_id = m_data.get("li_fat_id") or m_data.get("linkedin_click_id")
+                    if not msclkid:
+                        msclkid = m_data.get("msclkid") or m_data.get("microsoft_click_id")
+                    if not landing_url:
+                        landing_url = m_data.get("landing_page_url") or ""
+                    if not referrer_url:
+                        referrer_url = m_data.get("referring_url") or m_data.get("referrer_url") or ""
         
         if not gclid:
             gclid = daily_sync.extract_param_from_url(landing_url, "gclid") or daily_sync.extract_param_from_url(referrer_url, "gclid")

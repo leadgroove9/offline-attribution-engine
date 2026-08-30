@@ -3146,11 +3146,25 @@ async def receive_callrail_webhook(request: Request, client_id: Optional[int] = 
         referrer_data = payload.get('referrer')
         referrer_dict = referrer_data if isinstance(referrer_data, dict) else {}
         
-        # 2. Extract Webhook Variables safely
+        # 2. Extract Webhook Variables safely (with robust Milestones block lookup)
         gclid = payload.get('google_click_id') or payload.get('gclid') or referrer_dict.get('gclid')
         fbclid = payload.get('facebook_click_id') or payload.get('fbclid') or referrer_dict.get('fbclid')
         li_fat_id = payload.get('linkedin_click_id') or payload.get('li_fat_id') or referrer_dict.get('li_fat_id')
         msclkid = payload.get('microsoft_click_id') or payload.get('msclkid') or referrer_dict.get('msclkid')
+        
+        # Fallback to milestones block if top-level fields are missing in payload
+        milestones = payload.get("milestones")
+        if isinstance(milestones, dict):
+            for m_key, m_data in milestones.items():
+                if isinstance(m_data, dict):
+                    if not gclid:
+                        gclid = m_data.get("gclid") or m_data.get("google_click_id")
+                    if not fbclid:
+                        fbclid = m_data.get("fbclid") or m_data.get("facebook_click_id")
+                    if not li_fat_id:
+                        li_fat_id = m_data.get("li_fat_id") or m_data.get("linkedin_click_id")
+                    if not msclkid:
+                        msclkid = m_data.get("msclkid") or m_data.get("microsoft_click_id")
         
         # Advanced dynamic regex URL extraction (for redundancy / fallback)
         landing_page = payload.get('landing_page_url') or referrer_dict.get('landing_page_url') or ""
