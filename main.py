@@ -14,7 +14,7 @@ from anthropic import Anthropic
 app = FastAPI(
     title="Offline Attribution Engine (Multi-Tenant Multi-Channel)",
     description="Multi-tenant agency platform for tracking offline leads/sales and AI audits across Google, Meta, LinkedIn, and Microsoft",
-    version="9.0.0"
+    version="13.0.0"
 )
 
 # ---------------------------------------------------------
@@ -508,8 +508,8 @@ def view_dashboard(client_id: Optional[int] = None):
                 .btn-export:hover {{ filter: brightness(0.9); }}
                 .btn-add-client {{ display: inline-block; background-color: #1a237e; color: white; padding: 10px 18px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 14px; border: none; transition: background 0.2s; cursor: pointer; }}
                 .btn-add-client:hover {{ background-color: #0d1b2a; }}
-                .btn-settings { display: inline-block; background-color: #607d8b; color: white; padding: 10px 18px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 14px; border: none; transition: background 0.2s; cursor: pointer; }
-                .btn-settings:hover { background-color: #455a64; }
+                .btn-settings {{ display: inline-block; background-color: #607d8b; color: white; padding: 10px 18px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 14px; border: none; transition: background 0.2s; cursor: pointer; }}
+                .btn-settings:hover {{ background-color: #455a64; }}
 
             </style>
         </head>
