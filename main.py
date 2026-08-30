@@ -349,6 +349,7 @@ class ClientCreate(BaseModel):
     lead_count_rule: str
     exclude_past_customers: str
     excluded_customers: Optional[list[ExcludedCustomer]] = None
+    exclusion_action: Optional[str] = "append"
 
 
 # ---------------------------------------------------------
@@ -700,6 +701,7 @@ class ClientUpdate(BaseModel):
     lead_count_rule: str
     exclude_past_customers: str
     excluded_customers: Optional[list[ExcludedCustomer]] = None
+    exclusion_action: Optional[str] = "append"
 
 
 @app.get("/dashboard/settings", response_class=HTMLResponse)
@@ -1024,7 +1026,7 @@ def view_settings(client_id: Optional[int] = None):
                             
                             <!-- EXCLUSION UPLOAD PANEL -->
                             <p id="existing-exclusions-msg" style="font-size: 11px; color: #1b5e20; font-weight: bold; margin-top: 10px; margin-bottom: 10px; display: {'block' if client_data.get('exclude_past_customers') == 'YES' else 'none'};">
-                                ℹ️ This client currently has <strong>{exclusion_count}</strong> active excluded customer records stored. Uploading a new CSV will replace this list.
+                                ℹ️ Currently ignoring <strong>{exclusion_count}</strong> past customers. Uploading a new list can append or replace this database.
                             </p>
                             <div id="exclusion-upload-box" class="conditional-box" style="display: {'block' if client_data.get('exclude_past_customers') == 'YES' else 'none'}; padding: 15px; margin-top: 10px;">
                                 <div class="instructions" style="background-color: #f1f8e9; border-left-color: #2e7d32; color: #2e7d32; margin-bottom: 15px; font-size: 12px; line-height: 1.5; padding: 12px;">
@@ -1036,6 +1038,19 @@ def view_settings(client_id: Optional[int] = None):
                                     <a href="/dashboard/export/exclusions?client_id={active_client_id}" id="btn-download-exclusions" class="btn-copy" style="background-color: #607d8b; padding: 8px 12px; font-size: 11px; text-decoration: none; display: {'inline-block' if exclusion_count > 0 else 'none'};">📥 Download Current Exclusions ({exclusion_count})</a>
                                     <input type="file" id="exclusion-file-input" accept=".csv" onchange="handleExclusionFileUpload(event)" style="display: none;">
                                     <button type="button" onclick="document.getElementById('exclusion-file-input').click()" class="btn-copy" style="background-color: #2e7d32; padding: 8px 12px; font-size: 11px;">📤 Choose File & Upload (.CSV)</button>
+                                </div>
+                                <div style="margin-top: 15px; margin-bottom: 15px; background: #fff; padding: 12px; border: 1px solid #e0e0e0; border-radius: 6px;">
+                                    <label style="font-weight: bold; font-size: 12px; margin-bottom: 8px; display: block; color: #1a237e;">🔄 Exclusions Upload Strategy:</label>
+                                    <div style="display: flex; gap: 20px; align-items: center;">
+                                        <label style="font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 12px; margin: 0;">
+                                            <input type="radio" name="exclusion_upload_action" value="append" checked style="cursor: pointer;">
+                                            <strong>Append new records</strong> (Keep existing ones, only add new customers)
+                                        </label>
+                                        <label style="font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 12px; margin: 0;">
+                                            <input type="radio" name="exclusion_upload_action" value="replace" style="cursor: pointer;">
+                                            <strong>Overwrite list</strong> (Wipe existing entries and start fresh)
+                                        </label>
+                                    </div>
                                 </div>
                                 <div id="upload-status-box" class="alert alert-success" style="display: none; margin-bottom: 0; font-size: 11px; padding: 10px;"></div>
                             </div>
@@ -1215,6 +1230,9 @@ def view_settings(client_id: Optional[int] = None):
                     btnSubmit.disabled = true;
                     btnSubmit.innerText = 'Saving changes...';
                     
+                    const actionRadio = document.querySelector('input[name="exclusion_upload_action"]:checked');
+                    const exclusionActionValue = actionRadio ? actionRadio.value : 'append';
+                    
                     const payload = {{
                         id: {active_client_id},
                         name: document.getElementById('name').value.trim(),
@@ -1231,7 +1249,9 @@ def view_settings(client_id: Optional[int] = None):
                         crm_deal_tags: document.getElementById('crm_deal_tags').value.trim(),
                         crm_lead_tags: document.getElementById('crm_lead_tags').value.trim(),
                         lead_count_rule: document.querySelector('input[name="lead_count_rule"]:checked').value,
-                        exclude_past_customers: document.querySelector('input[name="exclude_past_customers"]:checked').value
+                        exclude_past_customers: document.querySelector('input[name="exclude_past_customers"]:checked').value,
+                        exclusion_action: exclusionActionValue,
+                        excluded_customers: parsedExclusions
                     }};
                     
                     try {{
@@ -1322,9 +1342,27 @@ def update_client_settings(client: ClientUpdate):
         
         # Handle excluded customers updates if a new list was uploaded
         if client.excluded_customers is not None and len(client.excluded_customers) > 0:
-            cursor.execute("DELETE FROM excluded_customers WHERE client_id = ?", (client.id,))
+            if getattr(client, 'exclusion_action', 'append') == 'replace':
+                cursor.execute("DELETE FROM excluded_customers WHERE client_id = ?", (client.id,))
+                
             for cust in client.excluded_customers:
                 normalized_p = normalize_phone(cust.phone)
+                email_clean = cust.email.strip().lower() if cust.email else ""
+                
+                # Check for duplicates before inserting in append mode
+                if getattr(client, 'exclusion_action', 'append') == 'append':
+                    exists = False
+                    if normalized_p:
+                        cursor.execute("SELECT id FROM excluded_customers WHERE client_id = ? AND phone = ?", (client.id, normalized_p))
+                        if cursor.fetchone():
+                            exists = True
+                    if not exists and email_clean:
+                        cursor.execute("SELECT id FROM excluded_customers WHERE client_id = ? AND email = ?", (client.id, email_clean))
+                        if cursor.fetchone():
+                            exists = True
+                    if exists:
+                        continue # Skip duplicate record
+                        
                 cursor.execute("""
                     INSERT INTO excluded_customers (client_id, first_name, last_name, email, phone, company_name)
                     VALUES (?, ?, ?, ?, ?, ?)
@@ -1332,7 +1370,7 @@ def update_client_settings(client: ClientUpdate):
                     client.id,
                     cust.first_name,
                     cust.last_name,
-                    cust.email.strip().lower() if cust.email else "",
+                    email_clean,
                     normalized_p,
                     cust.company_name
                 ))
@@ -1686,6 +1724,19 @@ def add_client_page():
                                 <input type="file" id="exclusion-file-input" accept=".csv" onchange="handleExclusionFileUpload(event)" style="display: none;">
                                 <button type="button" onclick="document.getElementById('exclusion-file-input').click()" class="btn-copy" style="background-color: #2e7d32; padding: 8px 15px; font-size: 12px; cursor: pointer;">📤 Choose File & Upload (.CSV)</button>
                             </div>
+                            <div style="margin-top: 15px; margin-bottom: 15px; background: #fff; padding: 12px; border: 1px solid #e0e0e0; border-radius: 6px;">
+                                <label style="font-weight: bold; font-size: 12px; margin-bottom: 8px; display: block; color: #1a237e;">🔄 Exclusions Upload Strategy:</label>
+                                <div style="display: flex; gap: 20px; align-items: center;">
+                                    <label style="font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 12px; margin: 0;">
+                                        <input type="radio" name="exclusion_upload_action" value="append" checked style="cursor: pointer;">
+                                        <strong>Append new records</strong> (Keep existing ones, only add new customers)
+                                    </label>
+                                    <label style="font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 12px; margin: 0;">
+                                        <input type="radio" name="exclusion_upload_action" value="replace" style="cursor: pointer;">
+                                        <strong>Overwrite list</strong> (Wipe existing entries and start fresh)
+                                    </label>
+                                </div>
+                            </div>
                             <div id="upload-status-box" class="alert alert-success" style="display: none; margin-bottom: 0; font-size: 12px; padding: 12px;"></div>
                         </div>
                     </div>
@@ -1981,9 +2032,13 @@ def add_client_page():
                     nextBtn.disabled = true;
                     nextBtn.innerText = 'Creating profile...';
                     
+                    const actionRadio = document.querySelector('input[name="exclusion_upload_action"]:checked');
+                    const exclusionActionValue = actionRadio ? actionRadio.value : 'append';
+                    
                     const payload = {
                         name: document.getElementById('name').value.trim(),
                         excluded_customers: parsedExclusions,
+                        exclusion_action: exclusionActionValue,
                         callrail_company_id: document.getElementById('callrail_company_id').value.trim(),
                         google_ads_customer_id: document.getElementById('google_ads_customer_id').value.trim(),
                         facebook_ads_id: document.getElementById('facebook_ads_id').value.trim(),
@@ -2118,6 +2173,24 @@ def create_client(client: ClientCreate):
         ))
         
         client_id = cursor.lastrowid
+        
+        # Handle excluded customers updates for new onboarding if uploaded
+        if client.excluded_customers is not None and len(client.excluded_customers) > 0:
+            for cust in client.excluded_customers:
+                normalized_p = normalize_phone(cust.phone)
+                email_clean = cust.email.strip().lower() if cust.email else ""
+                
+                cursor.execute("""
+                    INSERT INTO excluded_customers (client_id, first_name, last_name, email, phone, company_name)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (
+                    client_id,
+                    cust.first_name,
+                    cust.last_name,
+                    email_clean,
+                    normalized_p,
+                    cust.company_name
+                ))
         
         conn.commit()
         conn.close()
