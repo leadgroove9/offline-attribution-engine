@@ -2148,9 +2148,9 @@ def add_client_page():
                         ["Jane", "Smith", "jane@company.com", "555-987-6543", "Smith Solar Corp"]
                     ];
                     let csvContent = "data:text/csv;charset=utf-8,";
-                    csvContent += headers.join(",") + "\n";
+                    csvContent += headers.join(",") + "\\n";
                     sampleRows.forEach(row => {
-                        csvContent += row.join(",") + "\n";
+                        csvContent += row.join(",") + "\\n";
                     });
                     const encodedUri = encodeURI(csvContent);
                     const link = document.createElement("a");
