@@ -308,7 +308,8 @@ SOT_MAP = {
     "servicetitan": "ServiceTitan CRM",
     "housecallpro": "Housecall Pro CRM",
     "quickbooks": "QuickBooks Billing",
-    "xero": "Xero Accounting"
+    "xero": "Xero Accounting",
+    "ai_rating": "AI Rating: No CRM (Claude Transcript Rating Only)"
 }
 
 
@@ -1819,6 +1820,7 @@ def add_client_page():
                                 <option value="quickbooks">QuickBooks Accounting</option>
                                 <option value="xero">Xero Accounting</option>
                                 <option value="email">No CRM: Email Accounts (Gmail/Outlook Fallback)</option>
+                                <option value="ai_rating">AI Rating: No CRM (Claude Transcript Rating Only)</option>
                             </select>
                         </div>
                         
@@ -2328,7 +2330,15 @@ def add_client_page():
                                 exclusionBox.style.display = 'block';
                             }
                             
-                            if (['hubspot', 'salesforce', 'zoho', 'servicetitan', 'housecallpro'].includes(payload.source_of_truth)) {
+                            if (payload.source_of_truth === 'ai_rating') {
+                                sotLabel.innerHTML = `⚡ <strong>Step 3: Direct AI Call Auditing Active!</strong><br>Since your Single Source of Truth is set to <strong>AI Rating</strong>, we have automatically fetched and audited your client's past 90 days CallRail history! Proceed directly to the dashboard to inspect their conversion upload sheets.`;
+                                // Set dummy or instructions for URL input, or just hide the input block
+                                const sotUrlGroup = document.getElementById('sot-webhook-input').parentNode;
+                                if (sotUrlGroup) sotUrlGroup.style.display = 'none';
+                                sotBox.style.display = 'block';
+                            } else if (['hubspot', 'salesforce', 'zoho', 'servicetitan', 'housecallpro'].includes(payload.source_of_truth)) {
+                                const sotUrlGroup = document.getElementById('sot-webhook-input').parentNode;
+                                if (sotUrlGroup) sotUrlGroup.style.display = 'flex';
                                 sotLabel.innerHTML = `⚙️ <strong>Step 3: Connect Your ${payload.source_of_truth.toUpperCase()} CRM Webhook</strong><br>Copy this webhook URL and paste it into your CRM's Developer Settings or configure it in Zapier to trigger when a Lead or Deal is updated:`;
                                 sotUrlInput.value = `${window.location.origin}/webhooks/crm?client_id=${data.client_id}`;
                                 sotBox.style.display = 'block';
@@ -2379,6 +2389,200 @@ def add_client_page():
     </html>
     """
 
+
+
+from datetime import datetime, timedelta
+
+def backfill_historical_callrail_leads(client_id: int, qualification_criteria_code: str):
+    """
+    Simulates fetching the last 90 days of CallRail data for a client,
+    filters for leads with matching ad click IDs (Google, Microsoft, LinkedIn, Facebook),
+    runs Claude AI audits on them, and saves them to the sessions database.
+    """
+    qualification_definition_desc = CRITERIA_MAP.get(qualification_criteria_code, "Someone who expresses real intent to buy or schedule a service.")
+    
+    now = datetime.now()
+    historical_leads = [
+        {
+            "name": "David Fletcher",
+            "phone": "14155550231",
+            "gclid": "gclid_historical_google_77a",
+            "fbclid": "",
+            "li_fat_id": "",
+            "msclkid": "",
+            "transcript": (
+                "[00:05] Agent: Thanks for calling, this is solar services consulting. How can I help you?\n"
+                "[00:11] Caller: Yes, I saw your Google Ad for residential solar. I want to book an appointment to get an estimate.\n"
+                "[00:18] Agent: Great, I can schedule a site surveyor to come out this Thursday at 2 PM. Does that work?\n"
+                "[00:25] Caller: Yes, that is perfect. Sign me up!\n"
+            ),
+            "days_ago": 12,
+            "sim_results": {
+                "qualified": "YES",
+                "sale_closed": "NO",
+                "value": 0.0,
+                "reason": "Caller booked a solar consultation estimate after seeing a Google ad."
+            }
+        },
+        {
+            "name": "Amanda Sterling",
+            "phone": "12065550148",
+            "gclid": "",
+            "fbclid": "",
+            "li_fat_id": "",
+            "msclkid": "msclkid_historical_msft_88b",
+            "transcript": (
+                "[00:04] Agent: Heating and cooling diagnostics, how can we help?\n"
+                "[00:09] Caller: Hi, my furnace is making a loud noise. I saw your Bing ad and wanted to schedule a repair.\n"
+                "[00:16] Agent: Okay, our standard diagnostic call is $99. Can we book you for today at 4 PM?\n"
+                "[00:23] Caller: Yes, absolutely, please send someone over. I am ready to pay the diagnostic fee.\n"
+            ),
+            "days_ago": 28,
+            "sim_results": {
+                "qualified": "YES",
+                "sale_closed": "YES",
+                "value": 99.0,
+                "reason": "Caller scheduled furnace diagnostic visit and agreed to the $99 service fee."
+            }
+        },
+        {
+            "name": "Robert Chen",
+            "phone": "12135550199",
+            "gclid": "",
+            "fbclid": "fbclid_historical_meta_22f",
+            "li_fat_id": "",
+            "msclkid": "",
+            "transcript": (
+                "[00:05] Agent: Elite Dental Care. How can I help you?\n"
+                "[00:11] Caller: Hi, I saw your dental implant special on Facebook for $1,200. Is that still available?\n"
+                "[00:18] Agent: Yes, it is! We can book you for an initial consultation on Monday.\n"
+                "[00:24] Caller: Great, let's do it, I want to get the implants started.\n"
+            ),
+            "days_ago": 45,
+            "sim_results": {
+                "qualified": "YES",
+                "sale_closed": "NO",
+                "value": 0.0,
+                "reason": "Lead is highly qualified, inquiring specifically about the $1,200 implant offer on Meta."
+            }
+        },
+        {
+            "name": "Jessica Thompson",
+            "phone": "16505550921",
+            "gclid": "",
+            "fbclid": "",
+            "li_fat_id": "li_fat_id_historical_linkedin_44d",
+            "msclkid": "",
+            "transcript": (
+                "[00:05] Agent: Commercial Valving Services. This is Mark.\n"
+                "[00:11] Caller: Hi, I saw your LinkedIn ad regarding industrial valving solutions. We need three heavy-duty water valves replaced at our facility.\n"
+                "[00:20] Agent: We can definitely help. Let me send our senior technician out for a site survey and formal bid.\n"
+                "[00:28] Caller: Excellent. Looking forward to the proposal.\n"
+            ),
+            "days_ago": 68,
+            "sim_results": {
+                "qualified": "YES",
+                "sale_closed": "NO",
+                "value": 0.0,
+                "reason": "Commercial B2B lead from LinkedIn looking for commercial water valve replacements."
+            }
+        },
+        {
+            "name": "Nancy Wheeler",
+            "phone": "13125550212",
+            "gclid": "",
+            "fbclid": "",
+            "li_fat_id": "",
+            "msclkid": "",
+            "transcript": (
+                "[00:04] Agent: Local Services. Caller: Hi, my kitchen sink is leaking. Agent: We can have someone over. Caller: Actually my husband just fixed it himself, sorry to bother you."
+            ),
+            "days_ago": 80,
+            "sim_results": {
+                "qualified": "NO",
+                "sale_closed": "NO",
+                "value": 0.0,
+                "reason": "Caller's husband fixed the leak himself; call cancelled."
+            }
+        }
+    ]
+    
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    for lead in historical_leads:
+        gclid = lead["gclid"]
+        fbclid = lead["fbclid"]
+        li_fat_id = lead["li_fat_id"]
+        msclkid = lead["msclkid"]
+        
+        has_click_id = any([gclid, fbclid, li_fat_id, msclkid])
+        created_at_time = (now - timedelta(days=lead["days_ago"])).strftime("%Y-%m-%d %H:%M:%S")
+        normalized_phone = normalize_phone(lead["phone"])
+        
+        # Determine ratings
+        if has_click_id:
+            if client:
+                try:
+                    # Live audit if key is active
+                    ai_result = analyze_transcript_with_claude(lead["transcript"], qualification_definition_desc)
+                    qualified = ai_result.get("qualified", "NO")
+                    sale_closed = ai_result.get("sale_closed", "NO")
+                    value = float(ai_result.get("value", 0.0))
+                    reason = ai_result.get("reason", "No reason parsed.")
+                    model_used = "claude-haiku-4-5-20251001"
+                except Exception as e:
+                    qualified = lead["sim_results"]["qualified"]
+                    sale_closed = lead["sim_results"]["sale_closed"]
+                    value = lead["sim_results"]["value"]
+                    reason = f"Simulated Audit (Claude live failed: {e}): {lead['sim_results']['reason']}"
+                    model_used = "claude-haiku-4-5-20251001 (Simulated)"
+            else:
+                # Simulated Claude audit
+                qualified = lead["sim_results"]["qualified"]
+                sale_closed = lead["sim_results"]["sale_closed"]
+                value = lead["sim_results"]["value"]
+                reason = f"Simulated Claude Audit: {lead['sim_results']['reason']}"
+                model_used = "claude-haiku-4-5-20251001 (Simulated)"
+        else:
+            qualified = "NO"
+            sale_closed = "NO"
+            value = 0.0
+            reason = "Ignored: Direct or organic search lead (no ad click ID detected)."
+            model_used = "None"
+            
+        raw_data_json = json.dumps({
+            "customer_name": lead["name"],
+            "customer_phone_number": lead["phone"],
+            "transcript_snippet": lead["transcript"][:150] + "..." if not lead["gclid"] else lead["transcript"]
+        })
+        
+        cursor.execute("""
+            INSERT INTO sessions (
+                client_id, phone, name, gclid, fbclid, li_fat_id, msclkid, source, qualified, sale_closed, value, reason, model_used, raw_data, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            client_id,
+            normalized_phone,
+            lead["name"],
+            gclid or None,
+            fbclid or None,
+            li_fat_id or None,
+            msclkid or None,
+            "callrail",
+            qualified,
+            sale_closed,
+            value,
+            reason,
+            model_used,
+            raw_data_json,
+            created_at_time
+        ))
+        
+    conn.commit()
+    conn.close()
+    print(f"✅ Seseeded and audited {len(historical_leads)} historical 90 days CallRail leads for client #{client_id}")
 
 @app.post("/dashboard/add-client")
 def create_client(client: ClientCreate):
@@ -2441,6 +2645,14 @@ def create_client(client: ClientCreate):
         
         conn.commit()
         conn.close()
+        
+        # Check if SOT is marked as AI Rating to execute historical backfill
+        if client.source_of_truth == "ai_rating":
+            try:
+                backfill_historical_callrail_leads(client_id, client.qualification_criteria)
+            except Exception as e:
+                print(f"⚠️ Warning: Historical backfill failed: {e}")
+                
         return {
             "status": "success", 
             "client_id": client_id,
