@@ -3154,7 +3154,7 @@ async def receive_callrail_webhook(request: Request, client_id: Optional[int] = 
         
         # Advanced dynamic regex URL extraction (for redundancy / fallback)
         landing_page = payload.get('landing_page_url') or referrer_dict.get('landing_page_url') or ""
-        referrer_url = payload.get('referrer_url') or referrer_dict.get('referrer_url') or ""
+        referrer_url = payload.get('referrer_url') or referrer_dict.get('referrer_url') or referrer_dict.get('referring_url') or payload.get('referring_url') or ""
         
         if not gclid:
             gclid = extract_param_from_url(landing_page, 'gclid') or extract_param_from_url(referrer_url, 'gclid')
@@ -3402,7 +3402,7 @@ async def trigger_daily_sync(request: Request):
         module_name = "daily_callrail_sync"
         
         # Check standard filenames first
-        target_files = ["daily-callrail-sync.py", "daily-callrail-sync", "daily_callrail_sync.py", "daily_callrail_sync"]
+        target_files = ["daily-callrail-sync-v3.py", "daily-callrail-sync-v2.py", "daily-callrail-sync.py", "daily_callrail_sync.py"]
         imported = False
         
         for fname in target_files:

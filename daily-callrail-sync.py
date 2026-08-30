@@ -359,7 +359,7 @@ def execute_daily_sync():
             msclkid = call.get("microsoft_click_id") or call.get("msclkid")
             
             landing_url = call.get("landing_page_url") or ""
-            referrer_url = call.get("referrer_url") or ""
+            referrer_url = call.get("referrer_url") or call.get("referring_url") or ""
             
             if not gclid:
                 gclid = extract_param_from_url(landing_url, "gclid") or extract_param_from_url(referrer_url, "gclid")
