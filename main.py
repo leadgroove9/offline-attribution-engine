@@ -1052,8 +1052,22 @@ def view_settings(client_id: Optional[int] = None):
                                         </label>
                                     </div>
                                 </div>
+
                                 <div id="upload-status-box" class="alert alert-success" style="display: none; margin-bottom: 0; font-size: 11px; padding: 10px;"></div>
                             </div>
+                            
+                            <!-- Real-Time CRM Exclusion sync webhook section -->
+                            <div id="settings-exclusion-webhook-box" class="conditional-box" style="display: {'block' if client_data.get('exclude_past_customers') == 'YES' else 'none'}; padding: 15px; margin-top: 15px; border-top: 1px dashed #ccc;">
+                                <p style="font-size: 12px; font-weight: bold; color: #1a237e; margin-top: 0; margin-bottom: 5px;">⚡ Real-Time CRM Exclusion Sync Webhook URL</p>
+                                <p style="font-size: 11px; color: #666; margin-top: 0; margin-bottom: 10px; line-height: 1.4;">
+                                    Connect your CRM (HubSpot, ServiceTitan, Salesforce, Zoho, etc.) directly using Zapier or a native webhook. Set your CRM to send a POST webhook to this URL whenever a customer is added or won. The contact's phone/email will be added to your exclusion filter automatically in real-time!
+                                </p>
+                                <div class="webhook-input-group">
+                                    <input type="text" class="webhook-input" id="exclusion-crm-webhook" readonly value="" data-suffix="/webhooks/exclude-customer?client_id={active_client_id}">
+                                    <button type="button" onclick="copyText('exclusion-crm-webhook', 'exclusion-crm-copy-btn')" id="exclusion-crm-copy-btn" class="btn-copy">📋 Copy</button>
+                                </div>
+                            </div>
+
                         </div>
                         
                         <!-- RIGHT COLUMN: Webhooks & SOT Integration -->
@@ -1795,6 +1809,19 @@ def add_client_page():
                         </div>
                     </div>
                     
+                    
+                    <!-- Real-Time CRM Exclusions Step (Shown conditionally) -->
+                    <div id="exclusion-instructions-box" style="display: none; margin-top: 25px;">
+                        <div class="instructions" style="text-align: left; background-color: #f1f8e9; border-left: 4px solid #2e7d32; color: #2e7d32; margin-bottom: 10px;">
+                            🔄 <strong>Step 4: Connect CRM for Real-Time Exclusions</strong><br>
+                            You enabled past customer exclusions! Copy this exclusion webhook URL and paste it into HubSpot, ServiceTitan, Salesforce, Zoho, or Zapier. Whenever a contact is added or a deal is won in your CRM, trigger a POST request to this URL to automatically add their contact info to our exclusion list in real-time:
+                        </div>
+                        <div style="display: flex; gap: 8px; margin-bottom: 15px;">
+                            <input type="text" id="exclusion-webhook-url-input" readonly style="flex: 1; padding: 10px; border-radius: 6px; border: 1px solid #ced4da; font-family: monospace; font-size: 12px; background-color: #f8f9fa;">
+                            <button type="button" onclick="copyWebhookUrl('exclusion-webhook-url-input', 'exclusion-copy-btn')" id="exclusion-copy-btn" class="btn-submit" style="margin: 0; width: auto; white-space: nowrap; padding: 0 15px; font-size: 14px; background-color: #2e7d32;">📋 Copy Webhook</button>
+                        </div>
+                    </div>
+
                     <a href="/dashboard" class="btn-submit" style="display: block; text-decoration: none; text-align: center; line-height: 20px; background-color: #1a237e; margin-top: 30px;">📊 Proceed to Dashboard</a>
                 </div>
                 
@@ -2077,7 +2104,7 @@ def add_client_page():
                             const liveWebhook = `${window.location.origin}/webhooks/callrail?client_id=${data.client_id}`;
                             document.getElementById('webhook-url-input').value = liveWebhook;
                             
-                            // CRM / Billing / Email custom success steps
+                                                        // CRM / Billing / Email custom success steps
                             const sotBox = document.getElementById('sot-instructions-box');
                             const sotLabel = document.getElementById('sot-instructions-label');
                             const sotUrlInput = document.getElementById('sot-webhook-input');
@@ -2086,6 +2113,16 @@ def add_client_page():
                             
                             sotBox.style.display = 'none';
                             sotEmailBox.style.display = 'none';
+                            
+                            // Real-Time Exclusions Webhook Step
+                            const exclusionBox = document.getElementById('exclusion-instructions-box');
+                            const exclusionUrlInput = document.getElementById('exclusion-webhook-url-input');
+                            exclusionBox.style.display = 'none';
+                            
+                            if (payload.exclude_past_customers === 'YES') {
+                                exclusionUrlInput.value = `${window.location.origin}/webhooks/exclude-customer?client_id=${data.client_id}`;
+                                exclusionBox.style.display = 'block';
+                            }
                             
                             if (['hubspot', 'salesforce', 'zoho', 'servicetitan', 'housecallpro'].includes(payload.source_of_truth)) {
                                 sotLabel.innerHTML = `⚙️ <strong>Step 3: Connect Your ${payload.source_of_truth.toUpperCase()} CRM Webhook</strong><br>Copy this webhook URL and paste it into your CRM's Developer Settings or configure it in Zapier to trigger when a Lead or Deal is updated:`;
@@ -2120,7 +2157,12 @@ def add_client_page():
                     navigator.clipboard.writeText(copyText.value);
                     
                     const copyBtn = document.getElementById(btnId);
-                    const originalText = inputId === "sot-email-address" ? "📋 Copy Email" : "📋 Copy URL";
+                    let originalText = "📋 Copy URL";
+                    if (inputId === "sot-email-address") {
+                        originalText = "📋 Copy Email";
+                    } else if (inputId === "exclusion-webhook-url-input") {
+                        originalText = "📋 Copy Webhook";
+                    }
                     copyBtn.innerText = "✅ Copied!";
                     copyBtn.style.backgroundColor = "#1b5e20";
                     setTimeout(() => {
@@ -2498,6 +2540,129 @@ def export_client_exclusions(client_id: int):
         'Content-Type': 'text/csv'
     }
     return StreamingResponse(output, headers=headers)
+
+
+
+@app.post("/webhooks/exclude-customer")
+async def receive_exclusion_webhook(request: Request, client_id: Optional[int] = None):
+    """
+    CRM/Zapier Exclusions Webhook Receiver.
+    Accepts real-time POST payloads containing contact information to add to the excluded_customers list.
+    """
+    try:
+        content_type = request.headers.get("content-type", "")
+        payload = {}
+        if "application/x-www-form-urlencoded" in content_type:
+            form_data = await request.form()
+            payload = dict(form_data)
+        else:
+            try:
+                payload = await request.json()
+            except Exception:
+                form_data = await request.form()
+                payload = dict(form_data)
+        
+        resolved_client_id = client_id or 1
+        print(f"🔄 [Exclusion Webhook] Received exclusion payload for Client #{resolved_client_id}: {payload}")
+        
+        first_name = (
+            payload.get("first_name") or 
+            payload.get("firstname") or 
+            payload.get("fname") or 
+            (payload.get("name", "").split(" ")[0] if payload.get("name") else "")
+        )
+        last_name = (
+            payload.get("last_name") or 
+            payload.get("lastname") or 
+            payload.get("lname") or 
+            (" ".join(payload.get("name", "").split(" ")[1:]) if (payload.get("name") and len(payload.get("name", "").split(" ")) > 1) else "")
+        )
+        email = (
+            payload.get("email") or 
+            payload.get("email_address") or 
+            payload.get("emailaddress") or 
+            ""
+        ).strip().lower()
+        phone_raw = (
+            payload.get("phone") or 
+            payload.get("phone_number") or 
+            payload.get("phonenumber") or 
+            payload.get("customer_phone") or 
+            payload.get("customer_phone_number") or 
+            ""
+        )
+        company_name = (
+            payload.get("company_name") or 
+            payload.get("companyname") or 
+            payload.get("company") or 
+            payload.get("business_name") or 
+            ""
+        )
+        
+        normalized_p = normalize_phone(phone_raw)
+        
+        if not email and not normalized_p:
+            return {
+                "status": "ignored",
+                "message": "Exclusion skipped: Payload must contain a valid 'phone' or 'email' identifier to exclude a user."
+            }
+            
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT id FROM clients WHERE id = ?", (resolved_client_id,))
+        if not cursor.fetchone():
+            conn.close()
+            raise HTTPException(status_code=400, detail=f"Invalid Client ID #{resolved_client_id}")
+            
+        exists = False
+        if normalized_p:
+            cursor.execute("SELECT id FROM excluded_customers WHERE client_id = ? AND phone = ?", (resolved_client_id, normalized_p))
+            if cursor.fetchone():
+                exists = True
+        if not exists and email:
+            cursor.execute("SELECT id FROM excluded_customers WHERE client_id = ? AND email = ?", (resolved_client_id, email))
+            if cursor.fetchone():
+                exists = True
+                
+        if exists:
+            conn.close()
+            print(f"ℹ️ [Client #{resolved_client_id}] Customer already excluded: email={email}, phone={normalized_p}. Skipping insert.")
+            return {
+                "status": "success",
+                "message": "Customer already on exclusion list. Duplicate skipped safely."
+            }
+            
+        cursor.execute("""
+            INSERT INTO excluded_customers (client_id, first_name, last_name, email, phone, company_name)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            resolved_client_id,
+            first_name,
+            last_name,
+            email,
+            normalized_p,
+            company_name
+        ))
+        conn.commit()
+        conn.close()
+        
+        print(f"✅ [Client #{resolved_client_id}] Excluded customer added via CRM Webhook: Name={first_name} {last_name}, Phone={normalized_p}, Email={email}")
+        return {
+            "status": "success",
+            "message": "Customer successfully added to exclusions list.",
+            "record": {
+                "client_id": resolved_client_id,
+                "first_name": first_name,
+                "last_name": last_name,
+                "email": email,
+                "phone": normalized_p,
+                "company_name": company_name
+            }
+        }
+    except Exception as e:
+        print(f"❌ Exclusion Webhook Error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.post("/webhooks/callrail")
