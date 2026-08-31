@@ -1195,7 +1195,12 @@ def view_settings(client_id: Optional[int] = None):
                                     </select>
                                 </div>
                                 <div class="form-group" style="margin-bottom: 0;">
-                                    <label for="email_account">Onboarding Integration Email Account</label>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                                        <label for="email_account" style="font-weight: bold; margin-bottom: 0;">Onboarding Integration Email Account</label>
+                                        <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none; display: flex; align-items: center; gap: 4px;">
+                                            🔑 How to get an App Password?
+                                        </a>
+                                    </div>
                                     <input type="text" id="email_account" value="{client_data.get("email_account", "") or ""}" placeholder="e.g. bookings@clientcompany.com">
                                 </div>
                             </div>
@@ -1244,6 +1249,70 @@ def view_settings(client_id: Optional[int] = None):
                             </div>
                         </div>
                     </div>
+
+                    <!-- App Password Modal Overlay -->
+                    <div id="app-password-modal" class="modal-overlay" style="display: none;">
+                        <div class="modal-card">
+                            <!-- Header -->
+                            <div class="modal-header">
+                                <h3 style="margin: 0; font-size: 18px; color: #1a237e; display: flex; align-items: center; gap: 8px;">
+                                    🔐 Generate a Secure App Password
+                                </h3>
+                                <span class="modal-close" onclick="closeAppPasswordModal()">&times;</span>
+                            </div>
+
+                            <!-- Body -->
+                            <div class="modal-body" style="padding: 20px; max-height: 70vh; overflow-y: auto; text-align: left;">
+                                <p style="margin-top: 0; font-size: 13px; line-height: 1.5; color: #555;">
+                                    For security, modern email networks require a <strong>16-character App Password</strong> rather than your standard account login password. This restricts our AI's access strictly to reading incoming booking emails via IMAP.
+                                </p>
+
+                                <!-- Provider Tabs -->
+                                <div style="display: flex; border-bottom: 2px solid #e0e0e0; margin-bottom: 15px;">
+                                    <button type="button" id="tab-btn-google" class="tab-btn active" onclick="switchModalTab('google')">
+                                        📁 Google Workspace / Gmail
+                                    </button>
+                                    <button type="button" id="tab-btn-ms" class="tab-btn" onclick="switchModalTab('ms')">
+                                        📁 Microsoft 365 / Outlook
+                                    </button>
+                                </div>
+
+                                <!-- Tab Content: Google -->
+                                <div id="modal-tab-google" class="tab-content">
+                                    <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; color: #333; margin: 0;">
+                                        <li style="margin-bottom: 8px;">Go to your <a href="https://myaccount.google.com/security" target="_blank" style="color: #1a237e; font-weight: bold; text-decoration: none;">Google Account Security Panel</a>.</li>
+                                        <li style="margin-bottom: 8px;">Ensure <strong>2-Step Verification</strong> is active under "How you sign in to Google".</li>
+                                        <li style="margin-bottom: 8px;">Type <strong>"App Passwords"</strong> in Google's search bar, or scroll to the bottom of 2-Step Verification and click <strong>App Passwords</strong>.</li>
+                                        <li style="margin-bottom: 8px;">Enter a custom name (e.g., <code>LeadGroove Conversion Engine</code>) and click <strong>Create</strong>.</li>
+                                        <li style="margin-bottom: 8px;">Copy the <strong>16-character code</strong> inside Google's yellow box, strip any spaces, and enter it as your password!</li>
+                                    </ol>
+                                </div>
+
+                                <!-- Tab Content: Microsoft -->
+                                <div id="modal-tab-ms" class="tab-content" style="display: none;">
+                                    <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; color: #333; margin: 0;">
+                                        <li style="margin-bottom: 8px;">Go to your <a href="https://mysignins.microsoft.com/security-info" target="_blank" style="color: #1a237e; font-weight: bold; text-decoration: none;">Microsoft Security Info Page</a>.</li>
+                                        <li style="margin-bottom: 8px;">Click the <strong>+ Add sign-in method</strong> button at the top.</li>
+                                        <li style="margin-bottom: 8px;">Select <strong>App Password</strong> from the dropdown menu and click <strong>Add</strong>.</li>
+                                        <li style="margin-bottom: 8px;">Name it (e.g., <code>LeadGroove Offline Tracker</code>) and click <strong>Next</strong>.</li>
+                                        <li style="margin-bottom: 8px;">Copy the <strong>16-character password key</strong> immediately before closing the confirmation window.</li>
+                                    </ol>
+                                </div>
+
+                                <!-- Security Footnote -->
+                                <div style="background-color: #f1f8e9; border-left: 4px solid #2e7d32; padding: 12px; margin-top: 20px; border-radius: 4px;">
+                                    <p style="margin: 0; font-size: 11px; line-height: 1.4; color: #1b5e20;">
+                                        🔒 <strong>Strict Privacy Guard:</strong> This code grants read-only IMAP credentials. It does not access your emails, calendars, or account dashboards. You can revoke it instantly at any time in your security settings.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <!-- Footer -->
+                            <div class="modal-footer" style="padding: 15px 20px; border-top: 1px solid #eaeaea; background-color: #f8f9fa; display: flex; justify-content: flex-end; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;">
+                                <button type="button" class="btn-modal-close" onclick="closeAppPasswordModal()">Got It, Thanks!</button>
+                            </div>
+                        </div>
+                    </div>
                     
                     <!-- Form Buttons -->
                     <div style="display:flex; justify-content: space-between; align-items: center; margin-top: 40px; border-top: 1px solid #eaeaea; padding-top: 20px;">
@@ -1254,6 +1323,38 @@ def view_settings(client_id: Optional[int] = None):
             </div>
             
             <script>
+
+                function openAppPasswordModal() {{
+                    document.getElementById('app-password-modal').style.display = 'flex';
+                }
+                
+                function closeAppPasswordModal() {{
+                    document.getElementById('app-password-modal').style.display = 'none';
+                }
+                
+                function switchModalTab(provider) {{
+                    document.getElementById('tab-btn-google').classList.remove('active');
+                    document.getElementById('tab-btn-ms').classList.remove('active');
+                    document.getElementById('modal-tab-google').style.display = 'none';
+                    document.getElementById('modal-tab-ms').style.display = 'none';
+                    
+                    if (provider === 'google') {{
+                        document.getElementById('tab-btn-google').classList.add('active');
+                        document.getElementById('modal-tab-google').style.display = 'block';
+                    }} else {{
+                        document.getElementById('tab-btn-ms').classList.add('active');
+                        document.getElementById('modal-tab-ms').style.display = 'block';
+                    }}
+                }
+
+                // Close modal if user clicks outside of the card
+                window.addEventListener('click', (e) => {{
+                    const overlay = document.getElementById('app-password-modal');
+                    if (e.target === overlay) {{
+                        closeAppPasswordModal();
+                    }}
+                }});
+
                 // Auto-populate the active hostname into webhook input fields
                 window.addEventListener('DOMContentLoaded', () => {{
                     const origin = window.location.origin;
@@ -1947,7 +2048,12 @@ def add_client_page():
                                 </select>
                             </div>
                             <div class="form-group" style="margin-bottom: 0;">
-                                <label for="email_account">Onboarding Integration Email Account</label>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                                    <label for="email_account" style="font-weight: bold; margin-bottom: 0;">Onboarding Integration Email Account</label>
+                                    <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none; display: flex; align-items: center; gap: 4px;">
+                                        🔑 How to get an App Password?
+                                    </a>
+                                </div>
                                 <input type="text" id="email_account" placeholder="e.g. bookings@clientcompany.com">
                                 <small style="color: #666; font-size: 11px; margin-top: 4px; display: block;">
                                     Your system will securely monitor this inbox for transcript files & booking notifications.
@@ -2101,10 +2207,107 @@ def add_client_page():
                     <a href="/dashboard" class="btn-submit" style="display: block; text-decoration: none; text-align: center; line-height: 20px; background-color: #1a237e; color: white !important; margin-top: 30px;">📊 Proceed to Dashboard</a>
                 </div>
                 
+
+                <!-- App Password Modal Overlay -->
+                <div id="app-password-modal" class="modal-overlay" style="display: none;">
+                    <div class="modal-card">
+                        <!-- Header -->
+                        <div class="modal-header">
+                            <h3 style="margin: 0; font-size: 18px; color: #1a237e; display: flex; align-items: center; gap: 8px;">
+                                🔐 Generate a Secure App Password
+                            </h3>
+                            <span class="modal-close" onclick="closeAppPasswordModal()">&times;</span>
+                        </div>
+
+                        <!-- Body -->
+                        <div class="modal-body" style="padding: 20px; max-height: 70vh; overflow-y: auto; text-align: left;">
+                            <p style="margin-top: 0; font-size: 13px; line-height: 1.5; color: #555;">
+                                For security, modern email networks require a <strong>16-character App Password</strong> rather than your standard account login password. This restricts our AI's access strictly to reading incoming booking emails via IMAP.
+                            </p>
+
+                            <!-- Provider Tabs -->
+                            <div style="display: flex; border-bottom: 2px solid #e0e0e0; margin-bottom: 15px;">
+                                <button type="button" id="tab-btn-google" class="tab-btn active" onclick="switchModalTab('google')">
+                                    📁 Google Workspace / Gmail
+                                </button>
+                                <button type="button" id="tab-btn-ms" class="tab-btn" onclick="switchModalTab('ms')">
+                                    📁 Microsoft 365 / Outlook
+                                </button>
+                            </div>
+
+                            <!-- Tab Content: Google -->
+                            <div id="modal-tab-google" class="tab-content">
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; color: #333; margin: 0;">
+                                    <li style="margin-bottom: 8px;">Go to your <a href="https://myaccount.google.com/security" target="_blank" style="color: #1a237e; font-weight: bold; text-decoration: none;">Google Account Security Panel</a>.</li>
+                                    <li style="margin-bottom: 8px;">Ensure <strong>2-Step Verification</strong> is active under "How you sign in to Google".</li>
+                                    <li style="margin-bottom: 8px;">Type <strong>"App Passwords"</strong> in Google's search bar, or scroll to the bottom of 2-Step Verification and click <strong>App Passwords</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Enter a custom name (e.g., <code>LeadGroove Conversion Engine</code>) and click <strong>Create</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Copy the <strong>16-character code</strong> inside Google's yellow box, strip any spaces, and enter it as your password!</li>
+                                </ol>
+                            </div>
+
+                            <!-- Tab Content: Microsoft -->
+                            <div id="modal-tab-ms" class="tab-content" style="display: none;">
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; color: #333; margin: 0;">
+                                    <li style="margin-bottom: 8px;">Go to your <a href="https://mysignins.microsoft.com/security-info" target="_blank" style="color: #1a237e; font-weight: bold; text-decoration: none;">Microsoft Security Info Page</a>.</li>
+                                    <li style="margin-bottom: 8px;">Click the <strong>+ Add sign-in method</strong> button at the top.</li>
+                                    <li style="margin-bottom: 8px;">Select <strong>App Password</strong> from the dropdown menu and click <strong>Add</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Name it (e.g., <code>LeadGroove Offline Tracker</code>) and click <strong>Next</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Copy the <strong>16-character password key</strong> immediately before closing the confirmation window.</li>
+                                </ol>
+                            </div>
+
+                            <!-- Security Footnote -->
+                            <div style="background-color: #f1f8e9; border-left: 4px solid #2e7d32; padding: 12px; margin-top: 20px; border-radius: 4px;">
+                                <p style="margin: 0; font-size: 11px; line-height: 1.4; color: #1b5e20;">
+                                    🔒 <strong>Strict Privacy Guard:</strong> This code grants read-only IMAP credentials. It does not access your emails, calendars, or account dashboards. You can revoke it instantly at any time in your security settings.
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Footer -->
+                        <div class="modal-footer" style="padding: 15px 20px; border-top: 1px solid #eaeaea; background-color: #f8f9fa; display: flex; justify-content: flex-end; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;">
+                            <button type="button" class="btn-modal-close" onclick="closeAppPasswordModal()">Got It, Thanks!</button>
+                        </div>
+                    </div>
+                </div>
+
                 <a href="/dashboard" class="btn-cancel" id="cancel-link">⬅️ Cancel and Return to Dashboard</a>
             </div>
             
             <script>
+
+                function openAppPasswordModal() {
+                    document.getElementById('app-password-modal').style.display = 'flex';
+                }
+                
+                function closeAppPasswordModal() {
+                    document.getElementById('app-password-modal').style.display = 'none';
+                }
+                
+                function switchModalTab(provider) {
+                    document.getElementById('tab-btn-google').classList.remove('active');
+                    document.getElementById('tab-btn-ms').classList.remove('active');
+                    document.getElementById('modal-tab-google').style.display = 'none';
+                    document.getElementById('modal-tab-ms').style.display = 'none';
+                    
+                    if (provider === 'google') {
+                        document.getElementById('tab-btn-google').classList.add('active');
+                        document.getElementById('modal-tab-google').style.display = 'block';
+                    } else {
+                        document.getElementById('tab-btn-ms').classList.add('active');
+                        document.getElementById('modal-tab-ms').style.display = 'block';
+                    }
+                }
+
+                // Close modal if user clicks outside of the card
+                window.addEventListener('click', (e) => {
+                    const overlay = document.getElementById('app-password-modal');
+                    if (e.target === overlay) {
+                        closeAppPasswordModal();
+                    }
+                });
+
                 let currentStep = 1;
                 const totalSteps = 4;
                 
