@@ -919,6 +919,52 @@ def view_settings(client_id: Optional[int] = None):
                     border-color: #1b5e20 !important;
                     color: white !important;
                 }}
+                
+                /* Speech Bubble Tooltip Styles */
+                .tooltip-icon {{
+                    position: relative;
+                    display: inline-block;
+                    cursor: help;
+                    margin-left: 6px;
+                    font-size: 14px;
+                    vertical-align: middle;
+                    color: #1a237e;
+                }}
+                .tooltip-icon .tooltip-text {{
+                    visibility: hidden;
+                    width: 320px;
+                    background-color: #1a237e;
+                    color: #fff;
+                    text-align: left;
+                    border-radius: 6px;
+                    padding: 10px 12px;
+                    position: absolute;
+                    z-index: 1000;
+                    bottom: 125%;
+                    left: 50%;
+                    margin-left: -160px;
+                    opacity: 0;
+                    transition: opacity 0.3s;
+                    font-size: 11px;
+                    line-height: 1.4;
+                    font-weight: normal;
+                    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                }}
+                .tooltip-icon .tooltip-text::after {{
+                    content: "";
+                    position: absolute;
+                    top: 100%;
+                    left: 50%;
+                    margin-left: -5px;
+                    border-width: 5px;
+                    border-style: solid;
+                    border-color: #1a237e transparent transparent transparent;
+                }}
+                .tooltip-icon:hover .tooltip-text {{
+                    visibility: visible;
+                    opacity: 1;
+                }}
 
                 /* Tooltip styling */
                 .tooltip {{
@@ -1196,7 +1242,16 @@ def view_settings(client_id: Optional[int] = None):
                                 </div>
                                 <div class="form-group" style="margin-bottom: 0;">
                                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                                        <label for="email_account" style="font-weight: bold; margin-bottom: 0;">Onboarding Integration Email Account</label>
+                                        <label for="email_account" style="font-weight: bold; margin-bottom: 0; display: inline-flex; align-items: center; gap: 4px;">
+                                            Onboarding Integration Email Account
+                                            <span class="tooltip-icon">
+                                                💬
+                                                <span class="tooltip-text">
+                                                    Forward your customer booking emails, invoice alerts, or form lead replies to:<br>
+                                                    <strong class="settings-forwarding-email" style="color: #81c784; word-break: break-all;">conversions-{active_client_id}@your-agency.com</strong>
+                                                </span>
+                                            </span>
+                                        </label>
                                         <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none; display: flex; align-items: center; gap: 4px;">
                                             🔑 How to get an App Password?
                                         </a>
@@ -1326,11 +1381,11 @@ def view_settings(client_id: Optional[int] = None):
 
                 function openAppPasswordModal() {{
                     document.getElementById('app-password-modal').style.display = 'flex';
-                }
+                }}
                 
                 function closeAppPasswordModal() {{
                     document.getElementById('app-password-modal').style.display = 'none';
-                }
+                }}
                 
                 function switchModalTab(provider) {{
                     document.getElementById('tab-btn-google').classList.remove('active');
@@ -1345,7 +1400,7 @@ def view_settings(client_id: Optional[int] = None):
                         document.getElementById('tab-btn-ms').classList.add('active');
                         document.getElementById('modal-tab-ms').style.display = 'block';
                     }}
-                }
+                }}
 
                 // Close modal if user clicks outside of the card
                 window.addEventListener('click', (e) => {{
@@ -1358,6 +1413,9 @@ def view_settings(client_id: Optional[int] = None):
                 // Auto-populate the active hostname into webhook input fields
                 window.addEventListener('DOMContentLoaded', () => {{
                     const origin = window.location.origin;
+                    const host = window.location.host;
+                    const emailDomain = host.includes('localhost') ? 'your-agency.com' : host.replace('www.', '').split(':')[0];
+                    
                     document.querySelectorAll('.webhook-input').forEach(input => {{
                         const suffix = input.getAttribute('data-suffix');
                         if (suffix.startsWith('conversions-')) {{
@@ -1367,6 +1425,12 @@ def view_settings(client_id: Optional[int] = None):
                             input.value = origin + suffix;
                         }}
                     }});
+                    
+                    // Inject dynamic forwarding email domain inside Settings page tooltip
+                    const forwardingLabel = document.querySelector('.settings-forwarding-email');
+                    if (forwardingLabel) {{
+                        forwardingLabel.innerText = `conversions-{active_client_id}@${{emailDomain}}`;
+                    }}
                     
                     toggleSOTFields();
                 }});
@@ -1816,6 +1880,52 @@ def add_client_page():
                     border-color: #1b5e20 !important;
                     color: white !important;
                 }
+                
+                /* Speech Bubble Tooltip Styles */
+                .tooltip-icon {
+                    position: relative;
+                    display: inline-block;
+                    cursor: help;
+                    margin-left: 6px;
+                    font-size: 14px;
+                    vertical-align: middle;
+                    color: #1a237e;
+                }
+                .tooltip-icon .tooltip-text {
+                    visibility: hidden;
+                    width: 320px;
+                    background-color: #1a237e;
+                    color: #fff;
+                    text-align: left;
+                    border-radius: 6px;
+                    padding: 10px 12px;
+                    position: absolute;
+                    z-index: 1000;
+                    bottom: 125%;
+                    left: 50%;
+                    margin-left: -160px;
+                    opacity: 0;
+                    transition: opacity 0.3s;
+                    font-size: 11px;
+                    line-height: 1.4;
+                    font-weight: normal;
+                    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                }
+                .tooltip-icon .tooltip-text::after {
+                    content: "";
+                    position: absolute;
+                    top: 100%;
+                    left: 50%;
+                    margin-left: -5px;
+                    border-width: 5px;
+                    border-style: solid;
+                    border-color: #1a237e transparent transparent transparent;
+                }
+                .tooltip-icon:hover .tooltip-text {
+                    visibility: visible;
+                    opacity: 1;
+                }
                 @keyframes slideDown {
                     from { opacity: 0; transform: translateY(-10px); }
                     to { opacity: 1; transform: translateY(0); }
@@ -2049,7 +2159,17 @@ def add_client_page():
                             </div>
                             <div class="form-group" style="margin-bottom: 0;">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                                    <label for="email_account" style="font-weight: bold; margin-bottom: 0;">Onboarding Integration Email Account</label>
+                                    <label for="email_account" style="font-weight: bold; margin-bottom: 0; display: inline-flex; align-items: center; gap: 4px;">
+                                        Onboarding Integration Email Account
+                                        <span class="tooltip-icon">
+                                            💬
+                                            <span class="tooltip-text">
+                                                Forward your booking emails, invoice alerts, or form replies to your custom system address:<br>
+                                                <strong class="wizard-forwarding-email" style="color: #81c784; word-break: break-all;">conversions-[id]@your-agency.com</strong><br>
+                                                <span style="font-size: 9px; color: #ccc;">(Your actual ID will show up on the next screen once profile is created)</span>
+                                            </span>
+                                        </span>
+                                    </label>
                                     <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none; display: flex; align-items: center; gap: 4px;">
                                         🔑 How to get an App Password?
                                     </a>
@@ -2305,6 +2425,16 @@ def add_client_page():
                     const overlay = document.getElementById('app-password-modal');
                     if (e.target === overlay) {
                         closeAppPasswordModal();
+                    }
+                });
+
+                // Auto-populate the active hostname into wizard forwarding tooltips
+                window.addEventListener('DOMContentLoaded', () => {
+                    const host = window.location.host;
+                    const emailDomain = host.includes('localhost') ? 'your-agency.com' : host.replace('www.', '').split(':')[0];
+                    const wizardEmailLabel = document.querySelector('.wizard-forwarding-email');
+                    if (wizardEmailLabel) {
+                        wizardEmailLabel.innerText = `conversions-[id]@${emailDomain}`;
                     }
                 });
 
