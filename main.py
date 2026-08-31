@@ -363,7 +363,7 @@ CRITERIA_MAP = {
 }
 
 SOT_MAP = {
-    "email": "Email Account Notifications",
+    "email": "Monthly Sales Spreadsheet Ingestion via Email",
     "hubspot": "HubSpot CRM",
     "zoho": "Zoho CRM",
     "salesforce": "Salesforce CRM",
@@ -371,7 +371,7 @@ SOT_MAP = {
     "housecallpro": "Housecall Pro CRM",
     "quickbooks": "QuickBooks Billing",
     "xero": "Xero Accounting",
-    "ai_rating": "AI Rating: No CRM (Claude Transcript Rating Only)"
+    "ai_rating": "AI Rating (Direct Call Audits & Dynamic Form-Email Monitoring)"
 }
 
 
@@ -1277,6 +1277,10 @@ def view_settings(client_id: Optional[int] = None):
                     element.classList.add('selected');
                     element.querySelector('input[type="radio"]').checked = true;
                     
+                    if (name === 'lead_gen_method') {{
+                        toggleSOTFields();
+                    }}
+                    
                     if (name === 'exclude_past_customers') {{
                         const uploadBox = document.getElementById('exclusion-upload-box');
                         const msgBox = document.getElementById('existing-exclusions-msg');
@@ -1300,6 +1304,8 @@ def view_settings(client_id: Optional[int] = None):
                 
                 function toggleSOTFields() {{
                     const sot = document.getElementById('source_of_truth').value;
+                    const leadGenRadio = document.querySelector('input[name="lead_gen_method"]:checked');
+                    const leadGen = leadGenRadio ? leadGenRadio.value : 'both';
                     
                     const dealBox = document.getElementById('sot-deal-tags-box');
                     const leadBox = document.getElementById('sot-lead-tags-box');
@@ -1329,6 +1335,9 @@ def view_settings(client_id: Optional[int] = None):
                     }} else if (sot === 'email') {{
                         emailBox.style.display = 'block';
                         emailCard.style.display = 'block';
+                    }} else if (sot === 'ai_rating' && (leadGen === 'both' || leadGen === 'form')) {{
+                        // AI Rating with Web Forms allows configuring an optional Ingestion Email Account
+                        emailBox.style.display = 'block';
                     }}
                 }}
 
@@ -1898,8 +1907,8 @@ def add_client_page():
                                 <option value="housecallpro">Housecall Pro (Home Services)</option>
                                 <option value="quickbooks">QuickBooks Accounting</option>
                                 <option value="xero">Xero Accounting</option>
-                                <option value="email">No CRM: Email Accounts (Gmail/Outlook Fallback)</option>
-                                <option value="ai_rating">AI Rating: No CRM (Claude Transcript Rating Only)</option>
+                                <option value="email">Monthly Sales Spreadsheet Ingestion via Email</option>
+                                <option value="ai_rating">AI Rating (Direct Call Audits & Dynamic Form-Email Monitoring)</option>
                             </select>
                         </div>
                         
@@ -2276,6 +2285,10 @@ def add_client_page():
                     element.classList.add('selected');
                     element.querySelector('input[type="radio"]').checked = true;
                     
+                    if (name === 'lead_gen_method') {
+                        toggleSOTFields();
+                    }
+                    
                     if (name === 'exclude_past_customers') {
                         const uploadBox = document.getElementById('exclusion-upload-box');
                         const msgBox = document.getElementById('existing-exclusions-msg');
@@ -2301,6 +2314,9 @@ def add_client_page():
                 
                 function toggleSOTFields() {
                     const sot = document.getElementById('source_of_truth').value;
+                    const leadGenRadio = document.querySelector('input[name="lead_gen_method"]:checked');
+                    const leadGen = leadGenRadio ? leadGenRadio.value : 'both';
+                    
                     const dealBox = document.getElementById('sot-deal-tags-box');
                     const leadBox = document.getElementById('sot-lead-tags-box');
                     const emailBox = document.getElementById('sot-email-box');
@@ -2314,6 +2330,9 @@ def add_client_page():
                     } else if (['servicetitan', 'housecallpro'].includes(sot)) {
                         leadBox.style.display = 'block';
                     } else if (sot === 'email') {
+                        emailBox.style.display = 'block';
+                    } else if (sot === 'ai_rating' && (leadGen === 'both' || leadGen === 'form')) {
+                        // AI Rating with Web Forms allows configuring an optional Ingestion Email Account
                         emailBox.style.display = 'block';
                     }
                 }
@@ -2416,6 +2435,14 @@ def add_client_page():
                                 const sotUrlGroup = document.getElementById('sot-webhook-input').parentNode;
                                 if (sotUrlGroup) sotUrlGroup.style.display = 'none';
                                 sotBox.style.display = 'block';
+                                
+                                // Auto-forwarding instruction if they configure email verification under AI Rating mode
+                                if ((payload.lead_gen_method === 'both' || payload.lead_gen_method === 'form') && payload.email_account) {
+                                    const host = window.location.host;
+                                    const emailDomain = host.includes('localhost') ? 'your-agency.com' : host.replace('www.', '').split(':')[0];
+                                    sotEmailAddress.value = `conversions-${data.client_id}@${emailDomain}`;
+                                    sotEmailBox.style.display = 'block';
+                                }
                             } else if (['hubspot', 'salesforce', 'zoho', 'servicetitan', 'housecallpro'].includes(payload.source_of_truth)) {
                                 const sotUrlGroup = document.getElementById('sot-webhook-input').parentNode;
                                 if (sotUrlGroup) sotUrlGroup.style.display = 'flex';
