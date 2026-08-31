@@ -107,19 +107,10 @@ def check_is_excluded_customer(client_id: int, phone: str, email: str = "") -> O
 # CLAUDE AI TRANSCRIPT AUDITING
 # ---------------------------------------------------------
 
-_anthropic_client = None
-
-def get_anthropic_client(api_key: str):
-    global _anthropic_client
-    if _anthropic_client is None:
-        from anthropic import Anthropic
-        _anthropic_client = Anthropic(api_key=api_key, max_retries=3, timeout=30.0)
-    return _anthropic_client
-
-def analyze_transcript_with_claude(transcript: str, criteria_desc: str) -> Dict[str, Any]:
+def analyze_transcript_with_claude(transcript: str, qualification_criteria_desc: str) -> dict:
     """
-    Calls Anthropic Claude to audit the call transcript based on custom rules.
-    If no API key is set, returns simulated outcomes based on keywords.
+    Sends a transcript to Claude 4.5 Haiku to audit based on the client's custom qualification criteria.
+    Uses standard HTTP/1.1 requests to bypass httpx/HTTP/2 connection resets on Render/Cloudflare.
     """
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
@@ -146,58 +137,105 @@ def analyze_transcript_with_claude(transcript: str, criteria_desc: str) -> Dict[
             "qualified": "YES",
             "sale_closed": sale_closed,
             "value": value,
-            "reason": f"Simulated Audit: Detected qualification signals aligning with standard: '{criteria_desc}'."
+            "reason": f"Simulated Audit: Detected qualification signals aligning with standard: '{qualification_criteria_desc}'."
         }
 
-    try:
-        client = get_anthropic_client(api_key)
-        
-        system_prompt = (
-            "You are an expert sales auditor and conversion tracking engine for local service businesses.\n"
-            "Your job is to read a transcript (phone call or email log) and determine three things:\n"
-            f"1. Is the lead a 'Qualified Lead'? For this business, a qualified lead is defined as: \"{criteria_desc}\". Return 'YES' or 'NO' based strictly on this custom threshold.\n"
-            "2. Was a sale 'Closed'? (Did they agree to purchase, pay a deposit, or book a paid job? Return 'YES' or 'NO')\n"
-            "3. What was the 'Value' of the transaction? (Extract the exact dollar amount if mentioned. If no sale closed or no value was stated, return 0)\n"
-            "\n"
-            "CRITICAL: You must return your response in RAW, valid JSON format. Do not write any introduction, "
-            "explanation, or markdown formatting (do not wrap in ```json). Your entire response must look exactly like this:\n"
-            "{\n"
-            '  "qualified": "YES",\n'
-            '  "sale_closed": "YES",\n'
-            '  "value": 450.00,\n'
-            '  "reason": "A 1-2 sentence explanation of why you made this decision."\n'
-            "}"
-        )
-
-        message = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=500,
-            system=system_prompt,
-            messages=[
-                {"role": "user", "content": f"Analyze this transcript:\n\n{transcript}"}
-            ]
-        )
-        
-        response_text = message.content[0].text.strip()
-        # Clean any accidental markdown wrap
-        if response_text.startswith("```"):
-            response_text = re.sub(r"^```(?:json)?\n|```$", "", response_text, flags=re.MULTILINE).strip()
-            
-        result = json.loads(response_text)
-        return {
-            "qualified": str(result.get("qualified", "NO")).upper(),
-            "sale_closed": str(result.get("sale_closed", "NO")).upper(),
-            "value": float(result.get("value", 0.0)),
-            "reason": str(result.get("reason", "No reason provided."))
-        }
-    except Exception as e:
+    if not transcript or not transcript.strip():
         return {
             "qualified": "NO",
             "sale_closed": "NO",
             "value": 0.0,
-            "reason": f"Claude API Sync Error: {str(e)}"
+            "reason": "No transcript available for analysis."
         }
 
+    import requests
+    import time
+    
+    url = "https://api.anthropic.com/v1/messages"
+    headers = {
+        "x-api-key": api_key,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json"
+    }
+    
+    system_prompt = (
+        "You are an expert sales auditor and conversion tracking engine for local service businesses.\n"
+        "Your job is to read a transcript (phone call or email log) and determine three things:\n"
+        f"1. Is the lead a 'Qualified Lead'? For this business, a qualified lead is defined as: \"{qualification_criteria_desc}\". Return 'YES' or 'NO' based strictly on this custom threshold.\n"
+        "2. Was a sale 'Closed'? (Did they agree to purchase, pay a deposit, or book a paid job? Return 'YES' or 'NO')\n"
+        "3. What was the 'Value' of the transaction? (Extract the exact dollar amount if mentioned. If no sale closed or no value was stated, return 0)\n"
+        "\n"
+        "CRITICAL: You must return your response in RAW, valid JSON format. Do not write any introduction, "
+        "explanation, or markdown formatting (do not wrap in ```json). Your entire response must look exactly like this:\n"
+        "{\n"
+        '  "qualified": "YES",\n'
+        '  "sale_closed": "YES",\n'
+        '  "value": 450.00,\n'
+        '  "reason": "A 1-2 sentence explanation of why you made this decision."\n'
+        "}"
+    )
+    
+    payload = {
+        "model": "claude-haiku-4-5-20251001",
+        "max_tokens": 500,
+        "system": system_prompt,
+        "messages": [
+            {"role": "user", "content": f"Analyze this transcript:\n\n{transcript}"}
+        ]
+    }
+    
+    max_retries = 3
+    retry_delay = 2
+    
+    for attempt in range(max_retries):
+        try:
+            session = requests.Session()
+            response = session.post(url, headers=headers, json=payload, timeout=25)
+            
+            if response.status_code == 200:
+                result = response.json()
+                content_text = result.get("content", [{}])[0].get("text", "").strip()
+                
+                # Clean any accidental markdown wrap
+                if content_text.startswith("```"):
+                    content_text = re.sub(r"^```(?:json)?\n|```$", "", content_text, flags=re.MULTILINE).strip()
+                    
+                parsed_res = json.loads(content_text)
+                return {
+                    "qualified": str(parsed_res.get("qualified", "NO")).upper(),
+                    "sale_closed": str(parsed_res.get("sale_closed", "NO")).upper(),
+                    "value": float(parsed_res.get("value", 0.0)),
+                    "reason": str(parsed_res.get("reason", "No reason provided."))
+                }
+            elif response.status_code in [429, 500, 502, 503, 504]:
+                print(f"⚠️ Claude API transient error {response.status_code}. Retrying in {retry_delay}s...")
+                time.sleep(retry_delay)
+                retry_delay *= 2
+            else:
+                return {
+                    "qualified": "NO",
+                    "sale_closed": "NO",
+                    "value": 0.0,
+                    "reason": f"Claude API Error (HTTP {response.status_code}): {response.text}"
+                }
+        except Exception as e:
+            if attempt == max_retries - 1:
+                return {
+                    "qualified": "NO",
+                    "sale_closed": "NO",
+                    "value": 0.0,
+                    "reason": f"Claude Connection Exception: {str(e)}"
+                }
+            print(f"⚠️ Claude Connection Attempt {attempt + 1} failed: {e}. Retrying in {retry_delay}s...")
+            time.sleep(retry_delay)
+            retry_delay *= 2
+            
+    return {
+        "qualified": "NO",
+        "sale_closed": "NO",
+        "value": 0.0,
+        "reason": "Claude API request failed after maximum retries."
+    }
 
 # ---------------------------------------------------------
 # CALLRAIL API SYNC SCRAPER
