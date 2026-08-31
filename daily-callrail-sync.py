@@ -112,7 +112,7 @@ def analyze_transcript_with_claude(transcript: str, qualification_criteria_desc:
     Sends a transcript to Claude 4.5 Haiku to audit based on the client's custom qualification criteria.
     Uses standard HTTP/1.1 requests to bypass httpx/HTTP/2 connection resets on Render/Cloudflare.
     """
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
     if not api_key:
         # High-Fidelity Simulation Fallback
         lower_t = transcript.lower()
