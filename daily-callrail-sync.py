@@ -107,6 +107,15 @@ def check_is_excluded_customer(client_id: int, phone: str, email: str = "") -> O
 # CLAUDE AI TRANSCRIPT AUDITING
 # ---------------------------------------------------------
 
+_anthropic_client = None
+
+def get_anthropic_client(api_key: str):
+    global _anthropic_client
+    if _anthropic_client is None:
+        from anthropic import Anthropic
+        _anthropic_client = Anthropic(api_key=api_key, max_retries=3, timeout=30.0)
+    return _anthropic_client
+
 def analyze_transcript_with_claude(transcript: str, criteria_desc: str) -> Dict[str, Any]:
     """
     Calls Anthropic Claude to audit the call transcript based on custom rules.
@@ -141,8 +150,7 @@ def analyze_transcript_with_claude(transcript: str, criteria_desc: str) -> Dict[
         }
 
     try:
-        from anthropic import Anthropic
-        client = Anthropic(api_key=api_key)
+        client = get_anthropic_client(api_key)
         
         system_prompt = (
             "You are an expert sales auditor and conversion tracking engine for local service businesses.\n"

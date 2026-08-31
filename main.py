@@ -161,7 +161,7 @@ init_db()
 # ANTHROPIC CLAUDE CONFIGURATION
 # ---------------------------------------------------------
 API_KEY = os.environ.get("ANTHROPIC_API_KEY")
-client = Anthropic(api_key=API_KEY) if API_KEY else None
+client = Anthropic(api_key=API_KEY, max_retries=3, timeout=30.0) if API_KEY else None
 
 def clean_json_string(text: str) -> str:
     text = text.strip()
