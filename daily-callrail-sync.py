@@ -260,7 +260,7 @@ def fetch_callrail_logs_for_client(client_id: int, company_id: str, start_date: 
         "start_date": start_date,
         "end_date": end_date,
         "per_page": 100,
-        "fields": "gclid,fbclid,msclkid,li_fat_id,google_click_id,facebook_click_id,microsoft_click_id,linkedin_click_id,landing_page_url,referring_url,transcription,transcript,milestones"
+        "fields": "id,customer_name,customer_phone_number,caller_number,start_time,created_at,duration,gclid,fbclid,msclkid,li_fat_id,landing_page_url,referring_url,transcription,milestones"
     }
     
     try:
