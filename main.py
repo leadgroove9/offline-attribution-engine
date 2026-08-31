@@ -3181,7 +3181,23 @@ async def receive_callrail_webhook(request: Request, client_id: Optional[int] = 
             
         caller_name = payload.get('customer_name', 'Unknown Caller')
         raw_phone = payload.get('customer_phone_number')
-        transcript = payload.get('transcript') or payload.get('transcription') or ""
+        raw_transcript = payload.get('transcript') or payload.get('transcription') or ""
+        transcript = ""
+        if isinstance(raw_transcript, str):
+            transcript = raw_transcript
+        elif isinstance(raw_transcript, list):
+            segments = []
+            for segment in raw_transcript:
+                if isinstance(segment, dict):
+                    speaker = segment.get("speaker") or segment.get("role") or "Speaker"
+                    text = segment.get("text") or segment.get("message") or ""
+                    if text:
+                        segments.append(f"[{speaker}]: {text}")
+                elif isinstance(segment, str):
+                    segments.append(segment)
+            transcript = "\n".join(segments)
+        elif isinstance(raw_transcript, dict):
+            transcript = raw_transcript.get("text") or raw_transcript.get("transcription") or str(raw_transcript)
         
         # 3. Normalize Phone
         normalized_phone = normalize_phone(raw_phone)
