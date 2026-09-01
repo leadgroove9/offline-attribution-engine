@@ -597,11 +597,11 @@ async def post_register(request: Request):
         confirm_password = form_data.get("confirm_password")
         
         if not email or not password or not confirm_password:
-            return get_register(request, error="All fields are required.")
+            return HTMLResponse(get_register(request, error="All fields are required."))
         if password != confirm_password:
-            return get_register(request, error="Passwords do not match.")
+            return HTMLResponse(get_register(request, error="Passwords do not match."))
         if len(password) < 6:
-            return get_register(request, error="Password must be at least 6 characters.")
+            return HTMLResponse(get_register(request, error="Password must be at least 6 characters."))
             
         try:
             conn = sqlite3.connect(DB_PATH)
@@ -611,7 +611,7 @@ async def post_register(request: Request):
             cursor.execute("SELECT id FROM users WHERE email = ?", (email,))
             if cursor.fetchone():
                 conn.close()
-                return get_register(request, error="An account with this email already exists.")
+                return HTMLResponse(get_register(request, error="An account with this email already exists."))
                 
             hashed = hash_password(password)
             cursor.execute("INSERT INTO users (email, hashed_password) VALUES (?, ?)", (email, hashed))
@@ -624,7 +624,7 @@ async def post_register(request: Request):
             response.set_cookie(key="session_token", value=token, max_age=86400 * 30, httponly=True)
             return response
         except Exception as e:
-            return get_register(request, error=f"Database error: {str(e)}")
+            return HTMLResponse(get_register(request, error=f"Database error: {str(e)}"))
     except Exception as outer_e:
         import traceback
         tb = traceback.format_exc()
@@ -692,7 +692,7 @@ async def post_login(request: Request):
         password = form_data.get("password")
         
         if not email or not password:
-            return get_login(request, error="All fields are required.")
+            return HTMLResponse(get_login(request, error="All fields are required."))
             
         try:
             conn = sqlite3.connect(DB_PATH)
@@ -702,14 +702,14 @@ async def post_login(request: Request):
             conn.close()
             
             if not row or not verify_password(row[0], password):
-                return get_login(request, error="Invalid email or password.")
+                return HTMLResponse(get_login(request, error="Invalid email or password."))
                 
             token = create_session(email)
             response = RedirectResponse(url="/dashboard", status_code=303)
             response.set_cookie(key="session_token", value=token, max_age=86400 * 30, httponly=True)
             return response
         except Exception as e:
-            return get_login(request, error=f"Database error: {str(e)}")
+            return HTMLResponse(get_login(request, error=f"Database error: {str(e)}"))
     except Exception as outer_e:
         import traceback
         tb = traceback.format_exc()
