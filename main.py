@@ -1209,6 +1209,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
         </head>
         <body>
             <div class="container">
+                {user_header_bar}
                 <header>
                     <div>
                         <h1>{client_name_header} 📊</h1>
