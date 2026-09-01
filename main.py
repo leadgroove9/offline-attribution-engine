@@ -473,6 +473,8 @@ CRITERIA_MAP = {
     "I": "Someone who is credit pre-qualified"
 }
 
+ADMIN_EMAILS = {"admin@leadgrove.net", "admin@leadgroove.net", "corey@test.com", "corey@leadgrove.net", "corey@leadgroove.net"}
+
 SOT_MAP = {
     "email": "Monthly Sales Spreadsheet Ingestion via Email",
     "hubspot": "HubSpot CRM",
@@ -728,6 +730,92 @@ def get_logout(request: Request):
     response.delete_cookie("session_token")
     return response
 
+@app.get("/admin/users", response_class=HTMLResponse)
+def get_admin_users(request: Request):
+    email = is_authenticated(request)
+    if not email:
+        return RedirectResponse(url="/login", status_code=303)
+    if email not in ADMIN_EMAILS:
+        raise HTTPException(status_code=403, detail="Unauthorized: Access is restricted to site administrators.")
+        
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, email, created_at FROM users ORDER BY created_at DESC")
+        users = cursor.fetchall()
+        conn.close()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error while querying registered users: {str(e)}")
+        
+    user_rows_html = ""
+    for u_id, u_email, created_at in users:
+        role_badge = '<span class="badge-admin">🛡️ Administrator</span>' if u_email in ADMIN_EMAILS else '<span class="badge-user">👤 Registered User</span>'
+        user_rows_html += f"""
+        <tr>
+            <td><strong>#{u_id}</strong></td>
+            <td><code>{u_email}</code></td>
+            <td>{role_badge}</td>
+            <td><small>{created_at}</small></td>
+        </tr>
+        """
+        
+    if not user_rows_html:
+        user_rows_html = '<tr><td colspan="4" style="text-align: center; color: #888; padding: 40px;">No registered accounts found in the database.</td></tr>'
+        
+    total_users = len(users)
+    
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+        <head>
+            <title>LeadGrove Admin - User Directory 🛡️</title>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>
+                body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background-color: #f4f6f9; color: #333; margin: 0; padding: 20px; }}
+                .container {{ max-width: 1000px; margin: 20px auto; background: white; padding: 40px; border-radius: 12px; box-shadow: 0px 4px 15px rgba(0,0,0,0.05); }}
+                header {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eaeaea; padding-bottom: 20px; margin-bottom: 30px; }}
+                h1 {{ margin: 0; color: #1a237e; font-size: 24px; }}
+                .btn-back {{ display: inline-block; background-color: #1a237e; color: white; padding: 10px 18px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 14px; transition: background 0.2s; }}
+                .btn-back:hover {{ background-color: #0d1b2a; }}
+                table {{ width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }}
+                th, td {{ padding: 12px 15px; text-align: left; border-bottom: 1px solid #eaeaea; }}
+                th {{ background-color: #f8f9fa; color: #495057; font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; }}
+                tr:hover {{ background-color: #fdfdfd; }}
+                .badge-admin {{ background-color: #e8f5e9; color: #2e7d32; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 11px; border: 1px solid #c8e6c9; }}
+                .badge-user {{ background-color: #e3f2fd; color: #0d47a1; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 11px; border: 1px solid #bbdefb; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                {user_header_bar}
+                <header>
+                    <div>
+                        <h1>🛡️ LeadGrove Registered Users Directory</h1>
+                        <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">Total registered accounts using LeadGrove: <strong>{total_users}</strong></p>
+                    </div>
+                    <a href="/dashboard" class="btn-back">⬅️ Back to Dashboard</a>
+                </header>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th>User ID</th>
+                            <th>Email Address</th>
+                            <th>Role</th>
+                            <th>Registration Date (UTC)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {user_rows_html}
+                    </tbody>
+                </table>
+            </div>
+        </body>
+    </html>
+    """
+    return HTMLResponse(html_content)
+
 @app.get("/", response_class=HTMLResponse)
 def read_root(request: Request):
     """Agency Portal Landing Page with Auth Check."""
@@ -925,6 +1013,20 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
 
     # Conditionally show the Client header column
     client_th_html = '<th>Client Account</th>' if selected_client_id == 0 else ''
+    admin_link_html = ""
+    if email in ADMIN_EMAILS:
+        admin_link_html = ' | <a href="/admin/users" style="color: #2e7d32; text-decoration: none; font-weight: bold; margin-left: 5px;">🛡️ Admin User Directory</a>'
+        
+    user_header_bar = f"""
+    <div style="display: flex; justify-content: space-between; align-items: center; background-color: #f1f3f4; padding: 10px 15px; border-radius: 6px; margin-bottom: 20px; font-size: 13px;">
+        <div>
+            <span style="color: #666; font-weight: bold;">👤 Active Session:</span> <span style="font-weight: bold; color: #1a237e;">{email}</span>
+            {admin_link_html}
+        </div>
+        <a href="/logout" style="color: #c62828; text-decoration: none; font-weight: bold; display: flex; align-items: center; gap: 4px;">🚪 Log Out</a>
+    </div>
+    """
+
 
     return f"""
     <!DOCTYPE html>
@@ -1283,6 +1385,20 @@ def view_settings(request: Request, client_id: Optional[int] = None):
     # Setup the live Integration webhook variables to display on the page
     # Since these are loaded in the browser, window.location.origin is perfect!
     client_name = client_data.get("name", "")
+    admin_link_html = ""
+    if email in ADMIN_EMAILS:
+        admin_link_html = ' | <a href="/admin/users" style="color: #2e7d32; text-decoration: none; font-weight: bold; margin-left: 5px;">🛡️ Admin User Directory</a>'
+        
+    user_header_bar = f"""
+    <div style="display: flex; justify-content: space-between; align-items: center; background-color: #f1f3f4; padding: 10px 15px; border-radius: 6px; margin-bottom: 20px; font-size: 13px;">
+        <div>
+            <span style="color: #666; font-weight: bold;">👤 Active Session:</span> <span style="font-weight: bold; color: #1a237e;">{email}</span>
+            {admin_link_html}
+        </div>
+        <a href="/logout" style="color: #c62828; text-decoration: none; font-weight: bold; display: flex; align-items: center; gap: 4px;">🚪 Log Out</a>
+    </div>
+    """
+
     
     return f"""
     <!DOCTYPE html>
@@ -1449,6 +1565,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
         </head>
         <body>
             <div class="container">
+                {user_header_bar}
                 <header>
                     <div>
                         <h1>Client Configuration Settings ⚙️</h1>
@@ -2479,6 +2596,20 @@ def add_client_page(request: Request):
         conn.close()
     except Exception:
         next_id = 1
+    admin_link_html = ""
+    if email in ADMIN_EMAILS:
+        admin_link_html = ' | <a href="/admin/users" style="color: #2e7d32; text-decoration: none; font-weight: bold; margin-left: 5px;">🛡️ Admin User Directory</a>'
+        
+    user_header_bar = f"""
+    <div style="display: flex; justify-content: space-between; align-items: center; background-color: #f1f3f4; padding: 10px 15px; border-radius: 6px; margin-bottom: 20px; font-size: 13px;">
+        <div>
+            <span style="color: #666; font-weight: bold;">👤 Active Session:</span> <span style="font-weight: bold; color: #1a237e;">{email}</span>
+            {admin_link_html}
+        </div>
+        <a href="/logout" style="color: #c62828; text-decoration: none; font-weight: bold; display: flex; align-items: center; gap: 4px;">🚪 Log Out</a>
+    </div>
+    """
+
         
     html_content = """
     <!DOCTYPE html>
@@ -3702,6 +3833,7 @@ def add_client_page(request: Request):
         </body>
     </html>
     """
+    html_content = html_content.replace('<body>\n            <div class="container">', f'<body>\n            <div class="container">\n                {user_header_bar}')
     html_content = html_content.replace("conversions-[id]", f"conversions-{next_id}")
     return HTMLResponse(html_content)
 
