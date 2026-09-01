@@ -1412,6 +1412,39 @@ def view_settings(client_id: Optional[int] = None):
                                 </ol>
                             </div>
                         </div>
+                        <!-- CONDITIONAL INPUT: Zoho Setup Instructions -->
+                        <div id="sot-zoho-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
+                            <div style="background-color: #e8f5e9; border-left: 4px solid #2e7d32; padding: 15px; border-radius: 4px; color: #1b5e20; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                💡 <strong>Zoho CRM Outbound Webhook Setup Guide:</strong><br>
+                                <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #2e7d32;">
+                                    <li>Click the <strong>Setup (Gear Icon)</strong> in the top-right corner of your Zoho CRM dashboard.</li>
+                                    <li>Under <strong>Automation</strong>, click on <strong>Actions</strong>, then select the <strong>Webhooks</strong> tab at the top.</li>
+                                    <li>Click <strong>Configure Webhook</strong> and configure these fields:
+                                        <ul style="list-style-type: disc; padding-left: 15px; margin: 4px 0;">
+                                            <li><strong>Name</strong>: <code>LeadGroove Conversion Sync</code></li>
+                                            <li><strong>URL to notify</strong>: <code style="background: rgba(0,0,0,0.05); padding: 2px 4px; border-radius: 3px;">https://your-agency-app.onrender.com/webhooks/crm?client_id=conversions-{{active_client_id}}</code></li>
+                                            <li><strong>Method</strong>: Select <strong>POST</strong></li>
+                                            <li><strong>Module</strong>: Select <strong>Deals</strong> (or your tracking module)</li>
+                                        </ul>
+                                    </li>
+                                    <li>In the <strong>Body</strong> parameters section:
+                                        <ul style="list-style-type: disc; padding-left: 15px; margin: 4px 0;">
+                                            <li>Choose <strong>Raw</strong> format and select <strong>JSON</strong> from the dropdown.</li>
+                                            <li>Type <code>#</code> to dynamically insert CRM fields into this JSON structure:
+                                                <pre style="background: rgba(255,255,255,0.7); padding: 8px; border-radius: 4px; margin-top: 5px; font-family: monospace; font-size: 10px; overflow-x: auto; border: 1px solid #c8e6c9; color: #1b5e20;">{{
+  "customer_name": "${{Deals.Deal Name}}",
+  "customer_email": "${{Deals.Email}}",
+  "customer_phone": "${{Deals.Phone}}",
+  "deal_stage": "${{Deals.Stage}}",
+  "deal_value": ${{Deals.Amount}}
+}}</pre>
+                                            </li>
+                                        </ul>
+                                    </li>
+                                    <li>Click <strong>Save</strong>. Next, go to <strong>Workflow Rules</strong> (under Setup &gt; Automation) and create a rule triggered on Deal Update when the <strong>Stage is Closed Won</strong>, then associate this Webhook as an <strong>Instant Action</strong>!</li>
+                                </ol>
+                            </div>
+                        </div>
 
                             <!-- CONDITIONAL: CRM Lead status tags -->
                             <div id="sot-lead-tags-box" class="conditional-box">
@@ -1701,6 +1734,7 @@ def view_settings(client_id: Optional[int] = None):
                     const billingCard = document.getElementById('billing-webhook-card');
                     const emailCard = document.getElementById('email-webhook-card');
                     const salesforceBox = document.getElementById('sot-salesforce-instructions-box');
+                    const zohoBox = document.getElementById('sot-zoho-instructions-box');
                     
                     // Hide all by default
                     dealBox.style.display = 'none';
@@ -1708,6 +1742,7 @@ def view_settings(client_id: Optional[int] = None):
                     emailBox.style.display = 'none';
                     if (hsBox) hsBox.style.display = 'none';
                     if (salesforceBox) salesforceBox.style.display = 'none';
+                    if (zohoBox) zohoBox.style.display = 'none';
                     
                     crmCard.style.display = 'none';
                     billingCard.style.display = 'none';
@@ -1720,6 +1755,8 @@ def view_settings(client_id: Optional[int] = None):
                             hsBox.style.display = 'block';
                         }} else if (sot === 'salesforce' && salesforceBox) {{
                             salesforceBox.style.display = 'block';
+                        }} else if (sot === 'zoho' && zohoBox) {{
+                            zohoBox.style.display = 'block';
                         }}
                     }} else if (['servicetitan', 'housecallpro'].includes(sot)) {{
                         leadBox.style.display = 'block';
@@ -2428,6 +2465,40 @@ def add_client_page():
                             </div>
                         </div>
 
+                        <!-- CONDITIONAL INPUT: Zoho Setup Instructions -->
+                        <div id="sot-zoho-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
+                            <div style="background-color: #e8f5e9; border-left: 4px solid #2e7d32; padding: 15px; border-radius: 4px; color: #1b5e20; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                💡 <strong>Zoho CRM Outbound Webhook Setup Guide:</strong><br>
+                                <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #2e7d32;">
+                                    <li>Click the <strong>Setup (Gear Icon)</strong> in the top-right corner of your Zoho CRM dashboard.</li>
+                                    <li>Under <strong>Automation</strong>, click on <strong>Actions</strong>, then select the <strong>Webhooks</strong> tab at the top.</li>
+                                    <li>Click <strong>Configure Webhook</strong> and configure these fields:
+                                        <ul style="list-style-type: disc; padding-left: 15px; margin: 4px 0;">
+                                            <li><strong>Name</strong>: <code>LeadGroove Conversion Sync</code></li>
+                                            <li><strong>URL to notify</strong>: <code style="background: rgba(0,0,0,0.05); padding: 2px 4px; border-radius: 3px;">https://your-agency-app.onrender.com/webhooks/crm?client_id=conversions-[id]</code></li>
+                                            <li><strong>Method</strong>: Select <strong>POST</strong></li>
+                                            <li><strong>Module</strong>: Select <strong>Deals</strong> (or your tracking module)</li>
+                                        </ul>
+                                    </li>
+                                    <li>In the <strong>Body</strong> parameters section:
+                                        <ul style="list-style-type: disc; padding-left: 15px; margin: 4px 0;">
+                                            <li>Choose <strong>Raw</strong> format and select <strong>JSON</strong> from the dropdown.</li>
+                                            <li>Type <code>#</code> to dynamically insert CRM fields into this JSON structure:
+                                                <pre style="background: rgba(255,255,255,0.7); padding: 8px; border-radius: 4px; margin-top: 5px; font-family: monospace; font-size: 10px; overflow-x: auto; border: 1px solid #c8e6c9; color: #1b5e20;">{
+  "customer_name": "${Deals.Deal Name}",
+  "customer_email": "${Deals.Email}",
+  "customer_phone": "${Deals.Phone}",
+  "deal_stage": "${Deals.Stage}",
+  "deal_value": ${Deals.Amount}
+}</pre>
+                                            </li>
+                                        </ul>
+                                    </li>
+                                    <li>Click <strong>Save</strong>. Next, go to <strong>Workflow Rules</strong> (under Setup &gt; Automation) and create a rule triggered on Deal Update when the <strong>Stage is Closed Won</strong>, then associate this Webhook as an <strong>Instant Action</strong>!</li>
+                                </ol>
+                            </div>
+                        </div>
+
                         <!-- CONDITIONAL INPUT: CRM Lead status tags (ServiceTitan, Housecall Pro) -->
                         <div id="sot-lead-tags-box" class="conditional-box">
                             <label for="crm_lead_tags">Which tags/statuses under <strong>Leads</strong> signify qualification?</label>
@@ -2953,12 +3024,14 @@ def add_client_page():
                     const emailBox = document.getElementById('sot-email-box');
                     const hsBox = document.getElementById('sot-hubspot-instructions-box');
                     const salesforceBox = document.getElementById('sot-salesforce-instructions-box');
+                    const zohoBox = document.getElementById('sot-zoho-instructions-box');
                     
                     dealBox.style.display = 'none';
                     leadBox.style.display = 'none';
                     emailBox.style.display = 'none';
                     if (hsBox) hsBox.style.display = 'none';
                     if (salesforceBox) salesforceBox.style.display = 'none';
+                    if (zohoBox) zohoBox.style.display = 'none';
                     
                     if (['hubspot', 'salesforce', 'zoho'].includes(sot)) {
                         dealBox.style.display = 'block';
@@ -2966,6 +3039,8 @@ def add_client_page():
                             hsBox.style.display = 'block';
                         } else if (sot === 'salesforce' && salesforceBox) {
                             salesforceBox.style.display = 'block';
+                        } else if (sot === 'zoho' && zohoBox) {
+                            zohoBox.style.display = 'block';
                         }
                     } else if (['servicetitan', 'housecallpro'].includes(sot)) {
                         leadBox.style.display = 'block';
