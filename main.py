@@ -560,12 +560,21 @@ def view_dashboard(client_id: Optional[int] = None):
         # Display the client column only in the multi-client view
         client_column_html = f'<td><span class="client-badge">{client_name_linked}</span></td>' if selected_client_id == 0 else ''
         
+        # Beautiful lead source delineation (Phone Call vs Web Form)
+        source_lower = str(source).lower() if source else ""
+        if 'form' in source_lower:
+            source_badge = '<span class="badge-source badge-form">📝 Web Form</span>'
+        elif any(x in source_lower for x in ['call', 'phone', 'callrail']):
+            source_badge = '<span class="badge-source badge-call">📞 Phone Call</span>'
+        else:
+            source_badge = f'<span class="badge-source">{str(source).upper()}</span>'
+            
         table_rows_html += f"""
         <tr>
             <td>{id_val}</td>
             {client_column_html}
             <td><small>{created_at}</small></td>
-            <td><span class="badge-source">{source.upper()}</span></td>
+            <td>{source_badge}</td>
             <td><strong>{name or 'Unknown'}</strong><br><small style="color:#666;">{phone}</small></td>
             <td>{click_ids_display}</td>
             <td>{qual_badge}</td>
@@ -629,7 +638,9 @@ def view_dashboard(client_id: Optional[int] = None):
                 th, td {{ padding: 12px 15px; text-align: left; border-bottom: 1px solid #eaeaea; }}
                 th {{ background-color: #f8f9fa; color: #495057; font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; }}
                 tr:hover {{ background-color: #fdfdfd; }}
-                .badge-source {{ background: #e0f2f1; color: #00695c; font-size: 11px; padding: 2px 6px; border-radius: 4px; font-weight: bold; }}
+                .badge-source {{ font-size: 11px; padding: 4px 8px; border-radius: 6px; font-weight: bold; border: 1px solid transparent; display: inline-flex; align-items: center; gap: 4px; }}
+                .badge-source.badge-call {{ background: #e3f2fd; color: #0d47a1; border-color: #bbdefb; }}
+                .badge-source.badge-form {{ background: #f3e5f5; color: #4a148c; border-color: #e1bee7; }}
                 .client-badge {{ background: #eceff1; color: #37474f; font-size: 11px; padding: 3px 8px; border-radius: 4px; font-weight: bold; border: 1px solid #cfd8dc; }}
                 
                 .btn-export {{ display: block; color: white; padding: 10px 12px; border-radius: 5px; font-weight: bold; font-size: 13px; border: none; transition: filter 0.2s; cursor: pointer; }}
