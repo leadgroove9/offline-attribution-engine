@@ -588,40 +588,52 @@ def get_register(request: Request, error: Optional[str] = None):
 
 @app.post("/register")
 async def post_register(request: Request):
-    form_data = await request.form()
-    email = form_data.get("email", "").strip().lower()
-    password = form_data.get("password")
-    confirm_password = form_data.get("confirm_password")
-    
-    if not email or not password or not confirm_password:
-        return get_register(request, error="All fields are required.")
-    if password != confirm_password:
-        return get_register(request, error="Passwords do not match.")
-    if len(password) < 6:
-        return get_register(request, error="Password must be at least 6 characters.")
-        
     try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
+        form_data = await request.form()
+        email = form_data.get("email", "").strip().lower()
+        password = form_data.get("password")
+        confirm_password = form_data.get("confirm_password")
         
-        # Check if user already exists
-        cursor.execute("SELECT id FROM users WHERE email = ?", (email,))
-        if cursor.fetchone():
-            conn.close()
-            return get_register(request, error="An account with this email already exists.")
+        if not email or not password or not confirm_password:
+            return get_register(request, error="All fields are required.")
+        if password != confirm_password:
+            return get_register(request, error="Passwords do not match.")
+        if len(password) < 6:
+            return get_register(request, error="Password must be at least 6 characters.")
             
-        hashed = hash_password(password)
-        cursor.execute("INSERT INTO users (email, hashed_password) VALUES (?, ?)", (email, hashed))
-        conn.commit()
-        conn.close()
-        
-        # Auto-login after registration
-        token = create_session(email)
-        response = RedirectResponse(url="/dashboard", status_code=303)
-        response.set_cookie(key="session_token", value=token, max_age=86400 * 30, httponly=True)
-        return response
-    except Exception as e:
-        return get_register(request, error=f"Database error: {str(e)}")
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            cursor = conn.cursor()
+            
+            # Check if user already exists
+            cursor.execute("SELECT id FROM users WHERE email = ?", (email,))
+            if cursor.fetchone():
+                conn.close()
+                return get_register(request, error="An account with this email already exists.")
+                
+            hashed = hash_password(password)
+            cursor.execute("INSERT INTO users (email, hashed_password) VALUES (?, ?)", (email, hashed))
+            conn.commit()
+            conn.close()
+            
+            # Auto-login after registration
+            token = create_session(email)
+            response = RedirectResponse(url="/dashboard", status_code=303)
+            response.set_cookie(key="session_token", value=token, max_age=86400 * 30, httponly=True)
+            return response
+        except Exception as e:
+            return get_register(request, error=f"Database error: {str(e)}")
+    except Exception as outer_e:
+        import traceback
+        tb = traceback.format_exc()
+        return HTMLResponse(f"""
+        <html>
+            <body style="font-family: monospace; padding: 40px; background-color: #ffebee; color: #c62828;">
+                <h2>❌ Unhandled Registration Error</h2>
+                <pre>{tb}</pre>
+            </body>
+        </html>
+        """, status_code=500)
 
 @app.get("/login", response_class=HTMLResponse)
 def get_login(request: Request, error: Optional[str] = None):
@@ -672,29 +684,41 @@ def get_login(request: Request, error: Optional[str] = None):
 
 @app.post("/login")
 async def post_login(request: Request):
-    form_data = await request.form()
-    email = form_data.get("email", "").strip().lower()
-    password = form_data.get("password")
-    
-    if not email or not password:
-        return get_login(request, error="All fields are required.")
-        
     try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT hashed_password FROM users WHERE email = ?", (email,))
-        row = cursor.fetchone()
-        conn.close()
+        form_data = await request.form()
+        email = form_data.get("email", "").strip().lower()
+        password = form_data.get("password")
         
-        if not row or not verify_password(row[0], password):
-            return get_login(request, error="Invalid email or password.")
+        if not email or not password:
+            return get_login(request, error="All fields are required.")
             
-        token = create_session(email)
-        response = RedirectResponse(url="/dashboard", status_code=303)
-        response.set_cookie(key="session_token", value=token, max_age=86400 * 30, httponly=True)
-        return response
-    except Exception as e:
-        return get_login(request, error=f"Database error: {str(e)}")
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            cursor = conn.cursor()
+            cursor.execute("SELECT hashed_password FROM users WHERE email = ?", (email,))
+            row = cursor.fetchone()
+            conn.close()
+            
+            if not row or not verify_password(row[0], password):
+                return get_login(request, error="Invalid email or password.")
+                
+            token = create_session(email)
+            response = RedirectResponse(url="/dashboard", status_code=303)
+            response.set_cookie(key="session_token", value=token, max_age=86400 * 30, httponly=True)
+            return response
+        except Exception as e:
+            return get_login(request, error=f"Database error: {str(e)}")
+    except Exception as outer_e:
+        import traceback
+        tb = traceback.format_exc()
+        return HTMLResponse(f"""
+        <html>
+            <body style="font-family: monospace; padding: 40px; background-color: #ffebee; color: #c62828;">
+                <h2>❌ Unhandled Login Error</h2>
+                <pre>{tb}</pre>
+            </body>
+        </html>
+        """, status_code=500)
 
 @app.get("/logout")
 def get_logout(request: Request):
