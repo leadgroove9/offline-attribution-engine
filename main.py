@@ -1368,6 +1368,28 @@ def view_settings(client_id: Optional[int] = None):
                                 </div>
                             </div>
                             
+                            <!-- CONDITIONAL: HubSpot Setup Instructions -->
+                            <div id="sot-hubspot-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px;">
+                                <div style="background-color: #fff8e1; border-left: 4px solid #ffb300; padding: 15px; border-radius: 4px; color: #5d4037; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                    💡 <strong>HubSpot Private App Quick Setup Guide:</strong><br>
+                                    <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #4e342e;">
+                                        <li>Log into HubSpot as a <strong>Super Admin</strong>.</li>
+                                        <li>Go to <strong>Settings (Gear Icon) &gt; Integrations &gt; Private Apps</strong>.</li>
+                                        <li>Click <strong>Create Private App</strong> and configure basic info.</li>
+                                        <li>Under <strong>Scopes</strong>, search <code>CRM</code> and check <code>Read</code> permissions for:
+                                            <ul style="list-style-type: disc; padding-left: 15px; margin: 4px 0;">
+                                                <li><code>crm.objects.deals.read</code> (to track closed sales &amp; revenue)</li>
+                                                <li><code>crm.objects.contacts.read</code> (to sync leads)</li>
+                                            </ul>
+                                        </li>
+                                        <li>Click <strong>Create App</strong>. If you want real-time syncing, click the <strong>Webhooks</strong> tab of your new app, click <strong>Edit Webhooks</strong>, paste your dynamic target URL (provided above on this screen), and subscribe to <code>propertyChange</code> or <code>creation</code> for <strong>Deals</strong>!</li>
+                                    </ol>
+                                    <small style="display: block; font-style: italic; color: #6d4c41; line-height: 1.4; border-top: 1px solid #ffe082; padding-top: 8px;">
+                                        ⚠️ <strong>Tip:</strong> If you don't see the "Webhooks" tab inside Private App settings, go to your HubSpot profile (top-right) &gt; <strong>Product Updates &gt; Betas</strong>, click <strong>Join Beta</strong> for <em>"Private App Webhooks"</em>, and refresh!
+                                    </small>
+                                </div>
+                            </div>
+                            
                             <!-- CONDITIONAL: CRM Lead status tags -->
                             <div id="sot-lead-tags-box" class="conditional-box">
                                 <label for="crm_lead_tags">Which statuses under <strong>Leads</strong> signify qualification?</label>
@@ -1650,6 +1672,7 @@ def view_settings(client_id: Optional[int] = None):
                     const dealBox = document.getElementById('sot-deal-tags-box');
                     const leadBox = document.getElementById('sot-lead-tags-box');
                     const emailBox = document.getElementById('sot-email-box');
+                    const hsBox = document.getElementById('sot-hubspot-instructions-box');
                     
                     const crmCard = document.getElementById('crm-webhook-card');
                     const billingCard = document.getElementById('billing-webhook-card');
@@ -1659,6 +1682,7 @@ def view_settings(client_id: Optional[int] = None):
                     dealBox.style.display = 'none';
                     leadBox.style.display = 'none';
                     emailBox.style.display = 'none';
+                    if (hsBox) hsBox.style.display = 'none';
                     
                     crmCard.style.display = 'none';
                     billingCard.style.display = 'none';
@@ -1667,6 +1691,9 @@ def view_settings(client_id: Optional[int] = None):
                     if (['hubspot', 'salesforce', 'zoho'].includes(sot)) {{
                         dealBox.style.display = 'block';
                         crmCard.style.display = 'block';
+                        if (sot === 'hubspot' && hsBox) {{
+                            hsBox.style.display = 'block';
+                        }}
                     }} else if (['servicetitan', 'housecallpro'].includes(sot)) {{
                         leadBox.style.display = 'block';
                         crmCard.style.display = 'block';
@@ -2329,6 +2356,28 @@ def add_client_page():
                             </div>
                         </div>
                         
+                        <!-- CONDITIONAL INPUT: HubSpot Setup Instructions -->
+                        <div id="sot-hubspot-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: block;">
+                            <div style="background-color: #fff8e1; border-left: 4px solid #ffb300; padding: 15px; border-radius: 4px; color: #5d4037; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                💡 <strong>HubSpot Private App Quick Setup Guide:</strong><br>
+                                <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #4e342e;">
+                                    <li>Log into HubSpot as a <strong>Super Admin</strong>.</li>
+                                    <li>Go to <strong>Settings (Gear Icon) &gt; Integrations &gt; Private Apps</strong>.</li>
+                                    <li>Click <strong>Create Private App</strong> and configure basic info.</li>
+                                    <li>Under <strong>Scopes</strong>, search <code>CRM</code> and check <code>Read</code> permissions for:
+                                        <ul style="list-style-type: disc; padding-left: 15px; margin: 4px 0;">
+                                            <li><code>crm.objects.deals.read</code> (to track closed sales &amp; revenue)</li>
+                                            <li><code>crm.objects.contacts.read</code> (to sync leads)</li>
+                                        </ul>
+                                    </li>
+                                    <li>Click <strong>Create App</strong>. If you want real-time syncing, click the <strong>Webhooks</strong> tab of your new app, click <strong>Edit Webhooks</strong>, paste your dynamic target URL (provided on the next screen once saved), and subscribe to <code>propertyChange</code> or <code>creation</code> for <strong>Deals</strong>!</li>
+                                </ol>
+                                <small style="display: block; font-style: italic; color: #6d4c41; line-height: 1.4; border-top: 1px solid #ffe082; padding-top: 8px;">
+                                    ⚠️ <strong>Tip:</strong> If you don't see the "Webhooks" tab inside Private App settings, go to your HubSpot profile (top-right) &gt; <strong>Product Updates &gt; Betas</strong>, click <strong>Join Beta</strong> for <em>"Private App Webhooks"</em>, and refresh!
+                                </small>
+                            </div>
+                        </div>
+                        
                         <!-- CONDITIONAL INPUT: CRM Lead status tags (ServiceTitan, Housecall Pro) -->
                         <div id="sot-lead-tags-box" class="conditional-box">
                             <label for="crm_lead_tags">Which tags/statuses under <strong>Leads</strong> signify qualification?</label>
@@ -2852,13 +2901,18 @@ def add_client_page():
                     const dealBox = document.getElementById('sot-deal-tags-box');
                     const leadBox = document.getElementById('sot-lead-tags-box');
                     const emailBox = document.getElementById('sot-email-box');
+                    const hsBox = document.getElementById('sot-hubspot-instructions-box');
                     
                     dealBox.style.display = 'none';
                     leadBox.style.display = 'none';
                     emailBox.style.display = 'none';
+                    if (hsBox) hsBox.style.display = 'none';
                     
                     if (['hubspot', 'salesforce', 'zoho'].includes(sot)) {
                         dealBox.style.display = 'block';
+                        if (sot === 'hubspot' && hsBox) {
+                            hsBox.style.display = 'block';
+                        }
                     } else if (['servicetitan', 'housecallpro'].includes(sot)) {
                         leadBox.style.display = 'block';
                     } else if (sot === 'email' || sot === 'ai_rating') {
