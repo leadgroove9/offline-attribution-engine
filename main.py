@@ -1252,7 +1252,7 @@ def view_settings(client_id: Optional[int] = None):
                                     </select>
                                 </div>
                                 <div class="form-group" style="margin-bottom: 0;">
-                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 5px;">
                                         <label for="email_account" style="font-weight: bold; margin-bottom: 0; display: inline-flex; align-items: center; gap: 4px;">
                                             Onboarding Integration Email Account
                                             <span class="tooltip-icon">
@@ -2169,7 +2169,7 @@ def add_client_page():
                                 </select>
                             </div>
                             <div class="form-group" style="margin-bottom: 0;">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 5px;">
                                     <label for="email_account" style="font-weight: bold; margin-bottom: 0; display: inline-flex; align-items: center; gap: 4px;">
                                         Onboarding Integration Email Account
                                         <span class="tooltip-icon">
