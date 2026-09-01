@@ -894,6 +894,20 @@ def get_admin_users(request: Request):
         
     total_users = len(users)
     
+    admin_link_html = ""
+    if email in ADMIN_EMAILS:
+        admin_link_html = ' | <a href="/admin/users" style="color: #2e7d32; text-decoration: none; font-weight: bold; margin-left: 5px;">🛡️ Admin User Directory</a>'
+        
+    user_header_bar = f"""
+    <div style="display: flex; justify-content: space-between; align-items: center; background-color: #f1f3f4; padding: 10px 15px; border-radius: 6px; margin-bottom: 20px; font-size: 13px;">
+        <div>
+            <span style="color: #666; font-weight: bold;">👤 Active Session:</span> <span style="font-weight: bold; color: #1a237e;">{email}</span>
+            {admin_link_html}
+        </div>
+        <a href="/logout" style="color: #c62828; text-decoration: none; font-weight: bold; display: flex; align-items: center; gap: 4px;">🚪 Log Out</a>
+    </div>
+    """
+    
     html_content = f"""
     <!DOCTYPE html>
     <html>
