@@ -1821,7 +1821,6 @@ def view_settings(client_id: Optional[int] = None):
                     const housecallproBox = document.getElementById('sot-housecallpro-instructions-box');
                     const quickbooksBox = document.getElementById('sot-quickbooks-instructions-box');
                     const xeroBox = document.getElementById('sot-xero-instructions-box');
-                    const xeroBox = document.getElementById('sot-xero-instructions-box');
                     
                     // Hide all by default
                     dealBox.style.display = 'none';
@@ -1833,7 +1832,6 @@ def view_settings(client_id: Optional[int] = None):
                     if (servicetitanBox) servicetitanBox.style.display = 'none';
                     if (housecallproBox) housecallproBox.style.display = 'none';
                     if (quickbooksBox) quickbooksBox.style.display = 'none';
-                    if (xeroBox) xeroBox.style.display = 'none';
                     if (xeroBox) xeroBox.style.display = 'none';
                     
                     crmCard.style.display = 'none';
@@ -3213,7 +3211,6 @@ def add_client_page():
                     const housecallproBox = document.getElementById('sot-housecallpro-instructions-box');
                     const quickbooksBox = document.getElementById('sot-quickbooks-instructions-box');
                     const xeroBox = document.getElementById('sot-xero-instructions-box');
-                    const xeroBox = document.getElementById('sot-xero-instructions-box');
                     
                     dealBox.style.display = 'none';
                     leadBox.style.display = 'none';
@@ -3224,7 +3221,6 @@ def add_client_page():
                     if (servicetitanBox) servicetitanBox.style.display = 'none';
                     if (housecallproBox) housecallproBox.style.display = 'none';
                     if (quickbooksBox) quickbooksBox.style.display = 'none';
-                    if (xeroBox) xeroBox.style.display = 'none';
                     if (xeroBox) xeroBox.style.display = 'none';
                     
                     if (['hubspot', 'salesforce', 'zoho'].includes(sot)) {
