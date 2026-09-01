@@ -1938,7 +1938,7 @@ def add_client_page():
                 
                 .btn-submit { display: inline-block; background-color: #1a237e; color: white !important; text-decoration: none; padding: 12px 24px; border: none; border-radius: 6px; font-weight: bold; font-size: 15px; cursor: pointer; transition: background 0.2s; }
                 .btn-submit:hover { background-color: #0d1b2a; }
-                .btn-cancel { color: #666 !important; text-decoration: none; font-size: 14px; font-weight: bold; }
+                .btn-cancel { color: #666 !important; text-decoration: none; font-size: 14px; font-weight: bold; display: inline-block; margin-top: 25px; }
                 .btn-cancel:hover { color: #333 !important; }
                 
                 .alert { padding: 12px; border-radius: 6px; margin-bottom: 20px; display: none; font-size: 14px; font-weight: 600; }
