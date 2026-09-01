@@ -1871,7 +1871,21 @@ def update_client_settings(client: ClientUpdate):
 @app.get("/dashboard/add-client", response_class=HTMLResponse)
 def add_client_page():
     """Page to onboard a new client with complete wizard properties."""
-    return """
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT seq FROM sqlite_sequence WHERE name = 'clients'")
+        row = cursor.fetchone()
+        next_id = (row[0] + 1) if row else 1
+        if not row:
+            cursor.execute("SELECT MAX(id) FROM clients")
+            max_row = cursor.fetchone()
+            next_id = (max_row[0] + 1) if (max_row and max_row[0] is not None) else 1
+        conn.close()
+    except Exception:
+        next_id = 1
+        
+    html_content = """
     <!DOCTYPE html>
     <html>
         <head>
@@ -2900,6 +2914,8 @@ def add_client_page():
         </body>
     </html>
     """
+    html_content = html_content.replace("conversions-[id]", f"conversions-{next_id}")
+    return HTMLResponse(html_content)
 
 
 
