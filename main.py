@@ -5,12 +5,67 @@ import json
 import csv
 import io
 from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import HTMLResponse, StreamingResponse, Response
+from fastapi.responses import HTMLResponse, StreamingResponse, Response, RedirectResponse
 from pydantic import BaseModel
 from typing import Optional
 from anthropic import Anthropic
 
 # Initialize FastAPI App
+
+import hashlib
+import uuid
+
+def hash_password(password: str) -> str:
+    salt = uuid.uuid4().hex
+    hashed = hashlib.sha256(salt.encode() + password.encode()).hexdigest()
+    return f"{salt}:{hashed}"
+
+def verify_password(stored_password: str, provided_password: str) -> bool:
+    try:
+        salt, hashed = stored_password.split(":")
+        check_hashed = hashlib.sha256(salt.encode() + provided_password.encode()).hexdigest()
+        return check_hashed == hashed
+    except Exception:
+        return False
+
+def create_session(email: str) -> str:
+    token = uuid.uuid4().hex
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO user_sessions (token, email) VALUES (?, ?)", (token, email))
+    conn.commit()
+    conn.close()
+    return token
+
+def get_session_email(token: str) -> Optional[str]:
+    if not token:
+        return None
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT email FROM user_sessions WHERE token = ?", (token,))
+        row = cursor.fetchone()
+        conn.close()
+        return row[0] if row else None
+    except Exception:
+        return None
+
+def delete_session(token: str):
+    if not token:
+        return
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM user_sessions WHERE token = ?", (token,))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+def is_authenticated(request: Request) -> Optional[str]:
+    token = request.cookies.get("session_token")
+    return get_session_email(token)
+
 app = FastAPI(
     title="Offline Attribution Engine (Multi-Tenant Multi-Channel)",
     description="Multi-tenant agency platform for tracking offline leads/sales and AI audits across Google, Meta, LinkedIn, and Microsoft",
@@ -26,6 +81,26 @@ def init_db():
     """Initializes the database, creates necessary tables, and self-heals schemas."""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
+    # 6. Create Users Table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            hashed_password TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    
+    # 7. Create User Sessions Table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS user_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            token TEXT UNIQUE NOT NULL,
+            email TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     
     # 1. Create Excluded Customers Table
     cursor.execute("""
@@ -459,10 +534,196 @@ class ClientCreate(BaseModel):
 # ENDPOINTS
 # ---------------------------------------------------------
 
+
+@app.get("/register", response_class=HTMLResponse)
+def get_register(request: Request, error: Optional[str] = None):
+    error_html = f'<div style="background-color: #ffebee; color: #c62828; padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; font-weight: bold; border-left: 4px solid #c62828;">❌ {error}</div>' if error else ''
+    return f"""
+    <html>
+        <head>
+            <title>Register - LeadGroove 🤖</title>
+            <style>
+                body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding-top: 100px; background-color: #f4f6f9; color: #333; }}
+                .container {{ display: inline-block; background: white; padding: 40px; border-radius: 12px; box-shadow: 0px 8px 24px rgba(0,0,0,0.08); max-width: 400px; width: 100%; text-align: left; box-sizing: border-box; }}
+                h1 {{ color: #1a237e; margin-top: 0; margin-bottom: 8px; font-size: 24px; font-weight: 700; text-align: center; }}
+                p {{ color: #666; font-size: 14px; margin-top: 0; margin-bottom: 24px; text-align: center; }}
+                .form-group {{ margin-bottom: 18px; }}
+                label {{ display: block; font-weight: bold; font-size: 12px; margin-bottom: 6px; color: #1a237e; text-transform: uppercase; letter-spacing: 0.5px; }}
+                input[type="email"], input[type="password"] {{ width: 100%; padding: 12px; border-radius: 6px; border: 1px solid #ced4da; font-size: 14px; box-sizing: border-box; transition: border-color 0.2s; }}
+                input[type="email"]:focus, input[type="password"]:focus {{ border-color: #1a237e; outline: none; }}
+                .btn {{ width: 100%; background-color: #1a237e; color: white; padding: 12px; border: none; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; margin-top: 10px; transition: background 0.2s; }}
+                .btn:hover {{ background-color: #0d1b2a; }}
+                .switch-link {{ text-align: center; margin-top: 20px; font-size: 13px; color: #555; }}
+                .switch-link a {{ color: #1a237e; text-decoration: none; font-weight: bold; }}
+                .switch-link a:hover {{ text-decoration: underline; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>Create Your Account</h1>
+                <p>Register to start tracking conversions on LeadGroove</p>
+                {error_html}
+                <form action="/register" method="POST">
+                    <div class="form-group">
+                        <label for="email">Email Address</label>
+                        <input type="email" id="email" name="email" required placeholder="e.g. corey@youragency.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" name="password" required placeholder="••••••••">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 25px;">
+                        <label for="confirm_password">Confirm Password</label>
+                        <input type="password" id="confirm_password" name="confirm_password" required placeholder="••••••••">
+                    </div>
+                    <button type="submit" class="btn">🚀 Create Account</button>
+                </form>
+                <div class="switch-link">
+                    Already have an account? <a href="/login">Log In</a>
+                </div>
+            </div>
+        </body>
+    </html>
+    """
+
+@app.post("/register")
+async def post_register(request: Request):
+    form_data = await request.form()
+    email = form_data.get("email", "").strip().lower()
+    password = form_data.get("password")
+    confirm_password = form_data.get("confirm_password")
+    
+    if not email or not password or not confirm_password:
+        return get_register(request, error="All fields are required.")
+    if password != confirm_password:
+        return get_register(request, error="Passwords do not match.")
+    if len(password) < 6:
+        return get_register(request, error="Password must be at least 6 characters.")
+        
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        # Check if user already exists
+        cursor.execute("SELECT id FROM users WHERE email = ?", (email,))
+        if cursor.fetchone():
+            conn.close()
+            return get_register(request, error="An account with this email already exists.")
+            
+        hashed = hash_password(password)
+        cursor.execute("INSERT INTO users (email, hashed_password) VALUES (?, ?)", (email, hashed))
+        conn.commit()
+        conn.close()
+        
+        # Auto-login after registration
+        token = create_session(email)
+        response = RedirectResponse(url="/dashboard", status_code=303)
+        response.set_cookie(key="session_token", value=token, max_age=86400 * 30, httponly=True)
+        return response
+    except Exception as e:
+        return get_register(request, error=f"Database error: {str(e)}")
+
+@app.get("/login", response_class=HTMLResponse)
+def get_login(request: Request, error: Optional[str] = None):
+    error_html = f'<div style="background-color: #ffebee; color: #c62828; padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; font-weight: bold; border-left: 4px solid #c62828;">❌ {error}</div>' if error else ''
+    return f"""
+    <html>
+        <head>
+            <title>Log In - LeadGroove 🤖</title>
+            <style>
+                body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding-top: 120px; background-color: #f4f6f9; color: #333; }}
+                .container {{ display: inline-block; background: white; padding: 40px; border-radius: 12px; box-shadow: 0px 8px 24px rgba(0,0,0,0.08); max-width: 400px; width: 100%; text-align: left; box-sizing: border-box; }}
+                h1 {{ color: #1a237e; margin-top: 0; margin-bottom: 8px; font-size: 24px; font-weight: 700; text-align: center; }}
+                p {{ color: #666; font-size: 14px; margin-top: 0; margin-bottom: 24px; text-align: center; }}
+                .form-group {{ margin-bottom: 18px; }}
+                label {{ display: block; font-weight: bold; font-size: 12px; margin-bottom: 6px; color: #1a237e; text-transform: uppercase; letter-spacing: 0.5px; }}
+                input[type="email"], input[type="password"] {{ width: 100%; padding: 12px; border-radius: 6px; border: 1px solid #ced4da; font-size: 14px; box-sizing: border-box; transition: border-color 0.2s; }}
+                input[type="email"]:focus, input[type="password"]:focus {{ border-color: #1a237e; outline: none; }}
+                .btn {{ width: 100%; background-color: #1a237e; color: white; padding: 12px; border: none; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; margin-top: 10px; transition: background 0.2s; }}
+                .btn:hover {{ background-color: #0d1b2a; }}
+                .switch-link {{ text-align: center; margin-top: 20px; font-size: 13px; color: #555; }}
+                .switch-link a {{ color: #1a237e; text-decoration: none; font-weight: bold; }}
+                .switch-link a:hover {{ text-decoration: underline; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>Welcome Back</h1>
+                <p>Log in to access your conversion dashboard</p>
+                {error_html}
+                <form action="/login" method="POST">
+                    <div class="form-group">
+                        <label for="email">Email Address</label>
+                        <input type="email" id="email" name="email" required placeholder="e.g. corey@youragency.com">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 25px;">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" name="password" required placeholder="••••••••">
+                    </div>
+                    <button type="submit" class="btn">🔑 Log In</button>
+                </form>
+                <div class="switch-link">
+                    Don't have an account? <a href="/register">Sign Up</a>
+                </div>
+            </div>
+        </body>
+    </html>
+    """
+
+@app.post("/login")
+async def post_login(request: Request):
+    form_data = await request.form()
+    email = form_data.get("email", "").strip().lower()
+    password = form_data.get("password")
+    
+    if not email or not password:
+        return get_login(request, error="All fields are required.")
+        
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT hashed_password FROM users WHERE email = ?", (email,))
+        row = cursor.fetchone()
+        conn.close()
+        
+        if not row or not verify_password(row[0], password):
+            return get_login(request, error="Invalid email or password.")
+            
+        token = create_session(email)
+        response = RedirectResponse(url="/dashboard", status_code=303)
+        response.set_cookie(key="session_token", value=token, max_age=86400 * 30, httponly=True)
+        return response
+    except Exception as e:
+        return get_login(request, error=f"Database error: {str(e)}")
+
+@app.get("/logout")
+def get_logout(request: Request):
+    token = request.cookies.get("session_token")
+    delete_session(token)
+    response = RedirectResponse(url="/", status_code=303)
+    response.delete_cookie("session_token")
+    return response
+
 @app.get("/", response_class=HTMLResponse)
-def read_root():
-    """Agency Portal Landing Page."""
-    return """
+def read_root(request: Request):
+    """Agency Portal Landing Page with Auth Check."""
+    email = is_authenticated(request)
+    user_header_html = ""
+    auth_buttons_html = ""
+    
+    if email:
+        user_header_html = f'<p style="color: #2e7d32; font-weight: bold; font-size: 15px;">👤 Logged in as: {email} | <a href="/logout" style="color: #c62828; text-decoration: none;">🚪 Log Out</a></p>'
+        auth_buttons_html = '<a href="/dashboard" class="btn">📊 Open Agency & Client Dashboard</a>'
+    else:
+        user_header_html = '<p style="color: #666; font-weight: bold; font-size: 14px;">🔒 Account registration is currently free</p>'
+        auth_buttons_html = '''
+            <div style="display: flex; gap: 15px; justify-content: center; margin-top: 20px;">
+                <a href="/login" class="btn" style="margin-top: 0; background-color: #1a237e;">🔑 Log In</a>
+                <a href="/register" class="btn" style="margin-top: 0; background-color: #2e7d32;">🚀 Sign Up Free</a>
+            </div>
+        '''
+        
+    return f"""
     <html>
         <head>
             <title>Multi-Tenant Multi-Channel Attribution Engine 🤖</title>
@@ -479,11 +740,11 @@ def read_root():
         </head>
         <body>
             <div class="container">
-                <h1>Multi-Channel Attribution Engine Live! 🚀</h1>
+                <h1>Welcome To Lead Grove's Offline Conversion Tracking Automation SAAS!</h1>
                 <p>Status: <span class="badge">Healthy, Multi-Tenant & AI-Enabled</span></p>
-                <p>Welcome, Corey. Your agency platform is live with secure SQLite schema routing and Claude 4.5 Haiku.</p>
-                
-                <a href="/dashboard" class="btn">📊 Open Agency & Client Dashboard</a>
+                <p>Just point us to your offline lead/sales data, and it gets imported to your AD accounts automatically.</p>
+                {user_header_html}
+                {auth_buttons_html}
                 
                 <div class="feature-list">
                     <h3>Multi-Tenant Architecture Capabilities:</h3>
@@ -501,7 +762,10 @@ def read_root():
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
-def view_dashboard(client_id: Optional[int] = None):
+def view_dashboard(request: Request, client_id: Optional[int] = None):
+    email = is_authenticated(request)
+    if not email:
+        return RedirectResponse(url="/login", status_code=303)
     """Interactive dashboard with client filtering."""
     try:
         conn = sqlite3.connect(DB_PATH)
@@ -821,7 +1085,10 @@ class ClientUpdate(BaseModel):
 
 
 @app.get("/dashboard/settings", response_class=HTMLResponse)
-def view_settings(client_id: Optional[int] = None):
+def view_settings(request: Request, client_id: Optional[int] = None):
+    email = is_authenticated(request)
+    if not email:
+        return RedirectResponse(url="/login", status_code=303)
     """Page to manage and update client account configuration settings."""
     try:
         conn = sqlite3.connect(DB_PATH)
@@ -1633,7 +1900,7 @@ def view_settings(client_id: Optional[int] = None):
                                 <div class="webhook-title">📧 Inbound Invoice & Booking Email</div>
                                 <div class="webhook-desc">Set up auto-forwarding from your email inbox to send receipts or booking alerts directly to our system for Claude to audit:</div>
                                 <div class="webhook-input-group">
-                                    <input type="text" class="webhook-input" id="email-webhook" readonly value="" data-suffix="conversions-{active_client_id}@your-agency-app.com">
+                                    <input type="text" class="webhook-input" id="email-webhook" readonly value="" data-suffix="conversions-{active_client_id}@your-agency.com">
                                     <button type="button" onclick="copyText('email-webhook', 'em-copy-btn')" id="em-copy-btn" class="btn-copy">📋 Copy</button>
                                 </div>
                             </div>
@@ -2170,7 +2437,10 @@ def update_client_settings(client: ClientUpdate):
         raise HTTPException(status_code=500, detail=f"Database update error: {str(e)}")
 
 @app.get("/dashboard/add-client", response_class=HTMLResponse)
-def add_client_page():
+def add_client_page(request: Request):
+    email = is_authenticated(request)
+    if not email:
+        return RedirectResponse(url="/login", status_code=303)
     """Page to onboard a new client with complete wizard properties."""
     try:
         conn = sqlite3.connect(DB_PATH)
@@ -3607,7 +3877,10 @@ def backfill_historical_callrail_leads(client_id: int, qualification_criteria_co
     print(f"✅ Seseeded and audited {len(historical_leads)} historical 90 days CallRail leads for client #{client_id}")
 
 @app.post("/dashboard/add-client")
-def create_client(client: ClientCreate):
+def create_client(request: Request, client: ClientCreate):
+    email = is_authenticated(request)
+    if not email:
+        raise HTTPException(status_code=401, detail="Session expired. Please log in again.")
     """Endpoint to handle questionnaire form submission."""
     try:
         conn = sqlite3.connect(DB_PATH)
@@ -3688,7 +3961,10 @@ def create_client(client: ClientCreate):
 
 
 @app.get("/dashboard/export/google")
-def export_google_conversions(client_id: int):
+def export_google_conversions(request: Request, client_id: int):
+    email = is_authenticated(request)
+    if not email:
+        return RedirectResponse(url="/login", status_code=303)
     """
     Exports qualified and closed conversions that have a valid GCLID 
     into a Google Ads-compliant CSV upload format, filtered by client_id.
@@ -3753,7 +4029,10 @@ def export_google_conversions(client_id: int):
 
 
 @app.get("/dashboard/export/facebook")
-def export_facebook_conversions(client_id: int):
+def export_facebook_conversions(request: Request, client_id: int):
+    email = is_authenticated(request)
+    if not email:
+        return RedirectResponse(url="/login", status_code=303)
     """
     Exports qualified and closed conversions that have a valid FBCLID 
     into a Facebook-compliant Offline Conversions CSV format.
@@ -3814,7 +4093,10 @@ def export_facebook_conversions(client_id: int):
 
 
 @app.get("/dashboard/export/linkedin")
-def export_linkedin_conversions(client_id: int):
+def export_linkedin_conversions(request: Request, client_id: int):
+    email = is_authenticated(request)
+    if not email:
+        return RedirectResponse(url="/login", status_code=303)
     """
     Exports qualified and closed conversions that have a valid LI_FAT_ID
     into a LinkedIn-compliant Offline Conversions CSV format.
@@ -3874,7 +4156,10 @@ def export_linkedin_conversions(client_id: int):
 
 
 @app.get("/dashboard/export/microsoft")
-def export_microsoft_conversions(client_id: int):
+def export_microsoft_conversions(request: Request, client_id: int):
+    email = is_authenticated(request)
+    if not email:
+        return RedirectResponse(url="/login", status_code=303)
     """
     Exports qualified and closed conversions that have a valid MSCLKID
     into a Microsoft Ads-compliant Offline Conversions CSV format.
@@ -3934,7 +4219,10 @@ def export_microsoft_conversions(client_id: int):
 
 
 @app.get("/dashboard/export/exclusions")
-def export_client_exclusions(client_id: int):
+def export_client_exclusions(request: Request, client_id: int):
+    email = is_authenticated(request)
+    if not email:
+        return RedirectResponse(url="/login", status_code=303)
     """
     Exports the current active exclusion list for a client as a CSV file.
     """
