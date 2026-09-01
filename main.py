@@ -30,7 +30,7 @@ def verify_password(stored_password: str, provided_password: str) -> bool:
 
 def create_session(email: str) -> str:
     token = uuid.uuid4().hex
-    conn = sqlite3.connect(DB_PATH)
+    conn = db_router.connect()
     cursor = conn.cursor()
     cursor.execute("INSERT INTO user_sessions (token, email) VALUES (?, ?)", (token, email))
     conn.commit()
@@ -41,7 +41,7 @@ def get_session_email(token: str) -> Optional[str]:
     if not token:
         return None
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = db_router.connect()
         cursor = conn.cursor()
         cursor.execute("SELECT email FROM user_sessions WHERE token = ?", (token,))
         row = cursor.fetchone()
@@ -54,7 +54,7 @@ def delete_session(token: str):
     if not token:
         return
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = db_router.connect()
         cursor = conn.cursor()
         cursor.execute("DELETE FROM user_sessions WHERE token = ?", (token,))
         conn.commit()
@@ -77,9 +77,138 @@ app = FastAPI(
 # ---------------------------------------------------------
 DB_PATH = "offline_attribution.db"
 
+# ---------------------------------------------------------
+# UNIFIED DATABASE ROUTING LAYER (PostgreSQL & SQLite)
+# ---------------------------------------------------------
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+class PostgreSQLCursorWrapper:
+    def __init__(self, pg_cursor):
+        self.cursor = pg_cursor
+        self._fetchone_override = None
+        self._fetchall_override = None
+
+    def execute(self, query, params=None):
+        # Reset overrides
+        self._fetchone_override = None
+        self._fetchall_override = None
+        
+        # 1. Map SQLite parameters placeholder (?) to PostgreSQL (%s)
+        # Be careful not to replace ? inside text strings, but simple replace works for our code's query structure
+        query_formatted = query.replace("?", "%s")
+        
+        # 2. Map SQLite table creation constraints to PostgreSQL serialization schemas
+        query_formatted = query_formatted.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY")
+        query_formatted = query_formatted.replace("AUTOINCREMENT", "")
+        
+        # 3. Intercept PRAGMA table_info dynamic schema self-healing checks
+        if "PRAGMA table_info(" in query:
+            table_name = query.split("PRAGMA table_info(")[1].split(")")[0].strip().replace("'", "").replace('"', '')
+            pg_query = f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table_name}'"
+            self.cursor.execute(pg_query)
+            cols = self.cursor.fetchall()
+            # Mock PRAGMA table_info columns format: (cid, name, type, notnull, dflt_value, pk)
+            # main.py does: `existing_cols = [col[1] for col in cursor.fetchall()]`
+            mock_cols = [(0, col[0], 'TEXT', 0, None, 0) for col in cols]
+            self._fetchall_override = lambda: mock_cols
+            return self
+
+        # 4. Intercept sqlite_sequence checks used for calculating onboarding sequence IDs
+        if "SELECT seq FROM sqlite_sequence" in query:
+            table_name = "clients"
+            if "name =" in query:
+                parts = query.split("name =")
+                if len(parts) > 1:
+                    table_name = parts[1].replace("'", "").replace('"', '').strip()
+            pg_query = f"SELECT COALESCE(MAX(id), 0) FROM {table_name}"
+            self.cursor.execute(pg_query)
+            max_id = self.cursor.fetchone()[0]
+            self._fetchone_override = lambda: (max_id,)
+            return self
+            
+        # 5. Fix potential PostgreSQL cast/comparison issues with Boolean/Text
+        # If any queries need special PostgreSQL handling, adjust here
+        
+        # Execute raw query
+        self.cursor.execute(query_formatted, params)
+        return self
+
+    def executemany(self, query, params_list):
+        query_formatted = query.replace("?", "%s")
+        self.cursor.executemany(query_formatted, params_list)
+        return self
+
+    def fetchone(self):
+        if self._fetchone_override:
+            return self._fetchone_override()
+        return self.cursor.fetchone()
+
+    def fetchall(self):
+        if self._fetchall_override:
+            return self._fetchall_override()
+        return self.cursor.fetchall()
+
+    @property
+    def lastrowid(self):
+        # PostgreSQL doesn't support cursor.lastrowid; use LASTVAL() utility sequence lookup
+        try:
+            self.cursor.execute("SELECT LASTVAL()")
+            return self.cursor.fetchone()[0]
+        except Exception:
+            return 1
+
+    def close(self):
+        self.cursor.close()
+
+
+class PostgreSQLConnectionWrapper:
+    def __init__(self, pg_conn):
+        self.connection = pg_conn
+        
+    def cursor(self):
+        return PostgreSQLCursorWrapper(self.connection.cursor())
+        
+    def commit(self):
+        self.connection.commit()
+        
+    def rollback(self):
+        self.connection.rollback()
+        
+    def close(self):
+        self.connection.close()
+
+
+class DatabaseRouter:
+    @staticmethod
+    def connect():
+        if DATABASE_URL:
+            # Render PostgreSQL active connection routing
+            import psycopg2
+            # Render sometimes provides connection string starting with 'postgres://' 
+            # which python's psycopg2 expects as 'postgresql://'
+            url_clean = DATABASE_URL
+            if url_clean.startswith("postgres://"):
+                url_clean = url_clean.replace("postgres://", "postgresql://", 1)
+            
+            # Open PostgreSQL Connection and return our adapter wrapper
+            conn = psycopg2.connect(url_clean)
+            return PostgreSQLConnectionWrapper(conn)
+        else:
+            # Local development SQLite connection routing
+            import sqlite3
+            return sqlite3.connect("offline_attribution.db")
+
+# Monkeypatch sqlite3 inside current module scope to redirect connect calls transparently!
+class MockSqlite3:
+    def connect(self, *args, **kwargs):
+        return DatabaseRouter.connect()
+
+db_router = MockSqlite3()
+
+
 def init_db():
     """Initializes the database, creates necessary tables, and self-heals schemas."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = db_router.connect()
     cursor = conn.cursor()
     # 6. Create Users Table
     cursor.execute("""
@@ -422,7 +551,7 @@ def check_is_excluded_customer(client_id: int, phone: str = "", email: str = "")
         return None
         
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = db_router.connect()
         cursor = conn.cursor()
         
         # Check phone
@@ -604,7 +733,7 @@ async def post_register(request: Request):
             return HTMLResponse(get_register(request, error="Password must be at least 6 characters."))
             
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = db_router.connect()
             cursor = conn.cursor()
             
             # Check if user already exists
@@ -695,7 +824,7 @@ async def post_login(request: Request):
             return HTMLResponse(get_login(request, error="All fields are required."))
             
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = db_router.connect()
             cursor = conn.cursor()
             cursor.execute("SELECT hashed_password FROM users WHERE email = ?", (email,))
             row = cursor.fetchone()
@@ -739,7 +868,7 @@ def get_admin_users(request: Request):
         raise HTTPException(status_code=403, detail="Unauthorized: Access is restricted to site administrators.")
         
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = db_router.connect()
         cursor = conn.cursor()
         cursor.execute("SELECT id, email, created_at FROM users ORDER BY created_at DESC")
         users = cursor.fetchall()
@@ -880,7 +1009,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
         return RedirectResponse(url="/login", status_code=303)
     """Interactive dashboard with client filtering."""
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = db_router.connect()
         cursor = conn.cursor()
         
         # 1. Fetch All Available Clients for the Dropdown Selector
@@ -1217,7 +1346,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
         return RedirectResponse(url="/login", status_code=303)
     """Page to manage and update client account configuration settings."""
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = db_router.connect()
         cursor = conn.cursor()
         
         # 1. Fetch All Available Clients for the dropdown selector
@@ -2486,7 +2615,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
 def update_client_settings(client: ClientUpdate):
     """Endpoint to handle questionnaire form settings update."""
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = db_router.connect()
         cursor = conn.cursor()
         
         # Verify client exists
@@ -2584,7 +2713,7 @@ def add_client_page(request: Request):
         return RedirectResponse(url="/login", status_code=303)
     """Page to onboard a new client with complete wizard properties."""
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = db_router.connect()
         cursor = conn.cursor()
         cursor.execute("SELECT seq FROM sqlite_sequence WHERE name = 'clients'")
         row = cursor.fetchone()
@@ -3955,7 +4084,7 @@ def backfill_historical_callrail_leads(client_id: int, qualification_criteria_co
         }
     ]
     
-    conn = sqlite3.connect(DB_PATH)
+    conn = db_router.connect()
     cursor = conn.cursor()
     
     for lead in historical_leads:
@@ -4039,7 +4168,7 @@ def create_client(request: Request, client: ClientCreate):
         raise HTTPException(status_code=401, detail="Session expired. Please log in again.")
     """Endpoint to handle questionnaire form submission."""
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = db_router.connect()
         cursor = conn.cursor()
         
         # Verify unique CallRail ID
@@ -4126,7 +4255,7 @@ def export_google_conversions(request: Request, client_id: int):
     into a Google Ads-compliant CSV upload format, filtered by client_id.
     """
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = db_router.connect()
         cursor = conn.cursor()
         
         # Verify client exists
@@ -4194,7 +4323,7 @@ def export_facebook_conversions(request: Request, client_id: int):
     into a Facebook-compliant Offline Conversions CSV format.
     """
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = db_router.connect()
         cursor = conn.cursor()
         
         # Verify client exists
@@ -4258,7 +4387,7 @@ def export_linkedin_conversions(request: Request, client_id: int):
     into a LinkedIn-compliant Offline Conversions CSV format.
     """
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = db_router.connect()
         cursor = conn.cursor()
         
         # Verify client exists
@@ -4321,7 +4450,7 @@ def export_microsoft_conversions(request: Request, client_id: int):
     into a Microsoft Ads-compliant Offline Conversions CSV format.
     """
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = db_router.connect()
         cursor = conn.cursor()
         
         # Verify client exists
@@ -4383,7 +4512,7 @@ def export_client_exclusions(request: Request, client_id: int):
     Exports the current active exclusion list for a client as a CSV file.
     """
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = db_router.connect()
         cursor = conn.cursor()
         
         # Verify client exists
@@ -4491,7 +4620,7 @@ async def receive_exclusion_webhook(request: Request, client_id: Optional[int] =
                 "message": "Exclusion skipped: Payload must contain a valid 'phone' or 'email' identifier to exclude a user."
             }
             
-        conn = sqlite3.connect(DB_PATH)
+        conn = db_router.connect()
         cursor = conn.cursor()
         
         cursor.execute("SELECT id FROM clients WHERE id = ?", (resolved_client_id,))
@@ -4580,7 +4709,7 @@ async def receive_callrail_webhook(request: Request, client_id: Optional[int] = 
         else: 
             company_id = payload.get('company_id') or payload.get('account_id')
             if company_id:
-                conn = sqlite3.connect(DB_PATH)
+                conn = db_router.connect()
                 cursor = conn.cursor()
                 cursor.execute("SELECT id FROM clients WHERE callrail_company_id = ?", (str(company_id),))
                 match = cursor.fetchone()
@@ -4659,7 +4788,7 @@ async def receive_callrail_webhook(request: Request, client_id: Optional[int] = 
         
         qualification_definition_desc = "Someone who expresses real intent to buy or schedule a service."
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = db_router.connect()
         cursor = conn.cursor()
         cursor.execute("SELECT name, qualification_criteria, lead_count_rule, exclude_past_customers FROM clients WHERE id = ?", (resolved_client_id,))
         client_info = cursor.fetchone()
@@ -4698,7 +4827,7 @@ async def receive_callrail_webhook(request: Request, client_id: Optional[int] = 
             print(f"⚠️ [Client #{resolved_client_id}] No transcript provided in CallRail webhook for {caller_name}. Skipping AI audit.")
 
         # 5. Save Session including multi-channel click IDs
-        conn = sqlite3.connect(DB_PATH)
+        conn = db_router.connect()
         cursor = conn.cursor()
         
         cursor.execute("""
@@ -4761,7 +4890,7 @@ async def receive_form_lead(lead: FormLead, client_id: Optional[int] = None):
         is_excluded = False
         exclusion_reason = None
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = db_router.connect()
         cursor = conn.cursor()
         cursor.execute("SELECT exclude_past_customers FROM clients WHERE id = ?", (resolved_client_id,))
         client_row = cursor.fetchone()
@@ -4778,7 +4907,7 @@ async def receive_form_lead(lead: FormLead, client_id: Optional[int] = None):
         reason_val = None if not is_excluded else exclusion_reason
 
         # 2. Save to SQLite
-        conn = sqlite3.connect(DB_PATH)
+        conn = db_router.connect()
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO sessions (client_id, phone, email, name, company, gclid, fbclid, li_fat_id, msclkid, source, qualified, sale_closed, reason)
@@ -4825,7 +4954,7 @@ async def receive_crm_webhook(request: Request, client_id: Optional[int] = None)
         stage = payload.get('deal_stage') or payload.get('stage') or payload.get('status') or "Updated"
         amount = payload.get('amount') or payload.get('value') or payload.get('deal_value') or 0.0
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = db_router.connect()
         cursor = conn.cursor()
         
         cursor.execute("""
@@ -4872,7 +5001,7 @@ async def receive_billing_webhook(request: Request, client_id: Optional[int] = N
         invoice_number = payload.get('invoice_number') or payload.get('invoice_id') or payload.get('doc_number') or ""
         amount = payload.get('amount') or payload.get('amount_paid') or payload.get('total') or 0.0
         
-        conn = sqlite3.connect(DB_PATH)
+        conn = db_router.connect()
         cursor = conn.cursor()
         
         cursor.execute("""

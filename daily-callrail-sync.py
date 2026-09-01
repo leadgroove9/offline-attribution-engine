@@ -20,6 +20,114 @@ from typing import Optional, Dict, Any, List
 # Target DB Path
 DB_PATH = os.environ.get("DB_PATH", "offline_attribution.db")
 
+# ---------------------------------------------------------
+# UNIFIED DATABASE ROUTING LAYER (PostgreSQL & SQLite)
+# ---------------------------------------------------------
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+class PostgreSQLCursorWrapper:
+    def __init__(self, pg_cursor):
+        self.cursor = pg_cursor
+        self._fetchone_override = None
+        self._fetchall_override = None
+
+    def execute(self, query, params=None):
+        self._fetchone_override = None
+        self._fetchall_override = None
+        
+        query_formatted = query.replace("?", "%s")
+        query_formatted = query_formatted.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY")
+        query_formatted = query_formatted.replace("AUTOINCREMENT", "")
+        
+        if "PRAGMA table_info(" in query:
+            table_name = query.split("PRAGMA table_info(")[1].split(")")[0].strip().replace("'", "").replace('"', '')
+            pg_query = f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table_name}'"
+            self.cursor.execute(pg_query)
+            cols = self.cursor.fetchall()
+            mock_cols = [(0, col[0], 'TEXT', 0, None, 0) for col in cols]
+            self._fetchall_override = lambda: mock_cols
+            return self
+
+        if "SELECT seq FROM sqlite_sequence" in query:
+            table_name = "clients"
+            if "name =" in query:
+                parts = query.split("name =")
+                if len(parts) > 1:
+                    table_name = parts[1].replace("'", "").replace('"', '').strip()
+            pg_query = f"SELECT COALESCE(MAX(id), 0) FROM {table_name}"
+            self.cursor.execute(pg_query)
+            max_id = self.cursor.fetchone()[0]
+            self._fetchone_override = lambda: (max_id,)
+            return self
+            
+        self.cursor.execute(query_formatted, params)
+        return self
+
+    def executemany(self, query, params_list):
+        query_formatted = query.replace("?", "%s")
+        self.cursor.executemany(query_formatted, params_list)
+        return self
+
+    def fetchone(self):
+        if self._fetchone_override:
+            return self._fetchone_override()
+        return self.cursor.fetchone()
+
+    def fetchall(self):
+        if self._fetchall_override:
+            return self._fetchall_override()
+        return self.cursor.fetchall()
+
+    @property
+    def lastrowid(self):
+        try:
+            self.cursor.execute("SELECT LASTVAL()")
+            return self.cursor.fetchone()[0]
+        except Exception:
+            return 1
+
+    def close(self):
+        self.cursor.close()
+
+
+class PostgreSQLConnectionWrapper:
+    def __init__(self, pg_conn):
+        self.connection = pg_conn
+        
+    def cursor(self):
+        return PostgreSQLCursorWrapper(self.connection.cursor())
+        
+    def commit(self):
+        self.connection.commit()
+        
+    def rollback(self):
+        self.connection.rollback()
+        
+    def close(self):
+        self.connection.close()
+
+
+class DatabaseRouter:
+    @staticmethod
+    def connect():
+        if DATABASE_URL:
+            import psycopg2
+            url_clean = DATABASE_URL
+            if url_clean.startswith("postgres://"):
+                url_clean = url_clean.replace("postgres://", "postgresql://", 1)
+            conn = psycopg2.connect(url_clean)
+            return PostgreSQLConnectionWrapper(conn)
+        else:
+            import sqlite3
+            return sqlite3.connect("offline_attribution.db")
+
+class MockSqlite3:
+    def connect(self, *args, **kwargs):
+        return DatabaseRouter.connect()
+
+db_router = MockSqlite3()
+
+
 # Qualification Criteria Definitions
 CRITERIA_MAP = {
     "A": "Someone that I have a conversation with",
@@ -64,7 +172,7 @@ def check_is_excluded_customer(client_id: int, phone: str, email: str = "") -> O
     Checks if a phone or email matches any record in the excluded_customers table.
     Returns 'Phone Match', 'Email Match', or None.
     """
-    conn = sqlite3.connect(DB_PATH)
+    conn = db_router.connect()
     cursor = conn.cursor()
     
     normalized_p = normalize_phone(phone)
@@ -387,7 +495,7 @@ def execute_daily_sync():
         print(f"❌ Error: Database file '{DB_PATH}' was not found. Please verify running directories.")
         sys.exit(1)
         
-    conn = sqlite3.connect(DB_PATH)
+    conn = db_router.connect()
     cursor = conn.cursor()
     
     # Fetch All Active Clients who use CallRail tracking
