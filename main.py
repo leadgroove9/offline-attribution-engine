@@ -127,7 +127,9 @@ class PostgreSQLCursorWrapper:
             return self
             
         # 5. Fix potential PostgreSQL cast/comparison issues with Boolean/Text
-        # If any queries need special PostgreSQL handling, adjust here
+        # Also convert SQLite-style datetime(column, 'localtime') to PostgreSQL TO_CHAR(column, 'YYYY-MM-DD HH24:MI:SS')
+        import re
+        query_formatted = re.sub(r"datetime\(([^,]+),\s*'localtime'\)", r"to_char(\1, 'YYYY-MM-DD HH24:MI:SS')", query_formatted, flags=re.IGNORECASE)
         
         # Execute raw query
         self.cursor.execute(query_formatted, params)
