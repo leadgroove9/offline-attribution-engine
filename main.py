@@ -1378,17 +1378,19 @@ def view_settings(request: Request, client_id: Optional[int] = None):
         # Determine which client to edit
         active_client_id = client_id if client_id is not None else all_clients[0][0]
         
-        # 2. Fetch the specific client's settings
-        cursor.execute("SELECT * FROM clients WHERE id = ?", (active_client_id,))
+        # Extract column names dynamically first to guarantee matching order during SELECT
+        cursor.execute("PRAGMA table_info(clients)")
+        cols = [col[1] for col in cursor.fetchall()]
+        
+        # 2. Fetch the specific client's settings using explicit columns order (avoids PostgreSQL zip misalignment)
+        cols_formatted = ", ".join([f'"{c}"' for c in cols])
+        cursor.execute(f"SELECT {cols_formatted} FROM clients WHERE id = ?", (active_client_id,))
         client_row = cursor.fetchone()
         
         if not client_row:
             conn.close()
             raise HTTPException(status_code=404, detail="Client not found")
             
-        # Extract column names dynamically to map to fields easily
-        cursor.execute("PRAGMA table_info(clients)")
-        cols = [col[1] for col in cursor.fetchall()]
         client_data = dict(zip(cols, client_row))
         
         # Query last 5 analyzed emails for active_client_id
@@ -1716,7 +1718,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                 <header>
                     <div>
                         <h1>Client Configuration Settings ⚙️</h1>
-                        <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">Update dynamic rules, ad accounts, and system webhooks for <strong>{client_name}</strong></p>
+                        <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">Update dynamic rules, ad accounts, and system webhooks.</p>
                     </div>
                     
                     <div class="client-selector-container">
