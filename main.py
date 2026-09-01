@@ -14,7 +14,7 @@ from anthropic import Anthropic
 app = FastAPI(
     title="Offline Attribution Engine (Multi-Tenant Multi-Channel)",
     description="Multi-tenant agency platform for tracking offline leads/sales and AI audits across Google, Meta, LinkedIn, and Microsoft",
-    version="15.0.0"
+    version="15.1.0"
 )
 
 # ---------------------------------------------------------
@@ -96,6 +96,15 @@ def init_db():
 
     # 2. Create Sessions Table (Multi-Tenant)
     cursor.execute("""
+        CREATE TABLE IF NOT EXISTS analyzed_emails (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            client_id INTEGER,
+            subject TEXT,
+            sender TEXT,
+            recipient TEXT,
+            analyzed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        
         CREATE TABLE IF NOT EXISTS sessions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             client_id INTEGER DEFAULT 1,
@@ -815,6 +824,37 @@ def view_settings(client_id: Optional[int] = None):
         cols = [col[1] for col in cursor.fetchall()]
         client_data = dict(zip(cols, client_row))
         
+        # Query last 5 analyzed emails for active_client_id
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS analyzed_emails (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                client_id INTEGER,
+                subject TEXT,
+                sender TEXT,
+                recipient TEXT,
+                analyzed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.commit()
+        
+        cursor.execute("""
+            SELECT subject, datetime(analyzed_at, 'localtime') 
+            FROM analyzed_emails 
+            WHERE client_id = ? 
+            ORDER BY analyzed_at DESC LIMIT 5
+        """, (active_client_id,))
+        emails_list = cursor.fetchall()
+        
+        if not emails_list:
+            last_emails_html = "<span style='color: #ccc; font-style: italic;'>No emails analyzed yet.</span>"
+        else:
+            items = []
+            for sub, ts in emails_list:
+                clean_sub = sub if sub else "(No Subject)"
+                # Clean up nested f-string issues
+                items.append(f"<li style='margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px;'><strong>{clean_sub}</strong><br><span style='font-size: 9px; color: #aaa;'>{ts}</span></li>")
+            last_emails_html = f"<ul style='margin: 5px 0 0 0; padding-left: 15px; text-align: left; list-style-type: disc;'>{''.join(items)}</ul>"
+
         # Query exclusions count for current client
         cursor.execute("SELECT COUNT(*) FROM excluded_customers WHERE client_id = ?", (active_client_id,))
         exclusion_count = cursor.fetchone()[0]
@@ -1260,6 +1300,15 @@ def view_settings(client_id: Optional[int] = None):
                                                 <span class="tooltip-text">
                                                     Forward your customer booking emails, invoice alerts, or form lead replies to:<br>
                                                     <strong class="settings-forwarding-email" style="color: #81c784; word-break: break-all;">conversions-{active_client_id}@your-agency.com</strong>
+                                                </span>
+                                            </span>
+                                            
+                                            <!-- Check Logs Hover Link -->
+                                            <span class="tooltip-icon" style="margin-left: 10px; font-size: 11px; font-weight: bold;">
+                                                <a href="javascript:void(0)" style="color: #1a237e; text-decoration: underline;">check logs</a>
+                                                <span class="tooltip-text" style="width: 290px;">
+                                                    <strong>Last 5 Analyzed Emails:</strong><br>
+                                                    {last_emails_html}
                                                 </span>
                                             </span>
                                         </label>
@@ -2178,6 +2227,15 @@ def add_client_page():
                                                 Forward your booking emails, invoice alerts, or form replies to your custom system address:<br>
                                                 <strong class="wizard-forwarding-email" style="color: #81c784; word-break: break-all;">conversions-[id]@your-agency.com</strong><br>
                                                 <span style="font-size: 9px; color: #ccc;">(Your actual ID will show up on the next screen once profile is created)</span>
+                                            </span>
+                                        </span>
+                                        
+                                        <!-- Check Logs Hover Link -->
+                                        <span class="tooltip-icon" style="margin-left: 10px; font-size: 11px; font-weight: bold;">
+                                            <a href="javascript:void(0)" style="color: #1a237e; text-decoration: underline;">check logs</a>
+                                            <span class="tooltip-text" style="width: 290px;">
+                                                <strong>Last 5 Analyzed Emails:</strong><br>
+                                                <span style="color: #ccc; font-style: italic;">No emails analyzed yet (Onboarding in progress).</span>
                                             </span>
                                         </span>
                                     </label>
