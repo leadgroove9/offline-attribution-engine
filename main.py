@@ -728,14 +728,14 @@ def read_root(request: Request):
         <head>
             <title>Multi-Tenant Multi-Channel Attribution Engine 🤖</title>
             <style>
-                body { font-family: Arial, sans-serif; text-align: center; padding-top: 80px; background-color: #f4f6f9; }
-                .container { display: inline-block; background: white; padding: 40px; border-radius: 10px; box-shadow: 0px 4px 10px rgba(0,0,0,0.1); max-width: 600px; }
-                h1 { color: #1a237e; margin-bottom: 10px; }
-                p { color: #555; font-size: 18px; }
-                .badge { background-color: #e8f5e9; color: #2e7d32; padding: 5px 15px; border-radius: 15px; font-weight: bold; }
-                .btn { display: inline-block; background-color: #1a237e; color: white; padding: 12px 24px; text-decoration: none; font-size: 16px; font-weight: bold; border-radius: 5px; margin-top: 20px; transition: background 0.2s; }
-                .btn:hover { background-color: #0d1b2a; }
-                .feature-list { text-align: left; margin-top: 25px; color: #333; line-height: 1.6; }
+                body {{ font-family: Arial, sans-serif; text-align: center; padding-top: 80px; background-color: #f4f6f9; }}
+                .container {{ display: inline-block; background: white; padding: 40px; border-radius: 10px; box-shadow: 0px 4px 10px rgba(0,0,0,0.1); max-width: 600px; }}
+                h1 {{ color: #1a237e; margin-bottom: 10px; }}
+                p {{ color: #555; font-size: 18px; }}
+                .badge {{ background-color: #e8f5e9; color: #2e7d32; padding: 5px 15px; border-radius: 15px; font-weight: bold; }}
+                .btn {{ display: inline-block; background-color: #1a237e; color: white; padding: 12px 24px; text-decoration: none; font-size: 16px; font-weight: bold; border-radius: 5px; margin-top: 20px; transition: background 0.2s; }}
+                .btn:hover {{ background-color: #0d1b2a; }}
+                .feature-list {{ text-align: left; margin-top: 25px; color: #333; line-height: 1.6; }}
             </style>
         </head>
         <body>
