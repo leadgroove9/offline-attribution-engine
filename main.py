@@ -1488,7 +1488,47 @@ def view_settings(client_id: Optional[int] = None):
                                 </div>
                             </div>
 
-\n                            <!-- CONDITIONAL: CRM Lead status tags -->
+\n                            
+                            <!-- CONDITIONAL: QuickBooks Setup Instructions -->
+                            <div id="sot-quickbooks-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px;">
+                                <div style="background-color: #e3f2fd; border-left: 4px solid #0288d1; padding: 15px; border-radius: 4px; color: #01579b; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                    💡 <strong>QuickBooks Online Webhooks Quick Setup Guide:</strong><br>
+                                    <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #0277bd;">
+                                        <li>Log into the <strong>Intuit Developer Portal</strong> at <a href="https://developer.intuit.com" target="_blank" style="color: #1a237e; font-weight: bold; text-decoration: none;">developer.intuit.com</a>.</li>
+                                        <li>Go to your **Dashboard**, select your App, and navigate to **Production Settings ➡️ Webhooks** in the left sidebar menu.</li>
+                                        <li>In the **Endpoint URL** field, paste your dynamic target URL (provided above on this screen):
+                                            <code style="display: block; background: #fff; border: 1px solid #b3e5fc; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #01579b;">https://your-agency-app.onrender.com/webhooks/billing?client_id=conversions-{active_client_id}</code>
+                                        </li>
+                                        <li>Check the boxes for the event notifications you want to receive under **Invoices** or **Payments** (e.g., invoice creation and payment status updates).</li>
+                                        <li>Click **Save** to generate your **Verifier Token** (copy this key to verify QuickBooks signatures on your server!).</li>
+                                    </ol>
+                                    <small style="display: block; font-style: italic; color: #0288d1; line-height: 1.4; border-top: 1px solid #b3e5fc; padding-top: 8px;">
+                                        ⚠️ <strong>Important Note:</strong> QuickBooks Online aggregates webhook events and delivers them in **5-minute intervals**, so test events might take up to 5 minutes to appear in your logs!
+                                    </small>
+                                </div>
+                            </div>
+    
+                            <!-- CONDITIONAL: Xero Setup Instructions -->
+                            <div id="sot-xero-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px;">
+                                <div style="background-color: #e0f7fa; border-left: 4px solid #00b0ff; padding: 15px; border-radius: 4px; color: #006064; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                    💡 <strong>Xero Webhooks Quick Setup Guide:</strong><br>
+                                    <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #00838f;">
+                                        <li>Log into the <strong>Xero Developer Portal</strong> at <a href="https://developer.xero.com" target="_blank" style="color: #1a237e; font-weight: bold; text-decoration: none;">developer.xero.com</a> under **My Apps**.</li>
+                                        <li>Select your App and click on the **Webhooks** tab in the left-hand navigation panel.</li>
+                                        <li>In the **Send notifications to** (Delivery URL) field, paste your custom live endpoint (provided above on this screen):
+                                            <code style="display: block; background: #fff; border: 1px solid #80deea; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #006064;">https://your-agency-app.onrender.com/webhooks/billing?client_id=conversions-{active_client_id}</code>
+                                        </li>
+                                        <li>Select your preferred event categories. We highly recommend subscribing to **Invoices** (CREATE, UPDATE) and **Contacts** (CREATE, UPDATE).</li>
+                                        <li>Click **Save**. This will generate your **Webhook Key** (also known as the signing key) which you can copy to authenticate payloads.</li>
+                                        <li>Click the **Send intent to receive** button to initiate Xero's connection validation handshake and verify your setup is active!</li>
+                                    </ol>
+                                    <small style="display: block; font-style: italic; color: #00838f; line-height: 1.4; border-top: 1px solid #80deea; padding-top: 8px;">
+                                        🔒 <strong>Intent-to-Receive Handshake:</strong> To complete the setup, our platform automatically responds to Xero's secure validation checks. Ensure your SSL certificate is trusted (non-self-signed) and running on port 443.
+                                    </small>
+                                </div>
+                            </div>
+    
+                            <!-- CONDITIONAL: CRM Lead status tags -->
                             <div id="sot-lead-tags-box" class="conditional-box">
                                 <label for="crm_lead_tags">Which statuses under <strong>Leads</strong> signify qualification?</label>
                                 <input type="text" id="crm_lead_tags" value="{client_data.get("crm_lead_tags", "") or ""}" placeholder="e.g. job-booked, estimate-given">
@@ -1780,6 +1820,8 @@ def view_settings(client_id: Optional[int] = None):
                     const servicetitanBox = document.getElementById('sot-servicetitan-instructions-box');
                     const housecallproBox = document.getElementById('sot-housecallpro-instructions-box');
                     const quickbooksBox = document.getElementById('sot-quickbooks-instructions-box');
+                    const xeroBox = document.getElementById('sot-xero-instructions-box');
+                    const xeroBox = document.getElementById('sot-xero-instructions-box');
                     
                     // Hide all by default
                     dealBox.style.display = 'none';
@@ -1791,6 +1833,8 @@ def view_settings(client_id: Optional[int] = None):
                     if (servicetitanBox) servicetitanBox.style.display = 'none';
                     if (housecallproBox) housecallproBox.style.display = 'none';
                     if (quickbooksBox) quickbooksBox.style.display = 'none';
+                    if (xeroBox) xeroBox.style.display = 'none';
+                    if (xeroBox) xeroBox.style.display = 'none';
                     
                     crmCard.style.display = 'none';
                     billingCard.style.display = 'none';
@@ -1818,6 +1862,8 @@ def view_settings(client_id: Optional[int] = None):
                         billingCard.style.display = 'block';
                         if (sot === 'quickbooks' && quickbooksBox) {{
                             quickbooksBox.style.display = 'block';
+                        }} else if (sot === 'xero' && xeroBox) {{
+                            xeroBox.style.display = 'block';
                         }}
                     }} else if (sot === 'email' || sot === 'ai_rating') {{
                         emailBox.style.display = 'block';
@@ -2597,7 +2643,47 @@ def add_client_page():
                             </div>
                         </div>
 
-\n                        <!-- CONDITIONAL INPUT: CRM Lead status tags (ServiceTitan, Housecall Pro) -->
+\n                        
+                        <!-- CONDITIONAL INPUT: QuickBooks Setup Instructions -->
+                        <div id="sot-quickbooks-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
+                            <div style="background-color: #e3f2fd; border-left: 4px solid #0288d1; padding: 15px; border-radius: 4px; color: #01579b; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                💡 <strong>QuickBooks Online Webhooks Quick Setup Guide:</strong><br>
+                                <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #0277bd;">
+                                    <li>Log into the <strong>Intuit Developer Portal</strong> at <a href="https://developer.intuit.com" target="_blank" style="color: #1a237e; font-weight: bold; text-decoration: none;">developer.intuit.com</a>.</li>
+                                    <li>Go to your **Dashboard**, select your App, and navigate to **Production Settings ➡️ Webhooks** in the left sidebar menu.</li>
+                                    <li>In the **Endpoint URL** field, paste your dynamic target URL (which you can copy on the next success screen):
+                                        <code style="display: block; background: #fff; border: 1px solid #b3e5fc; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #01579b;">https://your-agency-app.onrender.com/webhooks/billing?client_id=conversions-[id]</code>
+                                    </li>
+                                    <li>Check the boxes for the event notifications you want to receive under **Invoices** or **Payments** (e.g., invoice creation and payment status updates).</li>
+                                    <li>Click **Save** to generate your **Verifier Token** (copy this key to verify QuickBooks signatures on your server!).</li>
+                                </ol>
+                                <small style="display: block; font-style: italic; color: #0288d1; line-height: 1.4; border-top: 1px solid #b3e5fc; padding-top: 8px;">
+                                    ⚠️ <strong>Important Note:</strong> QuickBooks Online aggregates webhook events and delivers them in **5-minute intervals**, so test events might take up to 5 minutes to appear in your logs!
+                                </small>
+                            </div>
+                        </div>
+    
+                        <!-- CONDITIONAL INPUT: Xero Setup Instructions -->
+                        <div id="sot-xero-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
+                            <div style="background-color: #e0f7fa; border-left: 4px solid #00b0ff; padding: 15px; border-radius: 4px; color: #006064; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                💡 <strong>Xero Webhooks Quick Setup Guide:</strong><br>
+                                <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #00838f;">
+                                    <li>Log into the <strong>Xero Developer Portal</strong> at <a href="https://developer.xero.com" target="_blank" style="color: #1a237e; font-weight: bold; text-decoration: none;">developer.xero.com</a> under **My Apps**.</li>
+                                    <li>Select your App and click on the **Webhooks** tab in the left-hand navigation panel.</li>
+                                    <li>In the **Send notifications to** (Delivery URL) field, paste your custom live endpoint (which you can copy on the next success screen):
+                                        <code style="display: block; background: #fff; border: 1px solid #80deea; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #006064;">https://your-agency-app.onrender.com/webhooks/billing?client_id=conversions-[id]</code>
+                                    </li>
+                                    <li>Select your preferred event categories. We highly recommend subscribing to **Invoices** (CREATE, UPDATE) and **Contacts** (CREATE, UPDATE).</li>
+                                    <li>Click **Save**. This will generate your **Webhook Key** (also known as the signing key) which you can copy to authenticate payloads.</li>
+                                    <li>Click the **Send intent to receive** button to initiate Xero's connection validation handshake and verify your setup is active!</li>
+                                </ol>
+                                <small style="display: block; font-style: italic; color: #00838f; line-height: 1.4; border-top: 1px solid #80deea; padding-top: 8px;">
+                                    🔒 <strong>Intent-to-Receive Handshake:</strong> To complete the setup, our platform automatically responds to Xero's secure validation checks. Ensure your SSL certificate is trusted (non-self-signed) and running on port 443.
+                                </small>
+                            </div>
+                        </div>
+    
+                        <!-- CONDITIONAL INPUT: CRM Lead status tags (ServiceTitan, Housecall Pro) -->
                         <div id="sot-lead-tags-box" class="conditional-box">
                             <label for="crm_lead_tags">Which tags/statuses under <strong>Leads</strong> signify qualification?</label>
                             <input type="text" id="crm_lead_tags" placeholder="e.g. job-booked, estimate-given, dispatched">
@@ -3126,6 +3212,8 @@ def add_client_page():
                     const servicetitanBox = document.getElementById('sot-servicetitan-instructions-box');
                     const housecallproBox = document.getElementById('sot-housecallpro-instructions-box');
                     const quickbooksBox = document.getElementById('sot-quickbooks-instructions-box');
+                    const xeroBox = document.getElementById('sot-xero-instructions-box');
+                    const xeroBox = document.getElementById('sot-xero-instructions-box');
                     
                     dealBox.style.display = 'none';
                     leadBox.style.display = 'none';
@@ -3136,6 +3224,8 @@ def add_client_page():
                     if (servicetitanBox) servicetitanBox.style.display = 'none';
                     if (housecallproBox) housecallproBox.style.display = 'none';
                     if (quickbooksBox) quickbooksBox.style.display = 'none';
+                    if (xeroBox) xeroBox.style.display = 'none';
+                    if (xeroBox) xeroBox.style.display = 'none';
                     
                     if (['hubspot', 'salesforce', 'zoho'].includes(sot)) {
                         dealBox.style.display = 'block';
@@ -3156,7 +3246,10 @@ def add_client_page():
                     } else if (['quickbooks', 'xero'].includes(sot)) {
                         if (sot === 'quickbooks' && quickbooksBox) {
                             quickbooksBox.style.display = 'block';
-                        } else if (sot === 'email' || sot === 'ai_rating') {
+                        } else if (sot === 'xero' && xeroBox) {
+                            xeroBox.style.display = 'block';
+                        }
+                    } else if (sot === 'email' || sot === 'ai_rating') {
                         emailBox.style.display = 'block';
                     }
                 }
