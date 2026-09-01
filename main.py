@@ -1446,7 +1446,28 @@ def view_settings(client_id: Optional[int] = None):
                             </div>
                         </div>
 
-                            <!-- CONDITIONAL: CRM Lead status tags -->
+                            
+                            <!-- CONDITIONAL: ServiceTitan Setup Instructions -->
+                            <div id="sot-servicetitan-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
+                                <div style="background-color: #f3f4f6; border-left: 4px solid #4b5563; padding: 15px; border-radius: 4px; color: #1f2937; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                    💡 <strong>ServiceTitan Webhooks V2 Quick Setup Guide:</strong><br>
+                                    <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #374151;">
+                                        <li>Navigate to the **ServiceTitan Developer Portal** at <a href="https://developer.servicetitan.io" target="_blank" style="color: #1a237e; font-weight: bold; text-decoration: none;">developer.servicetitan.io</a> and sign in with your production credentials.</li>
+                                        <li>Click **Create and Manage Applications** ➡️ **Create New App**. Name it <code>LeadGroove Webhook Sync</code> and set your tenant/business units.</li>
+                                        <li>Under **API Scopes**, select:
+                                            <ul style="list-style-type: disc; padding-left: 15px; margin: 4px 0;">
+                                                <li><code>crm.objects.leads.read</code> or <code>jpm.objects.jobs.read</code> (to capture lead states and bookings)</li>
+                                            </ul>
+                                        </li>
+                                        <li>Click **Save** to generate your **Client ID**, **Client Secret**, **App ID**, and **App Key**.</li>
+                                        <li>Log into your main production portal at <a href="https://go.servicetitan.com" target="_blank" style="color: #1a237e; font-weight: bold; text-decoration: none;">go.servicetitan.com</a>, go to **Settings ➡️ Integrations ➡️ API Application Access**, find your app, click **Edit**, and set your dynamic Webhook Endpoint Target URL:
+                                            <code style="display: block; background: #fff; border: 1px solid #d1d5db; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #1f2937;">https://your-agency-app.onrender.com/webhooks/crm?client_id=conversions-{active_client_id}</code>
+                                        </li>
+                                        <li>Register your endpoint triggers for <code>job.created</code> and <code>job.updated</code> (under Job Planning & Management v2 endpoints) to fire instantly when dispatch sheets are updated!</li>
+                                    </ol>
+                                </div>
+                            </div>
+\n                            <!-- CONDITIONAL: CRM Lead status tags -->
                             <div id="sot-lead-tags-box" class="conditional-box">
                                 <label for="crm_lead_tags">Which statuses under <strong>Leads</strong> signify qualification?</label>
                                 <input type="text" id="crm_lead_tags" value="{client_data.get("crm_lead_tags", "") or ""}" placeholder="e.g. job-booked, estimate-given">
@@ -1761,6 +1782,9 @@ def view_settings(client_id: Optional[int] = None):
                     }} else if (['servicetitan', 'housecallpro'].includes(sot)) {{
                         leadBox.style.display = 'block';
                         crmCard.style.display = 'block';
+                        if (sot === 'servicetitan' && servicetitanBox) {{
+                            servicetitanBox.style.display = 'block';
+                        }}
                     }} else if (['quickbooks', 'xero'].includes(sot)) {{
                         billingCard.style.display = 'block';
                     }} else if (sot === 'email' || sot === 'ai_rating') {{
@@ -2499,7 +2523,28 @@ def add_client_page():
                             </div>
                         </div>
 
-                        <!-- CONDITIONAL INPUT: CRM Lead status tags (ServiceTitan, Housecall Pro) -->
+                        
+                        <!-- CONDITIONAL INPUT: ServiceTitan Setup Instructions -->
+                        <div id="sot-servicetitan-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
+                            <div style="background-color: #f3f4f6; border-left: 4px solid #4b5563; padding: 15px; border-radius: 4px; color: #1f2937; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                💡 <strong>ServiceTitan Webhooks V2 Quick Setup Guide:</strong><br>
+                                <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #374151;">
+                                    <li>Navigate to the **ServiceTitan Developer Portal** at <a href="https://developer.servicetitan.io" target="_blank" style="color: #1a237e; font-weight: bold; text-decoration: none;">developer.servicetitan.io</a> and sign in with your production credentials.</li>
+                                    <li>Click **Create and Manage Applications** ➡️ **Create New App**. Name it <code>LeadGroove Webhook Sync</code> and set your tenant/business units.</li>
+                                    <li>Under **API Scopes**, select:
+                                        <ul style="list-style-type: disc; padding-left: 15px; margin: 4px 0;">
+                                            <li><code>crm.objects.leads.read</code> or <code>jpm.objects.jobs.read</code> (to capture lead states and bookings)</li>
+                                        </ul>
+                                    </li>
+                                    <li>Click **Save** to generate your **Client ID**, **Client Secret**, **App ID**, and **App Key**.</li>
+                                    <li>Log into your main production portal at <a href="https://go.servicetitan.com" target="_blank" style="color: #1a237e; font-weight: bold; text-decoration: none;">go.servicetitan.com</a>, go to **Settings ➡️ Integrations ➡️ API Application Access**, find your app, click **Edit**, and set your dynamic Webhook Endpoint Target URL (which you can copy on the next success screen):
+                                        <code style="display: block; background: #fff; border: 1px solid #d1d5db; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #1f2937;">https://your-agency-app.onrender.com/webhooks/crm?client_id=conversions-[id]</code>
+                                    </li>
+                                    <li>Register your endpoint triggers for <code>job.created</code> and <code>job.updated</code> (under Job Planning & Management v2 endpoints) to fire instantly when dispatch sheets are updated!</li>
+                                </ol>
+                            </div>
+                        </div>
+\n                        <!-- CONDITIONAL INPUT: CRM Lead status tags (ServiceTitan, Housecall Pro) -->
                         <div id="sot-lead-tags-box" class="conditional-box">
                             <label for="crm_lead_tags">Which tags/statuses under <strong>Leads</strong> signify qualification?</label>
                             <input type="text" id="crm_lead_tags" placeholder="e.g. job-booked, estimate-given, dispatched">
@@ -3025,6 +3070,7 @@ def add_client_page():
                     const hsBox = document.getElementById('sot-hubspot-instructions-box');
                     const salesforceBox = document.getElementById('sot-salesforce-instructions-box');
                     const zohoBox = document.getElementById('sot-zoho-instructions-box');
+                    const servicetitanBox = document.getElementById('sot-servicetitan-instructions-box');
                     
                     dealBox.style.display = 'none';
                     leadBox.style.display = 'none';
@@ -3032,6 +3078,7 @@ def add_client_page():
                     if (hsBox) hsBox.style.display = 'none';
                     if (salesforceBox) salesforceBox.style.display = 'none';
                     if (zohoBox) zohoBox.style.display = 'none';
+                    if (servicetitanBox) servicetitanBox.style.display = 'none';
                     
                     if (['hubspot', 'salesforce', 'zoho'].includes(sot)) {
                         dealBox.style.display = 'block';
@@ -3044,6 +3091,9 @@ def add_client_page():
                         }
                     } else if (['servicetitan', 'housecallpro'].includes(sot)) {
                         leadBox.style.display = 'block';
+                        if (sot === 'servicetitan' && servicetitanBox) {
+                            servicetitanBox.style.display = 'block';
+                        }
                     } else if (sot === 'email' || sot === 'ai_rating') {
                         emailBox.style.display = 'block';
                     }
