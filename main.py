@@ -1390,6 +1390,29 @@ def view_settings(client_id: Optional[int] = None):
                                 </div>
                             </div>
                             
+
+                        <!-- CONDITIONAL INPUT: Salesforce Setup Instructions -->
+                        <div id="sot-salesforce-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
+                            <div style="background-color: #e3f2fd; border-left: 4px solid #1e88e5; padding: 15px; border-radius: 4px; color: #0d47a1; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                💡 <strong>Salesforce Outbound Flow Setup Guide:</strong><br>
+                                <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #1565c0;">
+                                    <li>In Salesforce Setup, go to <strong>Named Credentials &gt; External Credentials</strong> tab, click <strong>New</strong>. Label <code>LeadGroove External Credential</code>, Name <code>LeadGroove_External_Credential</code>, Protocol <strong>Custom</strong>. Save, scroll to <em>Principals</em>, click <strong>New</strong> and define a principal named <code>LeadGroove_Principal</code>.</li>
+                                    <li>Create a <strong>Permission Set</strong> in Setup named <code>LeadGroove Webhook Access</code>. In it, click <strong>External Credential Principal Access</strong>, enable your new credential and principal, and assign this permission set to any integrating users.</li>
+                                    <li>Back in <strong>Named Credentials</strong>, click <strong>New</strong> under the main tab. Label <code>LeadGroove API</code>, Name <code>LeadGroove_API</code>, URL <code style="background: rgba(0,0,0,0.05); padding: 2px 4px; border-radius: 3px;">https://your-agency-app.onrender.com</code> (or active origin). Under <em>External Credential</em>, select the credential you created in Step 1, and save.</li>
+                                    <li>Create a <strong>Record-Triggered Flow</strong> on the <strong>Opportunity</strong> object (when updated) with conditions <code>StageName Equals Closed Won</code> (Only when updated to meet conditions), optimized for <strong>Actions and Related Records</strong>.</li>
+                                    <li>On the flow canvas, click <strong>+ Add Action &gt; Create HTTP Callout</strong>, select your Named Credential, and define a <strong>POST</strong> method with path <code style="color: #2e7d32; font-family: monospace;">/webhooks/crm?client_id=conversions-{{active_client_id}}</code>. Provide this sample JSON structure for automatic Salesforce parameter mapping:
+                                        <pre style="background: rgba(255,255,255,0.7); padding: 8px; border-radius: 4px; margin-top: 5px; font-family: monospace; font-size: 10px; overflow-x: auto; border: 1px solid #bbdefb; color: #0d47a1;">{{
+  "customer_name": "John Doe",
+  "customer_email": "john@example.com",
+  "customer_phone": "5551234567",
+  "deal_stage": "Closed Won",
+  "deal_value": 1500.00
+}}</pre>
+                                    </li>
+                                </ol>
+                            </div>
+                        </div>
+
                             <!-- CONDITIONAL: CRM Lead status tags -->
                             <div id="sot-lead-tags-box" class="conditional-box">
                                 <label for="crm_lead_tags">Which statuses under <strong>Leads</strong> signify qualification?</label>
@@ -1677,12 +1700,14 @@ def view_settings(client_id: Optional[int] = None):
                     const crmCard = document.getElementById('crm-webhook-card');
                     const billingCard = document.getElementById('billing-webhook-card');
                     const emailCard = document.getElementById('email-webhook-card');
+                    const salesforceBox = document.getElementById('sot-salesforce-instructions-box');
                     
                     // Hide all by default
                     dealBox.style.display = 'none';
                     leadBox.style.display = 'none';
                     emailBox.style.display = 'none';
                     if (hsBox) hsBox.style.display = 'none';
+                    if (salesforceBox) salesforceBox.style.display = 'none';
                     
                     crmCard.style.display = 'none';
                     billingCard.style.display = 'none';
@@ -1693,6 +1718,8 @@ def view_settings(client_id: Optional[int] = None):
                         crmCard.style.display = 'block';
                         if (sot === 'hubspot' && hsBox) {{
                             hsBox.style.display = 'block';
+                        }} else if (sot === 'salesforce' && salesforceBox) {{
+                            salesforceBox.style.display = 'block';
                         }}
                     }} else if (['servicetitan', 'housecallpro'].includes(sot)) {{
                         leadBox.style.display = 'block';
@@ -2378,6 +2405,29 @@ def add_client_page():
                             </div>
                         </div>
                         
+
+                        <!-- CONDITIONAL INPUT: Salesforce Setup Instructions -->
+                        <div id="sot-salesforce-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
+                            <div style="background-color: #e3f2fd; border-left: 4px solid #1e88e5; padding: 15px; border-radius: 4px; color: #0d47a1; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                💡 <strong>Salesforce Outbound Flow Setup Guide:</strong><br>
+                                <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #1565c0;">
+                                    <li>In Salesforce Setup, go to <strong>Named Credentials &gt; External Credentials</strong> tab, click <strong>New</strong>. Label <code>LeadGroove External Credential</code>, Name <code>LeadGroove_External_Credential</code>, Protocol <strong>Custom</strong>. Save, scroll to <em>Principals</em>, click <strong>New</strong> and define a principal named <code>LeadGroove_Principal</code>.</li>
+                                    <li>Create a <strong>Permission Set</strong> in Setup named <code>LeadGroove Webhook Access</code>. In it, click <strong>External Credential Principal Access</strong>, enable your new credential and principal, and assign this permission set to any integrating users.</li>
+                                    <li>Back in <strong>Named Credentials</strong>, click <strong>New</strong> under the main tab. Label <code>LeadGroove API</code>, Name <code>LeadGroove_API</code>, URL <code style="background: rgba(0,0,0,0.05); padding: 2px 4px; border-radius: 3px;">https://your-agency-app.onrender.com</code> (or active origin). Under <em>External Credential</em>, select the credential you created in Step 1, and save.</li>
+                                    <li>Create a <strong>Record-Triggered Flow</strong> on the <strong>Opportunity</strong> object (when updated) with conditions <code>StageName Equals Closed Won</code> (Only when updated to meet conditions), optimized for <strong>Actions and Related Records</strong>.</li>
+                                    <li>On the flow canvas, click <strong>+ Add Action &gt; Create HTTP Callout</strong>, select your Named Credential, and define a <strong>POST</strong> method with path <code style="color: #2e7d32; font-family: monospace;">/webhooks/crm?client_id=conversions-[id]</code>. Provide this sample JSON structure for automatic Salesforce parameter mapping:
+                                        <pre style="background: rgba(255,255,255,0.7); padding: 8px; border-radius: 4px; margin-top: 5px; font-family: monospace; font-size: 10px; overflow-x: auto; border: 1px solid #bbdefb; color: #0d47a1;">{
+  "customer_name": "John Doe",
+  "customer_email": "john@example.com",
+  "customer_phone": "5551234567",
+  "deal_stage": "Closed Won",
+  "deal_value": 1500.00
+}</pre>
+                                    </li>
+                                </ol>
+                            </div>
+                        </div>
+
                         <!-- CONDITIONAL INPUT: CRM Lead status tags (ServiceTitan, Housecall Pro) -->
                         <div id="sot-lead-tags-box" class="conditional-box">
                             <label for="crm_lead_tags">Which tags/statuses under <strong>Leads</strong> signify qualification?</label>
@@ -2902,16 +2952,20 @@ def add_client_page():
                     const leadBox = document.getElementById('sot-lead-tags-box');
                     const emailBox = document.getElementById('sot-email-box');
                     const hsBox = document.getElementById('sot-hubspot-instructions-box');
+                    const salesforceBox = document.getElementById('sot-salesforce-instructions-box');
                     
                     dealBox.style.display = 'none';
                     leadBox.style.display = 'none';
                     emailBox.style.display = 'none';
                     if (hsBox) hsBox.style.display = 'none';
+                    if (salesforceBox) salesforceBox.style.display = 'none';
                     
                     if (['hubspot', 'salesforce', 'zoho'].includes(sot)) {
                         dealBox.style.display = 'block';
                         if (sot === 'hubspot' && hsBox) {
                             hsBox.style.display = 'block';
+                        } else if (sot === 'salesforce' && salesforceBox) {
+                            salesforceBox.style.display = 'block';
                         }
                     } else if (['servicetitan', 'housecallpro'].includes(sot)) {
                         leadBox.style.display = 'block';
