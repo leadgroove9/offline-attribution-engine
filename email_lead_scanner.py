@@ -235,6 +235,19 @@ def scan_mailbox_for_client(client_row: tuple) -> int:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         
+        # Self-heal analyzed_emails table if not created yet
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS analyzed_emails (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                client_id INTEGER,
+                subject TEXT,
+                sender TEXT,
+                recipient TEXT,
+                analyzed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.commit()
+        
         updated_count = 0
         
         for m_id in mail_ids:
@@ -247,6 +260,16 @@ def scan_mailbox_for_client(client_row: tuple) -> int:
                     subject = subject_header[0]
                     if isinstance(subject, bytes):
                         subject = subject.decode(subject_header[1] or "utf-8", errors="ignore")
+                        
+                    # Real-time logging of analyzed email
+                    try:
+                        cursor.execute("""
+                            INSERT INTO analyzed_emails (client_id, subject, sender, recipient)
+                            VALUES (?, ?, ?, ?)
+                        """, (client_id, subject or "(No Subject)", str(msg.get("From", "")), str(msg.get("To", ""))))
+                        conn.commit()
+                    except Exception as e:
+                        print(f"   ⚠️ Error logging analyzed email to database: {e}")
                     
                     body = ""
                     if msg.is_multipart():

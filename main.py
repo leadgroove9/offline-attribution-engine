@@ -14,7 +14,7 @@ from anthropic import Anthropic
 app = FastAPI(
     title="Offline Attribution Engine (Multi-Tenant Multi-Channel)",
     description="Multi-tenant agency platform for tracking offline leads/sales and AI audits across Google, Meta, LinkedIn, and Microsoft",
-    version="15.0.0"
+    version="15.1.0"
 )
 
 # ---------------------------------------------------------
@@ -96,6 +96,15 @@ def init_db():
 
     # 2. Create Sessions Table (Multi-Tenant)
     cursor.execute("""
+        CREATE TABLE IF NOT EXISTS analyzed_emails (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            client_id INTEGER,
+            subject TEXT,
+            sender TEXT,
+            recipient TEXT,
+            analyzed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        
         CREATE TABLE IF NOT EXISTS sessions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             client_id INTEGER DEFAULT 1,
@@ -815,6 +824,37 @@ def view_settings(client_id: Optional[int] = None):
         cols = [col[1] for col in cursor.fetchall()]
         client_data = dict(zip(cols, client_row))
         
+        # Query last 5 analyzed emails for active_client_id
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS analyzed_emails (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                client_id INTEGER,
+                subject TEXT,
+                sender TEXT,
+                recipient TEXT,
+                analyzed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.commit()
+        
+        cursor.execute("""
+            SELECT subject, datetime(analyzed_at, 'localtime') 
+            FROM analyzed_emails 
+            WHERE client_id = ? 
+            ORDER BY analyzed_at DESC LIMIT 5
+        """, (active_client_id,))
+        emails_list = cursor.fetchall()
+        
+        if not emails_list:
+            last_emails_html = "<span style='color: #ccc; font-style: italic;'>No emails analyzed yet.</span>"
+        else:
+            items = []
+            for sub, ts in emails_list:
+                clean_sub = sub if sub else "(No Subject)"
+                # Clean up nested f-string issues
+                items.append(f"<li style='margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px;'><strong>{clean_sub}</strong><br><span style='font-size: 9px; color: #aaa;'>{ts}</span></li>")
+            last_emails_html = f"<ul style='margin: 5px 0 0 0; padding-left: 15px; text-align: left; list-style-type: disc;'>{''.join(items)}</ul>"
+
         # Query exclusions count for current client
         cursor.execute("SELECT COUNT(*) FROM excluded_customers WHERE client_id = ?", (active_client_id,))
         exclusion_count = cursor.fetchone()[0]
@@ -1119,7 +1159,7 @@ def view_settings(client_id: Optional[int] = None):
                             <div class="form-group">
                                 <label for="qualification_criteria" style="display: inline-flex; align-items: center; gap: 5px;">
                                     How do you qualify a lead?
-                                    <span class="tooltip">💬
+                                    <span class="tooltip"><svg viewBox="0 0 24 24" width="14" height="14" style="fill: #1a237e; vertical-align: middle; cursor: help; display: inline-block; margin-left: 4px;"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
                                         <span class="tooltiptext">Define a lead stage that is &quot;good enough&quot;, and would be happy with paying for all day long from your Ads. This is the minimum standard the system will go for when optimizing your Ads.</span>
                                     </span>
                                 </label>
@@ -1256,15 +1296,26 @@ def view_settings(client_id: Optional[int] = None):
                                         <label for="email_account" style="font-weight: bold; margin-bottom: 0; display: inline-flex; align-items: center; gap: 4px;">
                                             Onboarding Integration Email Account
                                             <span class="tooltip-icon">
-                                                💬
+                                                <svg viewBox="0 0 24 24" width="14" height="14" style="fill: #1a237e; vertical-align: middle; cursor: help; display: inline-block; margin-left: 4px;"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
                                                 <span class="tooltip-text">
                                                     Forward your customer booking emails, invoice alerts, or form lead replies to:<br>
                                                     <strong class="settings-forwarding-email" style="color: #81c784; word-break: break-all;">conversions-{active_client_id}@your-agency.com</strong>
                                                 </span>
                                             </span>
+                                            
+                                            <!-- Check Logs Hover Link -->
+                                            <span class="tooltip-icon" style="margin-left: 15px; font-size: 11px; font-weight: bold;">
+                                                <a href="javascript:void(0)" style="color: #1a237e; text-decoration: underline; display: inline-flex; align-items: center;">
+                                                    <svg viewBox="0 0 24 24" width="13" height="13" style="fill: #1a237e; vertical-align: middle; margin-right: 4px; display: inline-block;"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 3.39 6 6.5 11 6.5s9.27-3.11 11-6.5c-1.73-3.39-6-6.5-11-6.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>check logs
+                                                </a>
+                                                <span class="tooltip-text" style="width: 310px;">
+                                                    <strong>Last 5 Emails Analyzed by System:</strong><br>
+                                                    {last_emails_html}
+                                                </span>
+                                            </span>
                                         </label>
                                         <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none; display: flex; align-items: center; gap: 4px;">
-                                            🔑 How to get an App Password?
+                                            <svg viewBox="0 0 24 24" width="13" height="14" style="fill: #1a237e; vertical-align: middle; margin-right: 4px; display: inline-block;"><path d="M12.65 10C11.83 7.67 9.54 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.54 0 4.83-1.67 5.65-4H17v2h2v-2h2v-2h-8.35zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>How to get an App Password?
                                         </a>
                                     </div>
                                     <input type="text" id="email_account" value="{client_data.get("email_account", "") or ""}" placeholder="e.g. bookings@clientcompany.com">
@@ -1272,7 +1323,7 @@ def view_settings(client_id: Optional[int] = None):
                             </div>
                             
                             <!-- SECTION 5: Active Webhooks read-only deck -->
-                            <div class="section-title" style="margin-top: 30px;">🔑 Live Webhooks & Integration URLs</div>
+                            <div class="section-title" style="margin-top: 30px;"><svg viewBox="0 0 24 24" width="16" height="16" style="fill: #1a237e; vertical-align: middle; margin-right: 6px; display: inline-block;"><path d="M12.65 10C11.83 7.67 9.54 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.54 0 4.83-1.67 5.65-4H17v2h2v-2h2v-2h-8.35zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>Live Webhooks & Integration URLs</div>
                             
                             <!-- CallRail webhook (Always active) -->
                             <div class="webhook-card">
@@ -2092,7 +2143,7 @@ def add_client_page():
                         <div class="form-group">
                             <label for="qualification_criteria" style="display: inline-flex; align-items: center; gap: 5px;">
                                 How do you qualify a lead?
-                                <span class="tooltip">💬
+                                <span class="tooltip"><svg viewBox="0 0 24 24" width="14" height="14" style="fill: #1a237e; vertical-align: middle; cursor: help; display: inline-block; margin-left: 4px;"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
                                     <span class="tooltiptext">Define a lead stage that is &quot;good enough&quot;, and would be happy with paying for all day long from your Ads. This is the minimum standard the system will go for when optimizing your Ads.</span>
                                 </span>
                             </label>
@@ -2173,16 +2224,27 @@ def add_client_page():
                                     <label for="email_account" style="font-weight: bold; margin-bottom: 0; display: inline-flex; align-items: center; gap: 4px;">
                                         Onboarding Integration Email Account
                                         <span class="tooltip-icon">
-                                            💬
+                                            <svg viewBox="0 0 24 24" width="14" height="14" style="fill: #1a237e; vertical-align: middle; cursor: help; display: inline-block; margin-left: 4px;"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
                                             <span class="tooltip-text">
                                                 Forward your booking emails, invoice alerts, or form replies to your custom system address:<br>
                                                 <strong class="wizard-forwarding-email" style="color: #81c784; word-break: break-all;">conversions-[id]@your-agency.com</strong><br>
                                                 <span style="font-size: 9px; color: #ccc;">(Your actual ID will show up on the next screen once profile is created)</span>
                                             </span>
                                         </span>
+                                        
+                                        <!-- Check Logs Hover Link -->
+                                        <span class="tooltip-icon" style="margin-left: 15px; font-size: 11px; font-weight: bold;">
+                                            <a href="javascript:void(0)" style="color: #1a237e; text-decoration: underline; display: inline-flex; align-items: center;">
+                                                <svg viewBox="0 0 24 24" width="13" height="13" style="fill: #1a237e; vertical-align: middle; margin-right: 4px; display: inline-block;"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 3.39 6 6.5 11 6.5s9.27-3.11 11-6.5c-1.73-3.39-6-6.5-11-6.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>check logs
+                                            </a>
+                                            <span class="tooltip-text" style="width: 310px;">
+                                                <strong>Last 5 Emails Analyzed by System:</strong><br>
+                                                <span style="color: #ccc; font-style: italic;">No emails analyzed yet (Onboarding in progress).</span>
+                                            </span>
+                                        </span>
                                     </label>
                                     <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none; display: flex; align-items: center; gap: 4px;">
-                                        🔑 How to get an App Password?
+                                        <svg viewBox="0 0 24 24" width="13" height="14" style="fill: #1a237e; vertical-align: middle; margin-right: 4px; display: inline-block;"><path d="M12.65 10C11.83 7.67 9.54 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.54 0 4.83-1.67 5.65-4H17v2h2v-2h2v-2h-8.35zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>How to get an App Password?
                                     </a>
                                 </div>
                                 <input type="text" id="email_account" placeholder="e.g. bookings@clientcompany.com">
