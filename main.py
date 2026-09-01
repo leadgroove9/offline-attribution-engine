@@ -106,6 +106,30 @@ def init_db():
         )
     """)
 
+    # 4. Create CRM Webhook Logs Table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS crm_webhook_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            client_id INTEGER,
+            contact_name TEXT,
+            stage TEXT,
+            amount REAL,
+            received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # 5. Create Billing Webhook Logs Table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS billing_webhook_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            client_id INTEGER,
+            customer_name TEXT,
+            invoice_number TEXT,
+            amount REAL,
+            received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     # 3. Create Sessions Table (Multi-Tenant)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS sessions (
@@ -858,6 +882,70 @@ def view_settings(client_id: Optional[int] = None):
                 items.append(f"<li style='margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px;'><strong>{clean_sub}</strong><br><span style='font-size: 9px; color: #aaa;'>{ts}</span></li>")
             last_emails_html = f"<ul style='margin: 5px 0 0 0; padding-left: 15px; text-align: left; list-style-type: disc;'>{''.join(items)}</ul>"
 
+        # Query last 5 received CRM webhooks for active_client_id
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS crm_webhook_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                client_id INTEGER,
+                contact_name TEXT,
+                stage TEXT,
+                amount REAL,
+                received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.commit()
+        
+        cursor.execute("""
+            SELECT contact_name, stage, amount, datetime(received_at, 'localtime') 
+            FROM crm_webhook_logs 
+            WHERE client_id = ? 
+            ORDER BY received_at DESC LIMIT 5
+        """, (active_client_id,))
+        crm_logs_list = cursor.fetchall()
+        
+        if not crm_logs_list:
+            last_crm_logs_html = "<span style='color: #ccc; font-style: italic;'>No CRM webhooks received yet.</span>"
+        else:
+            items = []
+            for name, stg, amt, ts in crm_logs_list:
+                clean_name = name if name else "Unknown Deal/Contact"
+                clean_stage = stg if stg else "Updated"
+                clean_amt = f"${amt:,.2f}" if amt else "$0.00"
+                items.append(f"<li style='margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px;'><strong>{clean_name}</strong> ({clean_stage})<br><span style='font-size: 9px; color: #aaa;'>Value: {clean_amt} | {ts}</span></li>")
+            last_crm_logs_html = f"<ul style='margin: 5px 0 0 0; padding-left: 15px; text-align: left; list-style-type: disc;'>{''.join(items)}</ul>"
+
+        # Query last 5 received Billing webhooks for active_client_id
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS billing_webhook_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                client_id INTEGER,
+                customer_name TEXT,
+                invoice_number TEXT,
+                amount REAL,
+                received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.commit()
+        
+        cursor.execute("""
+            SELECT customer_name, invoice_number, amount, datetime(received_at, 'localtime') 
+            FROM billing_webhook_logs 
+            WHERE client_id = ? 
+            ORDER BY received_at DESC LIMIT 5
+        """, (active_client_id,))
+        billing_logs_list = cursor.fetchall()
+        
+        if not billing_logs_list:
+            last_billing_logs_html = "<span style='color: #ccc; font-style: italic;'>No billing webhooks received yet.</span>"
+        else:
+            items = []
+            for name, inv, amt, ts in billing_logs_list:
+                clean_name = name if name else "Unknown Customer"
+                clean_inv = f"Inv #{inv}" if inv else "Invoice"
+                clean_amt = f"${amt:,.2f}" if amt else "$0.00"
+                items.append(f"<li style='margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px;'><strong>{clean_name}</strong> ({clean_inv})<br><span style='font-size: 9px; color: #aaa;'>Paid: {clean_amt} | {ts}</span></li>")
+            last_billing_logs_html = f"<ul style='margin: 5px 0 0 0; padding-left: 15px; text-align: left; list-style-type: disc;'>{''.join(items)}</ul>"
+
         # Query exclusions count for current client
         cursor.execute("SELECT COUNT(*) FROM excluded_customers WHERE client_id = ?", (active_client_id,))
         exclusion_count = cursor.fetchone()[0]
@@ -1340,7 +1428,18 @@ def view_settings(client_id: Optional[int] = None):
                             
                             <!-- CRM webhook (Available if CRM active) -->
                             <div class="webhook-card" id="crm-webhook-card">
-                                <div class="webhook-title">⚙️ CRM Deal/Lead Webhook</div>
+                                <div class="webhook-title" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                                    <span>⚙️ CRM Deal/Lead Webhook</span>
+                                    
+                                    <!-- Check Logs Hover Link -->
+                                    <span class="tooltip-icon" style="font-size: 11px; font-weight: bold; margin-left: auto; cursor: help;">
+                                        <a href="javascript:void(0)" style="color: #1a237e; text-decoration: underline;">check logs</a>
+                                        <span class="tooltip-text" style="width: 290px;">
+                                            <strong>Last 5 Received Payloads:</strong><br>
+                                            {last_crm_logs_html}
+                                        </span>
+                                    </span>
+                                </div>
                                 <div class="webhook-desc">Use this URL inside Zapier or your CRM's developer workspace to push offline lead status updates back to our platform:</div>
                                 <div class="webhook-input-group">
                                     <input type="text" class="webhook-input" id="crm-webhook" readonly value="" data-suffix="/webhooks/crm?client_id={active_client_id}">
@@ -1350,7 +1449,18 @@ def view_settings(client_id: Optional[int] = None):
                             
                             <!-- Billing webhook (Available if Accounting active) -->
                             <div class="webhook-card" id="billing-webhook-card">
-                                <div class="webhook-title">💳 QuickBooks / Xero Billing Webhook</div>
+                                <div class="webhook-title" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                                    <span>💳 QuickBooks / Xero Billing Webhook</span>
+                                    
+                                    <!-- Check Logs Hover Link -->
+                                    <span class="tooltip-icon" style="font-size: 11px; font-weight: bold; margin-left: auto; cursor: help;">
+                                        <a href="javascript:void(0)" style="color: #1a237e; text-decoration: underline;">check logs</a>
+                                        <span class="tooltip-text" style="width: 290px;">
+                                            <strong>Last 5 Received Payments:</strong><br>
+                                            {last_billing_logs_html}
+                                        </span>
+                                    </span>
+                                </div>
                                 <div class="webhook-desc">Link your paid transaction updates directly using this endpoint to register closed invoice values:</div>
                                 <div class="webhook-input-group">
                                     <input type="text" class="webhook-input" id="billing-webhook" readonly value="" data-suffix="/webhooks/billing?client_id={active_client_id}">
@@ -3881,6 +3991,33 @@ async def receive_crm_webhook(request: Request, client_id: Optional[int] = None)
         payload = await request.json()
         resolved_client_id = client_id or 1
         print(f"🏢 [CRM Webhook] Received conversion payload for Client #{resolved_client_id}: {payload}")
+        
+        # Log to Database
+        contact_name = payload.get('deal_name') or payload.get('contact_name') or payload.get('lead_name') or payload.get('name') or "Unknown Deal/Contact"
+        stage = payload.get('deal_stage') or payload.get('stage') or payload.get('status') or "Updated"
+        amount = payload.get('amount') or payload.get('value') or payload.get('deal_value') or 0.0
+        
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS crm_webhook_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                client_id INTEGER,
+                contact_name TEXT,
+                stage TEXT,
+                amount REAL,
+                received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        cursor.execute("""
+            INSERT INTO crm_webhook_logs (client_id, contact_name, stage, amount)
+            VALUES (?, ?, ?, ?)
+        """, (resolved_client_id, str(contact_name), str(stage), float(amount)))
+        conn.commit()
+        conn.close()
+        
         return {
             "status": "success",
             "client_id": resolved_client_id,
@@ -3901,6 +4038,33 @@ async def receive_billing_webhook(request: Request, client_id: Optional[int] = N
         payload = await request.json()
         resolved_client_id = client_id or 1
         print(f"💳 [Billing Webhook] Received transaction payload for Client #{resolved_client_id}: {payload}")
+        
+        # Log to Database
+        customer_name = payload.get('customer_name') or payload.get('name') or "Unknown Customer"
+        invoice_number = payload.get('invoice_number') or payload.get('invoice_id') or payload.get('doc_number') or ""
+        amount = payload.get('amount') or payload.get('amount_paid') or payload.get('total') or 0.0
+        
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS billing_webhook_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                client_id INTEGER,
+                customer_name TEXT,
+                invoice_number TEXT,
+                amount REAL,
+                received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        cursor.execute("""
+            INSERT INTO billing_webhook_logs (client_id, customer_name, invoice_number, amount)
+            VALUES (?, ?, ?, ?)
+        """, (resolved_client_id, str(customer_name), str(invoice_number), float(amount)))
+        conn.commit()
+        conn.close()
+        
         return {
             "status": "success",
             "client_id": resolved_client_id,
