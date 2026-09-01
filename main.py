@@ -1562,12 +1562,11 @@ def view_settings(client_id: Optional[int] = None):
                         crmCard.style.display = 'block';
                     }} else if (['quickbooks', 'xero'].includes(sot)) {{
                         billingCard.style.display = 'block';
-                    }} else if (sot === 'email') {{
+                    }} else if (sot === 'email' || sot === 'ai_rating') {{
                         emailBox.style.display = 'block';
-                        emailCard.style.display = 'block';
-                    }} else if (sot === 'ai_rating' && (leadGen === 'both' || leadGen === 'form')) {{
-                        // AI Rating with Web Forms allows configuring an optional Ingestion Email Account
-                        emailBox.style.display = 'block';
+                        if (emailCard) {{
+                            emailCard.style.display = sot === 'email' ? 'block' : 'none';
+                        }}
                     }}
                 }}
 
@@ -2738,10 +2737,7 @@ def add_client_page():
                         dealBox.style.display = 'block';
                     } else if (['servicetitan', 'housecallpro'].includes(sot)) {
                         leadBox.style.display = 'block';
-                    } else if (sot === 'email') {
-                        emailBox.style.display = 'block';
-                    } else if (sot === 'ai_rating' && (leadGen === 'both' || leadGen === 'form')) {
-                        // AI Rating with Web Forms allows configuring an optional Ingestion Email Account
+                    } else if (sot === 'email' || sot === 'ai_rating') {
                         emailBox.style.display = 'block';
                     }
                 }
