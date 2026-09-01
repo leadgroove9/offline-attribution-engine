@@ -1467,6 +1467,27 @@ def view_settings(client_id: Optional[int] = None):
                                     </ol>
                                 </div>
                             </div>
+                            <!-- CONDITIONAL: Housecall Pro Setup Instructions -->
+                            <div id="sot-housecallpro-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
+                                <div style="background-color: #fff3e0; border-left: 4px solid #e65100; padding: 15px; border-radius: 4px; color: #e65100; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                    💡 <strong>Housecall Pro Webhooks Quick Setup Guide:</strong><br>
+                                    <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #e65100;">
+                                        <li>Sign in to your Housecall Pro admin account. (Only <strong>Admin</strong> users can access and generate webhook API settings).</li>
+                                        <li>Navigate to <strong>My Apps</strong> from the top navigation bar, then click <strong>All Apps</strong>.</li>
+                                        <li>Select the <strong>All Apps</strong> tab, search for the <strong>Webhooks</strong> app, and click to open it.</li>
+                                        <li>Click the toggle button in the top-right corner of the page to <strong>Enable Webhooks</strong>.</li>
+                                        <li>In the <strong>Target URL</strong> field, paste your client's custom live endpoint:
+                                            <code style="display: block; background: #fff; border: 1px solid #ffcc80; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #d84315;">https://your-agency-app.onrender.com/webhooks/crm?client_id=conversions-{active_client_id}</code>
+                                        </li>
+                                        <li>Select your preferred event triggers to notify our platform. We recommend subscribing to **<code>job.completed</code>**, <code>job.created</code>, and <code>job.paid</code> to track actual conversion events.</li>
+                                        <li>Click <strong>Save</strong> to activate the webhook instantly!</li>
+                                    </ol>
+                                    <small style="display: block; font-style: italic; color: #bf360c; line-height: 1.4; border-top: 1px solid #ffe0b2; padding-top: 8px;">
+                                        ⚠️ <strong>Note:</strong> Webhook access in Housecall Pro requires their **MAX plan** subscription level. If you don't see the Webhooks app under All Apps, contact Housecall Pro support to verify your plan access.
+                                    </small>
+                                </div>
+                            </div>
+
 \n                            <!-- CONDITIONAL: CRM Lead status tags -->
                             <div id="sot-lead-tags-box" class="conditional-box">
                                 <label for="crm_lead_tags">Which statuses under <strong>Leads</strong> signify qualification?</label>
@@ -1756,6 +1777,8 @@ def view_settings(client_id: Optional[int] = None):
                     const emailCard = document.getElementById('email-webhook-card');
                     const salesforceBox = document.getElementById('sot-salesforce-instructions-box');
                     const zohoBox = document.getElementById('sot-zoho-instructions-box');
+                    const servicetitanBox = document.getElementById('sot-servicetitan-instructions-box');
+                    const housecallproBox = document.getElementById('sot-housecallpro-instructions-box');
                     
                     // Hide all by default
                     dealBox.style.display = 'none';
@@ -1764,6 +1787,8 @@ def view_settings(client_id: Optional[int] = None):
                     if (hsBox) hsBox.style.display = 'none';
                     if (salesforceBox) salesforceBox.style.display = 'none';
                     if (zohoBox) zohoBox.style.display = 'none';
+                    if (servicetitanBox) servicetitanBox.style.display = 'none';
+                    if (housecallproBox) housecallproBox.style.display = 'none';
                     
                     crmCard.style.display = 'none';
                     billingCard.style.display = 'none';
@@ -1784,6 +1809,8 @@ def view_settings(client_id: Optional[int] = None):
                         crmCard.style.display = 'block';
                         if (sot === 'servicetitan' && servicetitanBox) {{
                             servicetitanBox.style.display = 'block';
+                        }} else if (sot === 'housecallpro' && housecallproBox) {{
+                            housecallproBox.style.display = 'block';
                         }}
                     }} else if (['quickbooks', 'xero'].includes(sot)) {{
                         billingCard.style.display = 'block';
@@ -2544,6 +2571,27 @@ def add_client_page():
                                 </ol>
                             </div>
                         </div>
+                        <!-- CONDITIONAL INPUT: Housecall Pro Setup Instructions -->
+                        <div id="sot-housecallpro-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
+                            <div style="background-color: #fff3e0; border-left: 4px solid #e65100; padding: 15px; border-radius: 4px; color: #e65100; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                💡 <strong>Housecall Pro Webhooks Quick Setup Guide:</strong><br>
+                                <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #e65100;">
+                                    <li>Sign in to your Housecall Pro admin account. (Only <strong>Admin</strong> users can access and generate webhook API settings).</li>
+                                    <li>Navigate to <strong>My Apps</strong> from the top navigation bar, then click <strong>All Apps</strong>.</li>
+                                    <li>Select the <strong>All Apps</strong> tab, search for the <strong>Webhooks</strong> app, and click to open it.</li>
+                                    <li>Click the toggle button in the top-right corner of the page to <strong>Enable Webhooks</strong>.</li>
+                                    <li>In the <strong>Target URL</strong> field, paste your client's custom live endpoint (which you can copy on the next success screen):
+                                        <code style="display: block; background: #fff; border: 1px solid #ffcc80; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #d84315;">https://your-agency-app.onrender.com/webhooks/crm?client_id=conversions-[id]</code>
+                                    </li>
+                                    <li>Select your preferred event triggers to notify our platform. We recommend subscribing to **<code>job.completed</code>**, <code>job.created</code>, and <code>job.paid</code> to track actual conversion events.</li>
+                                    <li>Click <strong>Save</strong> to activate the webhook instantly!</li>
+                                </ol>
+                                <small style="display: block; font-style: italic; color: #bf360c; line-height: 1.4; border-top: 1px solid #ffe0b2; padding-top: 8px;">
+                                    ⚠️ <strong>Note:</strong> Webhook access in Housecall Pro requires their **MAX plan** subscription level. If you don't see the Webhooks app under All Apps, contact Housecall Pro support to verify your plan access.
+                                </small>
+                            </div>
+                        </div>
+
 \n                        <!-- CONDITIONAL INPUT: CRM Lead status tags (ServiceTitan, Housecall Pro) -->
                         <div id="sot-lead-tags-box" class="conditional-box">
                             <label for="crm_lead_tags">Which tags/statuses under <strong>Leads</strong> signify qualification?</label>
@@ -3071,6 +3119,9 @@ def add_client_page():
                     const salesforceBox = document.getElementById('sot-salesforce-instructions-box');
                     const zohoBox = document.getElementById('sot-zoho-instructions-box');
                     const servicetitanBox = document.getElementById('sot-servicetitan-instructions-box');
+                    const housecallproBox = document.getElementById('sot-housecallpro-instructions-box');
+                    const servicetitanBox = document.getElementById('sot-servicetitan-instructions-box');
+                    const housecallproBox = document.getElementById('sot-housecallpro-instructions-box');
                     
                     dealBox.style.display = 'none';
                     leadBox.style.display = 'none';
@@ -3079,6 +3130,9 @@ def add_client_page():
                     if (salesforceBox) salesforceBox.style.display = 'none';
                     if (zohoBox) zohoBox.style.display = 'none';
                     if (servicetitanBox) servicetitanBox.style.display = 'none';
+                    if (housecallproBox) housecallproBox.style.display = 'none';
+                    if (servicetitanBox) servicetitanBox.style.display = 'none';
+                    if (housecallproBox) housecallproBox.style.display = 'none';
                     
                     if (['hubspot', 'salesforce', 'zoho'].includes(sot)) {
                         dealBox.style.display = 'block';
@@ -3089,10 +3143,12 @@ def add_client_page():
                         } else if (sot === 'zoho' && zohoBox) {
                             zohoBox.style.display = 'block';
                         }
-                    } else if (['servicetitan', 'housecallpro'].includes(sot)) {
+} else if (['servicetitan', 'housecallpro'].includes(sot)) {
                         leadBox.style.display = 'block';
                         if (sot === 'servicetitan' && servicetitanBox) {
                             servicetitanBox.style.display = 'block';
+                        } else if (sot === 'housecallpro' && housecallproBox) {
+                            housecallproBox.style.display = 'block';
                         }
                     } else if (sot === 'email' || sot === 'ai_rating') {
                         emailBox.style.display = 'block';
