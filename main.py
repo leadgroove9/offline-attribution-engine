@@ -1779,6 +1779,7 @@ def view_settings(client_id: Optional[int] = None):
                     const zohoBox = document.getElementById('sot-zoho-instructions-box');
                     const servicetitanBox = document.getElementById('sot-servicetitan-instructions-box');
                     const housecallproBox = document.getElementById('sot-housecallpro-instructions-box');
+                    const quickbooksBox = document.getElementById('sot-quickbooks-instructions-box');
                     
                     // Hide all by default
                     dealBox.style.display = 'none';
@@ -1789,6 +1790,7 @@ def view_settings(client_id: Optional[int] = None):
                     if (zohoBox) zohoBox.style.display = 'none';
                     if (servicetitanBox) servicetitanBox.style.display = 'none';
                     if (housecallproBox) housecallproBox.style.display = 'none';
+                    if (quickbooksBox) quickbooksBox.style.display = 'none';
                     
                     crmCard.style.display = 'none';
                     billingCard.style.display = 'none';
@@ -1814,6 +1816,9 @@ def view_settings(client_id: Optional[int] = None):
                         }}
                     }} else if (['quickbooks', 'xero'].includes(sot)) {{
                         billingCard.style.display = 'block';
+                        if (sot === 'quickbooks' && quickbooksBox) {{
+                            quickbooksBox.style.display = 'block';
+                        }}
                     }} else if (sot === 'email' || sot === 'ai_rating') {{
                         emailBox.style.display = 'block';
                         if (emailCard) {{
@@ -3120,8 +3125,7 @@ def add_client_page():
                     const zohoBox = document.getElementById('sot-zoho-instructions-box');
                     const servicetitanBox = document.getElementById('sot-servicetitan-instructions-box');
                     const housecallproBox = document.getElementById('sot-housecallpro-instructions-box');
-                    const servicetitanBox = document.getElementById('sot-servicetitan-instructions-box');
-                    const housecallproBox = document.getElementById('sot-housecallpro-instructions-box');
+                    const quickbooksBox = document.getElementById('sot-quickbooks-instructions-box');
                     
                     dealBox.style.display = 'none';
                     leadBox.style.display = 'none';
@@ -3131,8 +3135,7 @@ def add_client_page():
                     if (zohoBox) zohoBox.style.display = 'none';
                     if (servicetitanBox) servicetitanBox.style.display = 'none';
                     if (housecallproBox) housecallproBox.style.display = 'none';
-                    if (servicetitanBox) servicetitanBox.style.display = 'none';
-                    if (housecallproBox) housecallproBox.style.display = 'none';
+                    if (quickbooksBox) quickbooksBox.style.display = 'none';
                     
                     if (['hubspot', 'salesforce', 'zoho'].includes(sot)) {
                         dealBox.style.display = 'block';
@@ -3150,7 +3153,10 @@ def add_client_page():
                         } else if (sot === 'housecallpro' && housecallproBox) {
                             housecallproBox.style.display = 'block';
                         }
-                    } else if (sot === 'email' || sot === 'ai_rating') {
+                    } else if (['quickbooks', 'xero'].includes(sot)) {
+                        if (sot === 'quickbooks' && quickbooksBox) {
+                            quickbooksBox.style.display = 'block';
+                        } else if (sot === 'email' || sot === 'ai_rating') {
                         emailBox.style.display = 'block';
                     }
                 }
