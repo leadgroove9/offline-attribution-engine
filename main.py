@@ -94,7 +94,7 @@ def init_db():
             cursor.execute(f"ALTER TABLE clients ADD COLUMN {col_name} {col_type}")
             print(f"Added missing database column in clients: {col_name}")
 
-    # 2. Create Sessions Table (Multi-Tenant)
+    # 2. Create Analyzed Emails Table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS analyzed_emails (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -103,8 +103,11 @@ def init_db():
             sender TEXT,
             recipient TEXT,
             analyzed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-        
+        )
+    """)
+
+    # 3. Create Sessions Table (Multi-Tenant)
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS sessions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             client_id INTEGER DEFAULT 1,
