@@ -1293,8 +1293,10 @@ def view_settings(client_id: Optional[int] = None):
                                 </div>
                                 <div class="form-group" style="margin-bottom: 0;">
                                     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 5px;">
-                                        <label for="email_account" style="font-weight: bold; margin-bottom: 0; display: inline-flex; align-items: center; gap: 4px;">
-                                            Onboarding Integration Email Account
+                                        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                                            <label for="email_account" style="font-weight: bold; margin-bottom: 0;">Onboarding Integration Email Account</label>
+                                            
+                                            <!-- Speech Bubble Tooltip -->
                                             <span class="tooltip-icon">
                                                 💬
                                                 <span class="tooltip-text">
@@ -1304,14 +1306,14 @@ def view_settings(client_id: Optional[int] = None):
                                             </span>
                                             
                                             <!-- Check Logs Hover Link -->
-                                            <span class="tooltip-icon" style="margin-left: 10px; font-size: 11px; font-weight: bold;">
+                                            <span class="tooltip-icon" style="font-size: 11px; font-weight: bold; margin-left: 5px;">
                                                 <a href="javascript:void(0)" style="color: #1a237e; text-decoration: underline;">check logs</a>
                                                 <span class="tooltip-text" style="width: 290px;">
                                                     <strong>Last 5 Analyzed Emails:</strong><br>
                                                     {last_emails_html}
                                                 </span>
                                             </span>
-                                        </label>
+                                        </div>
                                         <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none; display: flex; align-items: center; gap: 4px;">
                                             🔑 How to get an App Password?
                                         </a>
@@ -2219,8 +2221,10 @@ def add_client_page():
                             </div>
                             <div class="form-group" style="margin-bottom: 0;">
                                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 5px;">
-                                    <label for="email_account" style="font-weight: bold; margin-bottom: 0; display: inline-flex; align-items: center; gap: 4px;">
-                                        Onboarding Integration Email Account
+                                    <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                                        <label for="email_account" style="font-weight: bold; margin-bottom: 0;">Onboarding Integration Email Account</label>
+                                        
+                                        <!-- Speech Bubble Tooltip -->
                                         <span class="tooltip-icon">
                                             💬
                                             <span class="tooltip-text">
@@ -2231,14 +2235,14 @@ def add_client_page():
                                         </span>
                                         
                                         <!-- Check Logs Hover Link -->
-                                        <span class="tooltip-icon" style="margin-left: 10px; font-size: 11px; font-weight: bold;">
+                                        <span class="tooltip-icon" style="font-size: 11px; font-weight: bold; margin-left: 5px;">
                                             <a href="javascript:void(0)" style="color: #1a237e; text-decoration: underline;">check logs</a>
                                             <span class="tooltip-text" style="width: 290px;">
-                                                <strong>Last 5 Analyzed Emails:</strong><br>
+                                                <strong>Last 5 Emails Analyzed by System:</strong><br>
                                                 <span style="color: #ccc; font-style: italic;">No emails analyzed yet (Onboarding in progress).</span>
                                             </span>
                                         </span>
-                                    </label>
+                                    </div>
                                     <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none; display: flex; align-items: center; gap: 4px;">
                                         🔑 How to get an App Password?
                                     </a>
