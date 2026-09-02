@@ -86,7 +86,7 @@ def get_user_role_and_client(email: str) -> tuple[str, Optional[int]]:
 app = FastAPI(
     title="Offline Attribution Engine (Multi-Tenant Multi-Channel)",
     description="Multi-tenant agency platform for tracking offline leads/sales and AI audits across Google, Meta, LinkedIn, and Microsoft",
-    version="15.1.0"
+    version="15.2.0"
 )
 
 # ---------------------------------------------------------
@@ -2545,14 +2545,14 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     <h3 style="margin-top: 0; color: #1a237e; font-size: 15px;">✉️ Invite a New Collaborator</h3>
                     <div id="invite-alert" class="alert" style="margin-bottom: 15px; padding: 10px; font-size: 12px;"></div>
                     
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; flex-wrap: wrap;">
-                        <div class="form-group" style="margin-bottom: 0;">
-                            <label for="invite_email" style="font-weight: bold; font-size: 11px;">RECIPIENT EMAIL ADDRESS</label>
+                    <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 15px;">
+                        <div class="form-group" style="flex: 1; min-width: 250px; margin-bottom: 10px;">
+                            <label for="invite_email" style="font-weight: bold; font-size: 11px; margin-bottom: 8px; display: block;">RECIPIENT EMAIL ADDRESS</label>
                             <input type="email" id="invite_email" placeholder="e.g. employee@clientcompany.com" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ced4da; font-size: 13px; background: white;">
                         </div>
-                        <div class="form-group" style="margin-bottom: 0;">
-                            <label for="invite_role" style="font-weight: bold; font-size: 11px;">ACCESS LEVEL</label>
-                            <select id="invite_role" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ced4da; font-size: 13px; background: white;">
+                        <div class="form-group" style="flex: 1; min-width: 200px; margin-bottom: 10px;">
+                            <label for="invite_role" style="font-weight: bold; font-size: 11px; margin-bottom: 8px; display: block;">ACCESS LEVEL</label>
+                            <select id="invite_role" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ced4da; font-size: 13px; background: white; height: auto;">
                                 <option value="read">Read-Only (Viewer)</option>
                                 <option value="full">Full Function (Manager)</option>
                             </select>
