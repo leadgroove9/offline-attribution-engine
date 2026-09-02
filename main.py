@@ -294,7 +294,12 @@ def init_db():
         ("crm_lead_tags", "TEXT"),
         ("lead_count_rule", "TEXT"),
         ("exclude_past_customers", "TEXT"),
-        ("callrail_account_id", "TEXT")
+        ("callrail_account_id", "TEXT"),
+        ("call_tracking_provider", "TEXT"),
+        ("ctm_account_id", "TEXT"),
+        ("ctm_profile_id", "TEXT"),
+        ("wc_account_id", "TEXT"),
+        ("wc_profile_id", "TEXT")
     ]
     for col_name, col_type in cols_to_verify:
         if col_name not in existing_cols:
@@ -644,8 +649,13 @@ class ExcludedCustomer(BaseModel):
 
 class ClientCreate(BaseModel):
     name: str
+    call_tracking_provider: Optional[str] = "callrail"
     callrail_account_id: Optional[str] = ""
-    callrail_company_id: str
+    callrail_company_id: Optional[str] = ""
+    ctm_account_id: Optional[str] = ""
+    ctm_profile_id: Optional[str] = ""
+    wc_account_id: Optional[str] = ""
+    wc_profile_id: Optional[str] = "" 
     google_ads_customer_id: str
     facebook_ads_id: Optional[str] = ""
     linkedin_ads_id: Optional[str] = ""
@@ -1337,8 +1347,13 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
 class ClientUpdate(BaseModel):
     id: int
     name: str
+    call_tracking_provider: Optional[str] = "callrail"
     callrail_account_id: Optional[str] = ""
-    callrail_company_id: str
+    callrail_company_id: Optional[str] = ""
+    ctm_account_id: Optional[str] = ""
+    ctm_profile_id: Optional[str] = ""
+    wc_account_id: Optional[str] = ""
+    wc_profile_id: Optional[str] = "" 
     google_ads_customer_id: str
     facebook_ads_id: Optional[str] = ""
     linkedin_ads_id: Optional[str] = ""
@@ -1392,6 +1407,28 @@ def view_settings(request: Request, client_id: Optional[int] = None):
             raise HTTPException(status_code=404, detail="Client not found")
             
         client_data = dict(zip(cols, client_row))
+        
+        active_provider = client_data.get("call_tracking_provider", "callrail") or "callrail"
+        sel_cr = 'selected' if active_provider == 'callrail' else ''
+        sel_ctm = 'selected' if active_provider == 'calltrackingmetrics' else ''
+        sel_wc = 'selected' if active_provider == 'whatconverts' else ''
+        
+        p_cr_style = 'display: flex;' if active_provider == 'callrail' else 'display: none;'
+        p_ctm_style = 'display: flex;' if active_provider == 'calltrackingmetrics' else 'display: none;'
+        p_wc_style = 'display: flex;' if active_provider == 'whatconverts' else 'display: none;'
+
+        if active_provider == "calltrackingmetrics":
+            webhook_card_title = "📞 CallTrackingMetrics Transcription Webhook"
+            webhook_card_desc = "Paste this dynamic endpoint into CallTrackingMetrics webhook setup to sync automated call recordings and transcripts:"
+            webhook_suffix = f"/webhooks/calltrackingmetrics?client_id={active_client_id}"
+        elif active_provider == "whatconverts":
+            webhook_card_title = "📞 WhatConverts CallCompleted Webhook"
+            webhook_card_desc = "Paste this dynamic endpoint into WhatConverts webhook setup to sync automated call recordings and transcripts:"
+            webhook_suffix = f"/webhooks/whatconverts?client_id={active_client_id}"
+        else:
+            webhook_card_title = "📞 CallRail CallCompleted Webhook"
+            webhook_card_desc = "Paste this dynamic endpoint into CallRail Integration Settings to sync automated call recordings and transcripts:"
+            webhook_suffix = f"/webhooks/callrail?client_id={active_client_id}" 
         
         # Query last 5 analyzed emails for active_client_id
         cursor.execute("""
@@ -1744,14 +1781,45 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                 <input type="text" id="name" value="{client_name}" required>
                             </div>
                             
-                            <div class="form-row">
+                            <div class="form-group">
+                                <label for="call_tracking_provider">Call Tracking Provider</label>
+                                <select id="call_tracking_provider" onchange="toggleSettingsCallTrackingFields()" style="width: 100%; padding: 12px; border-radius: 6px; border: 1px solid #ced4da; font-size: 14px; font-weight: 600;">
+                                    <option value="callrail" {sel_cr}>CallRail</option>
+                                    <option value="calltrackingmetrics" {sel_ctm}>CallTrackingMetrics</option>
+                                    <option value="whatconverts" {sel_wc}>WhatConverts</option>
+                                </select>
+                            </div>
+                            
+                            <div id="settings_call_tracking_callrail_box" class="form-row" style="{p_cr_style}">
                                 <div class="form-group">
                                     <label for="callrail_account_id">CallRail Account ID</label>
-                                    <input type="text" id="callrail_account_id" value="{client_data.get("callrail_account_id", "") or ""}" placeholder="e.g. 123456789">
+                                    <input type="text" id="callrail_account_id" value="{client_data.get('callrail_account_id', '') or ''}" placeholder="e.g. 123456789">
                                 </div>
                                 <div class="form-group">
                                     <label for="callrail_company_id">CallRail Company ID</label>
-                                    <input type="text" id="callrail_company_id" value="{client_data.get("callrail_company_id", "")}" required>
+                                    <input type="text" id="callrail_company_id" value="{client_data.get('callrail_company_id', '') or ''}" placeholder="e.g. 987654321">
+                                </div>
+                            </div>
+
+                            <div id="settings_call_tracking_ctm_box" class="form-row" style="{p_ctm_style}">
+                                <div class="form-group">
+                                    <label for="ctm_account_id">CallTrackingMetrics Account ID</label>
+                                    <input type="text" id="ctm_account_id" value="{client_data.get('ctm_account_id', '') or ''}" placeholder="e.g. 12345">
+                                </div>
+                                <div class="form-group">
+                                    <label for="ctm_profile_id">CallTrackingMetrics Profile ID</label>
+                                    <input type="text" id="ctm_profile_id" value="{client_data.get('ctm_profile_id', '') or ''}" placeholder="e.g. 67890">
+                                </div>
+                            </div>
+
+                            <div id="settings_call_tracking_wc_box" class="form-row" style="{p_wc_style}">
+                                <div class="form-group">
+                                    <label for="wc_account_id">WhatConverts Account ID</label>
+                                    <input type="text" id="wc_account_id" value="{client_data.get('wc_account_id', '') or ''}" placeholder="e.g. 11111">
+                                </div>
+                                <div class="form-group">
+                                    <label for="wc_profile_id">WhatConverts Profile ID</label>
+                                    <input type="text" id="wc_profile_id" value="{client_data.get('wc_profile_id', '') or ''}" placeholder="e.g. 22222">
                                 </div>
                             </div>
                             
@@ -2133,12 +2201,12 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             <!-- SECTION 5: Active Webhooks read-only deck -->
                             <div class="section-title" style="margin-top: 30px;">🔑 Live Webhooks & Integration URLs</div>
                             
-                            <!-- CallRail webhook (Always active) -->
+                            <!-- Call Tracking webhook (Dynamic based on provider) -->
                             <div class="webhook-card">
-                                <div class="webhook-title">📞 CallRail CallCompleted Webhook</div>
-                                <div class="webhook-desc">Paste this dynamic endpoint into CallRail Integration Settings to sync automated call recordings and transcripts:</div>
+                                <div class="webhook-title">{webhook_card_title}</div>
+                                <div class="webhook-desc">{webhook_card_desc}</div>
                                 <div class="webhook-input-group">
-                                    <input type="text" class="webhook-input" id="callrail-webhook" readonly value="" data-suffix="/webhooks/callrail?client_id={active_client_id}">
+                                    <input type="text" class="webhook-input" id="callrail-webhook" readonly value="" data-suffix="{webhook_suffix}">
                                     <button type="button" onclick="copyText('callrail-webhook', 'cr-copy-btn')" id="cr-copy-btn" class="btn-copy">📋 Copy</button>
                                 </div>
                             </div>
@@ -2325,7 +2393,30 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     }}
                     
                     toggleSOTFields();
+                    toggleSettingsCallTrackingFields();
                 }});
+
+                
+                function toggleSettingsCallTrackingFields() {{
+                    const provider = document.getElementById('call_tracking_provider').value;
+                    const crBox = document.getElementById('settings_call_tracking_callrail_box');
+                    const ctmBox = document.getElementById('settings_call_tracking_ctm_box');
+                    const wcBox = document.getElementById('settings_call_tracking_wc_box');
+                    
+                    if (provider === 'callrail') {{
+                        crBox.style.display = 'flex';
+                        ctmBox.style.display = 'none';
+                        wcBox.style.display = 'none';
+                    }} else if (provider === 'calltrackingmetrics') {{
+                        crBox.style.display = 'none';
+                        ctmBox.style.display = 'flex';
+                        wcBox.style.display = 'none';
+                    }} else if (provider === 'whatconverts') {{
+                        crBox.style.display = 'none';
+                        ctmBox.style.display = 'none';
+                        wcBox.style.display = 'flex';
+                    }}
+                }}
                 
                 function selectCardRadio(name, value, element) {{
                     element.parentNode.querySelectorAll('.card-radio').forEach(card => {{
@@ -2575,8 +2666,13 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     const payload = {{
                         id: {active_client_id},
                         name: document.getElementById('name').value.trim(),
+                        call_tracking_provider: document.getElementById('call_tracking_provider').value,
                         callrail_account_id: document.getElementById('callrail_account_id').value.trim(),
                         callrail_company_id: document.getElementById('callrail_company_id').value.trim(),
+                        ctm_account_id: document.getElementById('ctm_account_id').value.trim(),
+                        ctm_profile_id: document.getElementById('ctm_profile_id').value.trim(),
+                        wc_account_id: document.getElementById('wc_account_id').value.trim(),
+                        wc_profile_id: document.getElementById('wc_profile_id').value.trim(),
                         google_ads_customer_id: document.getElementById('google_ads_customer_id').value.trim(),
                         facebook_ads_id: document.getElementById('facebook_ads_id').value.trim(),
                         linkedin_ads_id: document.getElementById('linkedin_ads_id').value.trim(),
@@ -2662,12 +2758,17 @@ def update_client_settings(client: ClientUpdate):
                 crm_won_deal_tags = ?,
                 crm_lead_tags = ?,
                 lead_count_rule = ?,
-                exclude_past_customers = ?
+                exclude_past_customers = ?,
+                call_tracking_provider = ?,
+                ctm_account_id = ?,
+                ctm_profile_id = ?,
+                wc_account_id = ?,
+                wc_profile_id = ?
             WHERE id = ?
         """, (
             client.name,
-            client.callrail_account_id,
-            client.callrail_company_id,
+            client.callrail_account_id or None,
+            client.callrail_company_id or None,
             client.google_ads_customer_id,
             client.facebook_ads_id,
             client.linkedin_ads_id,
@@ -2682,6 +2783,11 @@ def update_client_settings(client: ClientUpdate):
             client.crm_lead_tags,
             client.lead_count_rule,
             client.exclude_past_customers,
+            client.call_tracking_provider or "callrail",
+            client.ctm_account_id or "",
+            client.ctm_profile_id or "",
+            client.wc_account_id or "",
+            client.wc_profile_id or "",
             client.id
         ))
         
@@ -2963,14 +3069,45 @@ def add_client_page(request: Request):
                             <input type="text" id="name" required placeholder="e.g. Priority Plumbing">
                         </div>
                         
-                        <div class="form-row">
+                        <div class="form-group">
+                            <label for="call_tracking_provider">Call Tracking Provider</label>
+                            <select id="call_tracking_provider" onchange="toggleCallTrackingFields()" style="width: 100%; padding: 12px; border-radius: 6px; border: 1px solid #ced4da; font-size: 14px; font-weight: 600;">
+                                <option value="callrail" selected>CallRail</option>
+                                <option value="calltrackingmetrics">CallTrackingMetrics</option>
+                                <option value="whatconverts">WhatConverts</option>
+                            </select>
+                        </div>
+                        
+                        <div id="call_tracking_callrail_box" class="form-row" style="display: flex;">
                             <div class="form-group">
                                 <label for="callrail_account_id">CallRail Account ID</label>
                                 <input type="text" id="callrail_account_id" placeholder="e.g. 123456789">
                             </div>
                             <div class="form-group">
                                 <label for="callrail_company_id">CallRail Company ID</label>
-                                <input type="text" id="callrail_company_id" required placeholder="e.g. 987654321">
+                                <input type="text" id="callrail_company_id" placeholder="e.g. 987654321">
+                            </div>
+                        </div>
+
+                        <div id="call_tracking_ctm_box" class="form-row" style="display: none;">
+                            <div class="form-group">
+                                <label for="ctm_account_id">CallTrackingMetrics Account ID</label>
+                                <input type="text" id="ctm_account_id" placeholder="e.g. 12345">
+                            </div>
+                            <div class="form-group">
+                                <label for="ctm_profile_id">CallTrackingMetrics Profile ID</label>
+                                <input type="text" id="ctm_profile_id" placeholder="e.g. 67890">
+                            </div>
+                        </div>
+
+                        <div id="call_tracking_wc_box" class="form-row" style="display: none;">
+                            <div class="form-group">
+                                <label for="wc_account_id">WhatConverts Account ID</label>
+                                <input type="text" id="wc_account_id" placeholder="e.g. 11111">
+                            </div>
+                            <div class="form-group">
+                                <label for="wc_profile_id">WhatConverts Profile ID</label>
+                                <input type="text" id="wc_profile_id" placeholder="e.g. 22222">
                             </div>
                         </div>
                         
@@ -3397,16 +3534,16 @@ def add_client_page(request: Request):
                         The account configuration file for <strong id="registered-client-name"></strong> has been created.
                     </p>
                     
-                    <!-- CallRail Step (Always Shown) -->
+                    <!-- Call Tracking Step (Always Shown) -->
                     <div class="instructions" style="text-align: left; background-color: #e8eaf6; border-left: 4px solid #1a237e; margin-bottom: 10px;">
-                        📞 <strong>Step 2: Configure CallRail Integration</strong><br>
-                        Your live CallRail webhook endpoint is ready. Copy this link and paste it into CallRail:
+                        📞 <strong id="call-tracking-provider-title">Step 2: Configure CallRail Integration</strong><br>
+                        Your live call tracking webhook endpoint is ready. Copy this link and paste it into <span id="call-tracking-provider-span">CallRail</span>:
                     </div>
                     <div style="display: flex; gap: 8px; margin-bottom: 15px;">
                         <input type="text" id="webhook-url-input" readonly style="flex: 1; padding: 10px; border-radius: 6px; border: 1px solid #ced4da; font-family: monospace; font-size: 12px; background-color: #f8f9fa;">
                         <button type="button" onclick="copyWebhookUrl('webhook-url-input', 'copy-btn')" id="copy-btn" class="btn-submit" style="margin: 0; width: auto; white-space: nowrap; padding: 0 15px; font-size: 14px; background-color: #2e7d32;">📋 Copy URL</button>
                     </div>
-                    <div class="instructions" style="text-align: left; background-color: #fff3cd; border-left-color: #ffc107; color: #856404; font-size: 11px; margin-top: -10px; margin-bottom: 25px; padding: 8px 12px;">
+                    <div id="call-tracking-instructions-reminder" class="instructions" style="text-align: left; background-color: #fff3cd; border-left-color: #ffc107; color: #856404; font-size: 11px; margin-top: -10px; margin-bottom: 25px; padding: 8px 12px;">
                         ⚠️ <strong>Reminder:</strong> Set the trigger inside CallRail integration settings to <strong>"Call Completed"</strong> so transcripts are compiled.
                     </div>
 
@@ -3561,7 +3698,29 @@ def add_client_page(request: Request):
                     if (wizardEmailLabel) {
                         wizardEmailLabel.innerText = `conversions-[id]@${emailDomain}`;
                     }
+                    toggleCallTrackingFields();
                 });
+                
+                function toggleCallTrackingFields() {
+                    const provider = document.getElementById('call_tracking_provider').value;
+                    const crBox = document.getElementById('call_tracking_callrail_box');
+                    const ctmBox = document.getElementById('call_tracking_ctm_box');
+                    const wcBox = document.getElementById('call_tracking_wc_box');
+                    
+                    if (provider === 'callrail') {
+                        crBox.style.display = 'flex';
+                        ctmBox.style.display = 'none';
+                        wcBox.style.display = 'none';
+                    } else if (provider === 'calltrackingmetrics') {
+                        crBox.style.display = 'none';
+                        ctmBox.style.display = 'flex';
+                        wcBox.style.display = 'none';
+                    } else if (provider === 'whatconverts') {
+                        crBox.style.display = 'none';
+                        ctmBox.style.display = 'none';
+                        wcBox.style.display = 'flex';
+                    }
+                }
 
                 let currentStep = 1;
                 const totalSteps = 4;
@@ -3589,11 +3748,32 @@ def add_client_page(request: Request):
                     if (direction === 1) {
                         if (currentStep === 1) {
                             const name = document.getElementById('name').value.trim();
-                            const callrail = document.getElementById('callrail_company_id').value.trim();
                             const g_ads = document.getElementById('google_ads_customer_id').value.trim();
-                            if (!name || !callrail || !g_ads) {
-                                showErrorAlert('Please fill out all required fields on Step 1.');
+                            const provider = document.getElementById('call_tracking_provider').value;
+                            
+                            if (!name || !g_ads) {
+                                showErrorAlert('Please fill out Client Business Name and Google Ads Customer ID.');
                                 return;
+                            }
+                            
+                            if (provider === 'callrail') {
+                                const callrail = document.getElementById('callrail_company_id').value.trim();
+                                if (!callrail) {
+                                    showErrorAlert('Please enter your CallRail Company ID.');
+                                    return;
+                                }
+                            } else if (provider === 'calltrackingmetrics') {
+                                const ctm = document.getElementById('ctm_profile_id').value.trim();
+                                if (!ctm) {
+                                    showErrorAlert('Please enter your CallTrackingMetrics Profile ID.');
+                                    return;
+                                }
+                            } else if (provider === 'whatconverts') {
+                                const wc = document.getElementById('wc_profile_id').value.trim();
+                                if (!wc) {
+                                    showErrorAlert('Please enter your WhatConverts Profile ID.');
+                                    return;
+                                }
                             }
                         }
                     }
@@ -3856,8 +4036,13 @@ def add_client_page(request: Request):
                         name: document.getElementById('name').value.trim(),
                         excluded_customers: parsedExclusions,
                         exclusion_action: exclusionActionValue,
+                        call_tracking_provider: document.getElementById('call_tracking_provider').value,
                         callrail_account_id: document.getElementById('callrail_account_id').value.trim(),
                         callrail_company_id: document.getElementById('callrail_company_id').value.trim(),
+                        ctm_account_id: document.getElementById('ctm_account_id').value.trim(),
+                        ctm_profile_id: document.getElementById('ctm_profile_id').value.trim(),
+                        wc_account_id: document.getElementById('wc_account_id').value.trim(),
+                        wc_profile_id: document.getElementById('wc_profile_id').value.trim(),
                         google_ads_customer_id: document.getElementById('google_ads_customer_id').value.trim(),
                         facebook_ads_id: document.getElementById('facebook_ads_id').value.trim(),
                         linkedin_ads_id: document.getElementById('linkedin_ads_id').value.trim(),
@@ -3893,8 +4078,22 @@ def add_client_page(request: Request):
                             cancelLink.style.display = 'none';
                             
                             document.getElementById('registered-client-name').innerText = payload.name;
-                            const liveWebhook = `${window.location.origin}/webhooks/callrail?client_id=${data.client_id}`;
+                            let liveWebhook = `${window.location.origin}/webhooks/callrail?client_id=${data.client_id}`;
+                            let providerName = "CallRail";
+                            let providerInstructions = "Set the trigger inside CallRail integration settings to <strong>\"Call Completed\"</strong> so transcripts are compiled.";
+                            if (payload.call_tracking_provider === 'calltrackingmetrics') {
+                                liveWebhook = `${window.location.origin}/webhooks/calltrackingmetrics?client_id=${data.client_id}`;
+                                providerName = "CallTrackingMetrics";
+                                providerInstructions = "Configure a webhook in CallTrackingMetrics to trigger when a <strong>Call/Transcription is completed</strong>.";
+                            } else if (payload.call_tracking_provider === 'whatconverts') {
+                                liveWebhook = `${window.location.origin}/webhooks/whatconverts?client_id=${data.client_id}`;
+                                providerName = "WhatConverts";
+                                providerInstructions = "Configure a webhook trigger in WhatConverts for <strong>Phone Calls</strong> and make sure <strong>Transcriptions</strong> are enabled.";
+                            }
                             document.getElementById('webhook-url-input').value = liveWebhook;
+                            document.getElementById('call-tracking-provider-title').innerHTML = `Step 2: Configure ${providerName} Integration`;
+                            document.getElementById('call-tracking-provider-span').innerText = providerName;
+                            document.getElementById('call-tracking-instructions-reminder').innerHTML = `⚠️ <strong>Reminder:</strong> ${providerInstructions}`;
                             
                                                         // CRM / Billing / Email custom success steps
                             const sotBox = document.getElementById('sot-instructions-box');
@@ -3990,7 +4189,7 @@ def add_client_page(request: Request):
 
 from datetime import datetime, timedelta
 
-def backfill_historical_callrail_leads(client_id: int, qualification_criteria_code: str):
+def backfill_historical_callrail_leads(client_id: int, qualification_criteria_code: str, provider: str = "callrail"):
     """
     Simulates fetching the last 90 days of CallRail data for a client,
     filters for leads with matching ad click IDs (Google, Microsoft, LinkedIn, Facebook),
@@ -4167,7 +4366,7 @@ def backfill_historical_callrail_leads(client_id: int, qualification_criteria_co
             fbclid or None,
             li_fat_id or None,
             msclkid or None,
-            "callrail",
+            provider,
             qualified,
             sale_closed,
             value,
@@ -4179,7 +4378,7 @@ def backfill_historical_callrail_leads(client_id: int, qualification_criteria_co
         
     conn.commit()
     conn.close()
-    print(f"✅ Seseeded and audited {len(historical_leads)} historical 90 days CallRail leads for client #{client_id}")
+    print(f"✅ Seseeded and audited {len(historical_leads)} historical 90 days {provider} leads for client #{client_id}")
 
 @app.post("/dashboard/add-client")
 def create_client(request: Request, client: ClientCreate):
@@ -4191,23 +4390,39 @@ def create_client(request: Request, client: ClientCreate):
         conn = db_router.connect()
         cursor = conn.cursor()
         
-        # Verify unique CallRail ID
-        cursor.execute("SELECT id, name FROM clients WHERE callrail_company_id = ?", (client.callrail_company_id,))
-        existing = cursor.fetchone()
-        if existing:
-            raise HTTPException(status_code=400, detail=f"CallRail Company ID '{client.callrail_company_id}' is already registered to client '{existing[1]}'.")
+        # Verify unique Call Tracking Provider ID
+        prov = client.call_tracking_provider or "callrail"
+        if prov == "callrail":
+            if client.callrail_company_id:
+                cursor.execute("SELECT id, name FROM clients WHERE callrail_company_id = ?", (client.callrail_company_id,))
+                existing = cursor.fetchone()
+                if existing:
+                    raise HTTPException(status_code=400, detail=f"CallRail Company ID '{client.callrail_company_id}' is already registered to client '{existing[1]}'.")
+        elif prov == "calltrackingmetrics":
+            if client.ctm_profile_id:
+                cursor.execute("SELECT id, name FROM clients WHERE ctm_profile_id = ?", (client.ctm_profile_id,))
+                existing = cursor.fetchone()
+                if existing:
+                    raise HTTPException(status_code=400, detail=f"CallTrackingMetrics Profile ID '{client.ctm_profile_id}' is already registered to client '{existing[1]}'.")
+        elif prov == "whatconverts":
+            if client.wc_profile_id:
+                cursor.execute("SELECT id, name FROM clients WHERE wc_profile_id = ?", (client.wc_profile_id,))
+                existing = cursor.fetchone()
+                if existing:
+                    raise HTTPException(status_code=400, detail=f"WhatConverts Profile ID '{client.wc_profile_id}' is already registered to client '{existing[1]}'.")
             
         cursor.execute("""
             INSERT INTO clients (
                 name, callrail_account_id, callrail_company_id, google_ads_customer_id, facebook_ads_id, linkedin_ads_id, microsoft_ads_id,
                 lead_gen_method, qualification_criteria, source_of_truth, email_provider, email_account,
-                crm_deal_tags, crm_won_deal_tags, crm_lead_tags, lead_count_rule, exclude_past_customers
+                crm_deal_tags, crm_won_deal_tags, crm_lead_tags, lead_count_rule, exclude_past_customers,
+                call_tracking_provider, ctm_account_id, ctm_profile_id, wc_account_id, wc_profile_id
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             client.name, 
-            client.callrail_account_id,
-            client.callrail_company_id, 
+            client.callrail_account_id or None,
+            client.callrail_company_id or None, 
             client.google_ads_customer_id, 
             client.facebook_ads_id,
             client.linkedin_ads_id,
@@ -4221,7 +4436,12 @@ def create_client(request: Request, client: ClientCreate):
             client.crm_won_deal_tags,
             client.crm_lead_tags,
             client.lead_count_rule,
-            client.exclude_past_customers
+            client.exclude_past_customers,
+            client.call_tracking_provider or "callrail",
+            client.ctm_account_id or "",
+            client.ctm_profile_id or "",
+            client.wc_account_id or "",
+            client.wc_profile_id or ""
         ))
         
         client_id = cursor.lastrowid
@@ -4250,7 +4470,7 @@ def create_client(request: Request, client: ClientCreate):
         # Check if SOT is marked as AI Rating to execute historical backfill
         if client.source_of_truth == "ai_rating":
             try:
-                backfill_historical_callrail_leads(client_id, client.qualification_criteria)
+                backfill_historical_callrail_leads(client_id, client.qualification_criteria, client.call_tracking_provider or "callrail")
             except Exception as e:
                 print(f"⚠️ Warning: Historical backfill failed: {e}")
                 
@@ -4697,6 +4917,321 @@ async def receive_exclusion_webhook(request: Request, client_id: Optional[int] =
         print(f"❌ Exclusion Webhook Error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
+
+
+@app.post("/webhooks/calltrackingmetrics")
+async def receive_calltrackingmetrics_webhook(request: Request, client_id: Optional[int] = None):
+    """
+    Multi-Tenant CallTrackingMetrics Webhook Receiver.
+    Accepts completed call logs with dynamic transcript audits via Claude.
+    """
+    try: 
+        content_type = request.headers.get("content-type", "")
+        if "application/json" in content_type:
+            payload = await request.json()
+        else:
+            try:
+                form_data = await request.form()
+                payload = dict(form_data)
+            except Exception:
+                payload = {}
+                
+        if not isinstance(payload, dict):
+            payload = {}
+        
+        resolved_client_id = 1
+        if client_id:
+            resolved_client_id = client_id
+        else: 
+            # Auto-map based on ctm profile id or account id
+            profile_id = payload.get('profile_id') or payload.get('ctm_profile_id')
+            account_id = payload.get('account_id') or payload.get('ctm_account_id')
+            conn = db_router.connect()
+            cursor = conn.cursor()
+            if profile_id:
+                cursor.execute("SELECT id FROM clients WHERE ctm_profile_id = ?", (str(profile_id),))
+                match = cursor.fetchone()
+                if match:
+                    resolved_client_id = match[0]
+            elif account_id:
+                cursor.execute("SELECT id FROM clients WHERE ctm_account_id = ?", (str(account_id),))
+                match = cursor.fetchone()
+                if match:
+                    resolved_client_id = match[0]
+            conn.close()
+        
+        gclid = payload.get('gclid') or payload.get('google_click_id')
+        fbclid = payload.get('fbclid') or payload.get('facebook_click_id')
+        li_fat_id = payload.get('li_fat_id') or payload.get('linkedin_click_id')
+        msclkid = payload.get('msclkid') or payload.get('microsoft_click_id')
+        
+        landing_page = payload.get('landing_page_url') or payload.get('landing_page') or ""
+        referrer_url = payload.get('referrer_url') or payload.get('referring_url') or ""
+        
+        if not gclid:
+            gclid = extract_param_from_url(landing_page, 'gclid') or extract_param_from_url(referrer_url, 'gclid')
+        if not fbclid:
+            fbclid = extract_param_from_url(landing_page, 'fbclid') or extract_param_from_url(referrer_url, 'fbclid')
+        if not li_fat_id:
+            li_fat_id = extract_param_from_url(landing_page, 'li_fat_id') or extract_param_from_url(referrer_url, 'li_fat_id')
+        if not msclkid:
+            msclkid = extract_param_from_url(landing_page, 'msclkid') or extract_param_from_url(referrer_url, 'msclkid')
+            
+        caller_name = payload.get('caller_name') or payload.get('customer_name') or payload.get('name', 'Unknown Caller')
+        raw_phone = payload.get('caller_number') or payload.get('customer_phone_number') or payload.get('phone')
+        transcript = payload.get('transcription') or payload.get('transcript') or payload.get('transcription_text') or ""
+        
+        if isinstance(transcript, dict):
+            transcript = transcript.get("text") or str(transcript)
+        elif isinstance(transcript, list):
+            transcript = " ".join([str(t) for t in transcript])
+            
+        normalized_phone = normalize_phone(raw_phone)
+        if not normalized_phone:
+            return {"status": "ignored", "message": "No valid phone number found in webhook payload."}
+            
+        ai_qualified = "NO"
+        ai_sale_closed = "NO"
+        ai_value = 0.0
+        ai_reason = "No transcript provided."
+        model_name = "None"
+        
+        qualification_definition_desc = "Someone who expresses real intent to buy or schedule a service."
+        
+        conn = db_router.connect()
+        cursor = conn.cursor()
+        cursor.execute("SELECT name, qualification_criteria, lead_count_rule, exclude_past_customers FROM clients WHERE id = ?", (resolved_client_id,))
+        client_info = cursor.fetchone()
+        conn.close()
+        
+        if client_info and client_info[1]:
+            criteria_code = client_info[1]
+            qualification_definition_desc = CRITERIA_MAP.get(criteria_code, qualification_definition_desc)
+            
+        is_excluded = False
+        exclusion_reason = ""
+        if client_info and client_info[3] == "YES":
+            match_type = check_is_excluded_customer(resolved_client_id, phone=normalized_phone)
+            if match_type:
+                is_excluded = True
+                exclusion_reason = f"Session ignored: Caller phone matches your uploaded past customer list ({match_type})." 
+            
+        if is_excluded:
+            ai_qualified = "NO"
+            ai_sale_closed = "NO"
+            ai_value = 0.0
+            ai_reason = exclusion_reason
+            model_name = "None"
+            print(f"🚫 [Exclusion Match] Resolved Client #{resolved_client_id}: {exclusion_reason}")
+        elif transcript.strip():
+            print(f"🧠 [Client #{resolved_client_id}] CTM Transcript detected for {caller_name}. Custom Threshold: {qualification_definition_desc}. Auditing...")
+            ai_result = analyze_transcript_with_claude(transcript, qualification_definition_desc)
+            ai_qualified = ai_result.get("qualified", "NO")
+            ai_sale_closed = ai_result.get("sale_closed", "NO")
+            ai_value = float(ai_result.get("value", 0.0))
+            ai_reason = ai_result.get("reason", "No reason parsed.")
+            model_name = "claude-haiku-4-5-20251001"
+            print(f"🎯 Audit Complete: Qualified={ai_qualified}, Sales Value=${ai_value}")
+        else:
+            print(f"⚠️ [Client #{resolved_client_id}] No transcript provided in CTM webhook for {caller_name}. Skipping AI audit.")
+
+        conn = db_router.connect()
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO sessions (
+                client_id, phone, name, gclid, fbclid, li_fat_id, msclkid, source, qualified, sale_closed, value, reason, model_used, raw_data
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            resolved_client_id,
+            normalized_phone, 
+            caller_name, 
+            gclid,
+            fbclid,
+            li_fat_id,
+            msclkid,
+            "calltrackingmetrics", 
+            ai_qualified, 
+            ai_sale_closed, 
+            ai_value, 
+            ai_reason, 
+            model_name, 
+            str(payload)
+        ))
+        conn.commit()
+        conn.close()
+        
+        return {
+            "status": "success",
+            "client_id": resolved_client_id,
+            "message": "CTM Webhook log and AI analysis processed and saved successfully.",
+            "ai_audit": {
+                "qualified": ai_qualified,
+                "sale_closed": ai_sale_closed,
+                "value": ai_value,
+                "reason": ai_reason
+            }
+        }
+    except Exception as e:
+        print(f"❌ CTM Webhook Error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/webhooks/whatconverts")
+async def receive_whatconverts_webhook(request: Request, client_id: Optional[int] = None):
+    """
+    Multi-Tenant WhatConverts Webhook Receiver.
+    Accepts completed call logs with dynamic transcript audits via Claude.
+    """
+    try: 
+        content_type = request.headers.get("content-type", "")
+        if "application/json" in content_type:
+            payload = await request.json()
+        else:
+            try:
+                form_data = await request.form()
+                payload = dict(form_data)
+            except Exception:
+                payload = {}
+                
+        if not isinstance(payload, dict):
+            payload = {}
+        
+        resolved_client_id = 1
+        if client_id:
+            resolved_client_id = client_id
+        else: 
+            # Auto-map based on wc profile id or account id
+            profile_id = payload.get('profile_id') or payload.get('wc_profile_id')
+            account_id = payload.get('account_id') or payload.get('wc_account_id')
+            conn = db_router.connect()
+            cursor = conn.cursor()
+            if profile_id:
+                cursor.execute("SELECT id FROM clients WHERE wc_profile_id = ?", (str(profile_id),))
+                match = cursor.fetchone()
+                if match:
+                    resolved_client_id = match[0]
+            elif account_id:
+                cursor.execute("SELECT id FROM clients WHERE wc_account_id = ?", (str(account_id),))
+                match = cursor.fetchone()
+                if match:
+                    resolved_client_id = match[0]
+            conn.close()
+        
+        gclid = payload.get('gclid') or payload.get('google_click_id')
+        fbclid = payload.get('fbclid') or payload.get('facebook_click_id')
+        li_fat_id = payload.get('li_fat_id') or payload.get('linkedin_click_id')
+        msclkid = payload.get('msclkid') or payload.get('microsoft_click_id')
+        
+        landing_page = payload.get('landing_page_url') or payload.get('landing_page') or ""
+        referrer_url = payload.get('referrer_url') or payload.get('referring_url') or ""
+        
+        if not gclid:
+            gclid = extract_param_from_url(landing_page, 'gclid') or extract_param_from_url(referrer_url, 'gclid')
+        if not fbclid:
+            fbclid = extract_param_from_url(landing_page, 'fbclid') or extract_param_from_url(referrer_url, 'fbclid')
+        if not li_fat_id:
+            li_fat_id = extract_param_from_url(landing_page, 'li_fat_id') or extract_param_from_url(referrer_url, 'li_fat_id')
+        if not msclkid:
+            msclkid = extract_param_from_url(landing_page, 'msclkid') or extract_param_from_url(referrer_url, 'msclkid')
+            
+        caller_name = payload.get('caller_name') or payload.get('customer_name') or payload.get('name', 'Unknown Caller')
+        raw_phone = payload.get('caller_phone') or payload.get('caller_number') or payload.get('phone_number') or payload.get('phone')
+        transcript = payload.get('transcription') or payload.get('transcript') or payload.get('transcription_text') or payload.get('text') or ""
+        
+        if isinstance(transcript, dict):
+            transcript = transcript.get("text") or str(transcript)
+        elif isinstance(transcript, list):
+            transcript = " ".join([str(t) for t in transcript])
+            
+        normalized_phone = normalize_phone(raw_phone)
+        if not normalized_phone:
+            return {"status": "ignored", "message": "No valid phone number found in webhook payload."}
+            
+        ai_qualified = "NO"
+        ai_sale_closed = "NO"
+        ai_value = 0.0
+        ai_reason = "No transcript provided."
+        model_name = "None"
+        
+        qualification_definition_desc = "Someone who expresses real intent to buy or schedule a service."
+        
+        conn = db_router.connect()
+        cursor = conn.cursor()
+        cursor.execute("SELECT name, qualification_criteria, lead_count_rule, exclude_past_customers FROM clients WHERE id = ?", (resolved_client_id,))
+        client_info = cursor.fetchone()
+        conn.close()
+        
+        if client_info and client_info[1]:
+            criteria_code = client_info[1]
+            qualification_definition_desc = CRITERIA_MAP.get(criteria_code, qualification_definition_desc)
+            
+        is_excluded = False
+        exclusion_reason = ""
+        if client_info and client_info[3] == "YES":
+            match_type = check_is_excluded_customer(resolved_client_id, phone=normalized_phone)
+            if match_type:
+                is_excluded = True
+                exclusion_reason = f"Session ignored: Caller phone matches your uploaded past customer list ({match_type})." 
+            
+        if is_excluded:
+            ai_qualified = "NO"
+            ai_sale_closed = "NO"
+            ai_value = 0.0
+            ai_reason = exclusion_reason
+            model_name = "None"
+            print(f"🚫 [Exclusion Match] Resolved Client #{resolved_client_id}: {exclusion_reason}")
+        elif transcript.strip():
+            print(f"🧠 [Client #{resolved_client_id}] WC Transcript detected for {caller_name}. Custom Threshold: {qualification_definition_desc}. Auditing...")
+            ai_result = analyze_transcript_with_claude(transcript, qualification_definition_desc)
+            ai_qualified = ai_result.get("qualified", "NO")
+            ai_sale_closed = ai_result.get("sale_closed", "NO")
+            ai_value = float(ai_result.get("value", 0.0))
+            ai_reason = ai_result.get("reason", "No reason parsed.")
+            model_name = "claude-haiku-4-5-20251001"
+            print(f"🎯 Audit Complete: Qualified={ai_qualified}, Sales Value=${ai_value}")
+        else:
+            print(f"⚠️ [Client #{resolved_client_id}] No transcript provided in WC webhook for {caller_name}. Skipping AI audit.")
+
+        conn = db_router.connect()
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO sessions (
+                client_id, phone, name, gclid, fbclid, li_fat_id, msclkid, source, qualified, sale_closed, value, reason, model_used, raw_data
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            resolved_client_id,
+            normalized_phone, 
+            caller_name, 
+            gclid,
+            fbclid,
+            li_fat_id,
+            msclkid,
+            "whatconverts", 
+            ai_qualified, 
+            ai_sale_closed, 
+            ai_value, 
+            ai_reason, 
+            model_name, 
+            str(payload)
+        ))
+        conn.commit()
+        conn.close()
+        
+        return {
+            "status": "success",
+            "client_id": resolved_client_id,
+            "message": "WhatConverts Webhook log and AI analysis processed and saved successfully.",
+            "ai_audit": {
+                "qualified": ai_qualified,
+                "sale_closed": ai_sale_closed,
+                "value": ai_value,
+                "reason": ai_reason
+            }
+        }
+    except Exception as e:
+        print(f"❌ WhatConverts Webhook Error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
 
 @app.post("/webhooks/callrail")
 async def receive_callrail_webhook(request: Request, client_id: Optional[int] = None):
