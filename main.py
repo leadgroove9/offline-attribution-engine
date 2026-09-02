@@ -4080,7 +4080,7 @@ def add_client_page(request: Request):
                             document.getElementById('registered-client-name').innerText = payload.name;
                             let liveWebhook = `${window.location.origin}/webhooks/callrail?client_id=${data.client_id}`;
                             let providerName = "CallRail";
-                            let providerInstructions = "Set the trigger inside CallRail integration settings to <strong>\"Call Completed\"</strong> so transcripts are compiled.";
+                            let providerInstructions = "Set the trigger inside CallRail integration settings to <strong>'Call Completed'</strong> so transcripts are compiled.";
                             if (payload.call_tracking_provider === 'calltrackingmetrics') {
                                 liveWebhook = `${window.location.origin}/webhooks/calltrackingmetrics?client_id=${data.client_id}`;
                                 providerName = "CallTrackingMetrics";
