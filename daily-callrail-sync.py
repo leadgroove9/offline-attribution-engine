@@ -491,7 +491,7 @@ def execute_daily_sync():
     print(f"🔄 CALLRAIL DAILY CRON SYNC STARTED AT: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("=========================================================")
     
-    if not os.path.exists(DB_PATH):
+    if not DATABASE_URL and not os.path.exists(DB_PATH):
         print(f"❌ Error: Database file '{DB_PATH}' was not found. Please verify running directories.")
         sys.exit(1)
         
