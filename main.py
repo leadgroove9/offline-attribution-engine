@@ -1796,7 +1796,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                     <input type="text" id="callrail_account_id" value="{client_data.get('callrail_account_id', '') or ''}" placeholder="e.g. 123456789">
                                 </div>
                                 <div class="form-group">
-                                    <label for="callrail_company_id">CallRail Company ID</label>
+                                    <label for="callrail_company_id">CallRail Client ID (Company ID)</label>
                                     <input type="text" id="callrail_company_id" value="{client_data.get('callrail_company_id', '') or ''}" placeholder="e.g. 987654321">
                                 </div>
                             </div>
@@ -1807,7 +1807,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                     <input type="text" id="ctm_account_id" value="{client_data.get('ctm_account_id', '') or ''}" placeholder="e.g. 12345">
                                 </div>
                                 <div class="form-group">
-                                    <label for="ctm_profile_id">CallTrackingMetrics Profile ID</label>
+                                    <label for="ctm_profile_id">CallTrackingMetrics Client ID (Profile ID)</label>
                                     <input type="text" id="ctm_profile_id" value="{client_data.get('ctm_profile_id', '') or ''}" placeholder="e.g. 67890">
                                 </div>
                             </div>
@@ -1818,7 +1818,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                     <input type="text" id="wc_account_id" value="{client_data.get('wc_account_id', '') or ''}" placeholder="e.g. 11111">
                                 </div>
                                 <div class="form-group">
-                                    <label for="wc_profile_id">WhatConverts Profile ID</label>
+                                    <label for="wc_profile_id">WhatConverts Client ID (Profile ID)</label>
                                     <input type="text" id="wc_profile_id" value="{client_data.get('wc_profile_id', '') or ''}" placeholder="e.g. 22222">
                                 </div>
                             </div>
@@ -3084,7 +3084,7 @@ def add_client_page(request: Request):
                                 <input type="text" id="callrail_account_id" placeholder="e.g. 123456789">
                             </div>
                             <div class="form-group">
-                                <label for="callrail_company_id">CallRail Company ID</label>
+                                <label for="callrail_company_id">CallRail Client ID (Company ID)</label>
                                 <input type="text" id="callrail_company_id" placeholder="e.g. 987654321">
                             </div>
                         </div>
@@ -3095,7 +3095,7 @@ def add_client_page(request: Request):
                                 <input type="text" id="ctm_account_id" placeholder="e.g. 12345">
                             </div>
                             <div class="form-group">
-                                <label for="ctm_profile_id">CallTrackingMetrics Profile ID</label>
+                                <label for="ctm_profile_id">CallTrackingMetrics Client ID (Profile ID)</label>
                                 <input type="text" id="ctm_profile_id" placeholder="e.g. 67890">
                             </div>
                         </div>
@@ -3106,7 +3106,7 @@ def add_client_page(request: Request):
                                 <input type="text" id="wc_account_id" placeholder="e.g. 11111">
                             </div>
                             <div class="form-group">
-                                <label for="wc_profile_id">WhatConverts Profile ID</label>
+                                <label for="wc_profile_id">WhatConverts Client ID (Profile ID)</label>
                                 <input type="text" id="wc_profile_id" placeholder="e.g. 22222">
                             </div>
                         </div>
@@ -3759,19 +3759,19 @@ def add_client_page(request: Request):
                             if (provider === 'callrail') {
                                 const callrail = document.getElementById('callrail_company_id').value.trim();
                                 if (!callrail) {
-                                    showErrorAlert('Please enter your CallRail Company ID.');
+                                    showErrorAlert('Please enter your CallRail Client ID (Company ID).');
                                     return;
                                 }
                             } else if (provider === 'calltrackingmetrics') {
                                 const ctm = document.getElementById('ctm_profile_id').value.trim();
                                 if (!ctm) {
-                                    showErrorAlert('Please enter your CallTrackingMetrics Profile ID.');
+                                    showErrorAlert('Please enter your CallTrackingMetrics Client ID (Profile ID).');
                                     return;
                                 }
                             } else if (provider === 'whatconverts') {
                                 const wc = document.getElementById('wc_profile_id').value.trim();
                                 if (!wc) {
-                                    showErrorAlert('Please enter your WhatConverts Profile ID.');
+                                    showErrorAlert('Please enter your WhatConverts Client ID (Profile ID).');
                                     return;
                                 }
                             }
