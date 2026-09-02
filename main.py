@@ -1159,7 +1159,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
         else:
             settings_btn_html = f'<a href="/dashboard/settings?client_id={selected_client_id}" class="btn-settings">⚙️ Client Settings</a>'
             
-        onboard_btn_html = f'{onboard_btn_html}' if is_manager and user_client_id is None else ''
+        onboard_btn_html = '<a href="/dashboard/add-client" class="btn-add-client">➕ Onboard Client</a>' if is_manager and user_client_id is None else ''
         
         # 2. Query Dashboard Rows and Calculations
         if selected_client_id == 0:
