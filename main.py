@@ -66,6 +66,23 @@ def is_authenticated(request: Request) -> Optional[str]:
     token = request.cookies.get("session_token")
     return get_session_email(token)
 
+def get_user_role_and_client(email: str) -> tuple[str, Optional[int]]:
+    """Returns the (role, client_id) for the user. Defaults to ('full', None) if not found."""
+    if not email:
+        return "read", None
+    conn = db_router.connect()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT role, client_id FROM users WHERE LOWER(TRIM(email)) = ?", (email.strip().lower(),))
+        row = cursor.fetchone()
+        if row:
+            return row[0] or "full", row[1]
+    except Exception as e:
+        print(f"⚠️ Error getting user role: {e}")
+    finally:
+        conn.close()
+    return "full", None
+
 app = FastAPI(
     title="Offline Attribution Engine (Multi-Tenant Multi-Channel)",
     description="Multi-tenant agency platform for tracking offline leads/sales and AI audits across Google, Meta, LinkedIn, and Microsoft",
@@ -218,7 +235,36 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             email TEXT UNIQUE NOT NULL,
             hashed_password TEXT NOT NULL,
+            role TEXT DEFAULT 'full',
+            client_id INTEGER,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    
+    # Self-heal users schema
+    cursor.execute("PRAGMA table_info(users)")
+    existing_user_cols = [col[1] for col in cursor.fetchall()]
+    user_cols_to_verify = [
+        ("role", "TEXT DEFAULT 'full'"),
+        ("client_id", "INTEGER")
+    ]
+    for col_name, col_type in user_cols_to_verify:
+        if col_name not in existing_user_cols:
+            cursor.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_type}")
+            print(f"Added missing user column: {col_name}")
+
+    # Create user_invitations table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS user_invitations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            role TEXT NOT NULL,
+            client_id INTEGER,
+            token TEXT UNIQUE NOT NULL,
+            invited_by TEXT NOT NULL,
+            is_used TEXT DEFAULT 'NO',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (client_id) REFERENCES clients (id)
         )
     """)
     
@@ -680,7 +726,33 @@ class ClientCreate(BaseModel):
 
 
 @app.get("/register", response_class=HTMLResponse)
-def get_register(request: Request, error: Optional[str] = None):
+def get_register(request: Request, error: Optional[str] = None, invite_token: Optional[str] = None):
+    email_val = ""
+    lock_email_attr = ""
+    invite_role_msg = ""
+    token_hidden_input = ""
+    
+    if invite_token:
+        conn = db_router.connect()
+        cursor = conn.cursor()
+        cursor.execute("SELECT email, role, client_id FROM user_invitations WHERE token = ? AND is_used = 'NO'", (invite_token,))
+        row = cursor.fetchone()
+        conn.close()
+        if not row:
+            error = "Invalid or expired invitation token. Please request a new invite link."
+        else:
+            invited_email, invited_role, invited_client_id = row
+            email_val = invited_email
+            lock_email_attr = "readonly style='background: #f1f3f4; color: #666;'"
+            role_title = "Full Function (Manager)" if invited_role == "full" else "Read-Only (Viewer)"
+            invite_role_msg = f"""
+            <div style="background-color: #e8f5e9; color: #2e7d32; padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; font-weight: bold; border-left: 4px solid #2e7d32;">
+                ✅ Invitation Verified!<br>
+                You are registering as a <strong>{role_title}</strong>.
+            </div>
+            """
+            token_hidden_input = f"<input type='hidden' name='invite_token' value='{invite_token}'>"
+
     error_html = f'<div style="background-color: #ffebee; color: #c62828; padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; font-weight: bold; border-left: 4px solid #c62828;">❌ {error}</div>' if error else ''
     return f"""
     <html>
@@ -707,10 +779,12 @@ def get_register(request: Request, error: Optional[str] = None):
                 <h1>Create Your Account</h1>
                 <p>Register to start tracking conversions on LeadGroove</p>
                 {error_html}
+                {invite_role_msg}
                 <form action="/register" method="POST">
+                    {token_hidden_input}
                     <div class="form-group">
                         <label for="email">Email Address</label>
-                        <input type="email" id="email" name="email" required placeholder="e.g. corey@youragency.com">
+                        <input type="email" id="email" name="email" required placeholder="e.g. corey@youragency.com" value="{email_val}" {lock_email_attr}>
                     </div>
                     <div class="form-group">
                         <label for="password">Password</label>
@@ -737,13 +811,31 @@ async def post_register(request: Request):
         email = form_data.get("email", "").strip().lower()
         password = form_data.get("password")
         confirm_password = form_data.get("confirm_password")
+        invite_token = form_data.get("invite_token")
         
         if not email or not password or not confirm_password:
-            return HTMLResponse(get_register(request, error="All fields are required."))
+            return HTMLResponse(get_register(request, error="All fields are required.", invite_token=invite_token))
         if password != confirm_password:
-            return HTMLResponse(get_register(request, error="Passwords do not match."))
+            return HTMLResponse(get_register(request, error="Passwords do not match.", invite_token=invite_token))
         if len(password) < 6:
-            return HTMLResponse(get_register(request, error="Password must be at least 6 characters."))
+            return HTMLResponse(get_register(request, error="Password must be at least 6 characters.", invite_token=invite_token))
+            
+        resolved_role = "full"
+        resolved_client_id = None
+        
+        if invite_token:
+            conn = db_router.connect()
+            cursor = conn.cursor()
+            cursor.execute("SELECT email, role, client_id FROM user_invitations WHERE token = ? AND is_used = 'NO'", (invite_token,))
+            row = cursor.fetchone()
+            if not row:
+                conn.close()
+                return HTMLResponse(get_register(request, error="Invalid or expired invitation token.", invite_token=invite_token))
+            invited_email, invited_role, invited_client_id = row
+            email = invited_email
+            resolved_role = invited_role
+            resolved_client_id = invited_client_id
+            conn.close()
             
         try:
             conn = db_router.connect()
@@ -753,10 +845,17 @@ async def post_register(request: Request):
             cursor.execute("SELECT id FROM users WHERE email = ?", (email,))
             if cursor.fetchone():
                 conn.close()
-                return HTMLResponse(get_register(request, error="An account with this email already exists."))
+                return HTMLResponse(get_register(request, error="An account with this email already exists.", invite_token=invite_token))
                 
             hashed = hash_password(password)
-            cursor.execute("INSERT INTO users (email, hashed_password) VALUES (?, ?)", (email, hashed))
+            cursor.execute("""
+                INSERT INTO users (email, hashed_password, role, client_id) 
+                VALUES (?, ?, ?, ?)
+            """, (email, hashed, resolved_role, resolved_client_id))
+            
+            if invite_token:
+                cursor.execute("UPDATE user_invitations SET is_used = 'YES' WHERE token = ?", (invite_token,))
+                
             conn.commit()
             conn.close()
             
@@ -1035,6 +1134,12 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
     if not email:
         return RedirectResponse(url="/login", status_code=303)
     """Interactive dashboard with client filtering."""
+    user_role, user_client_id = get_user_role_and_client(email)
+    is_manager = (user_role == "full")
+    
+    if user_client_id is not None:
+        client_id = user_client_id
+        
     try:
         conn = db_router.connect()
         cursor = conn.cursor()
@@ -1045,12 +1150,16 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
         
         # Determine filtering
         selected_client_id = client_id if client_id is not None else 0 # 0 signifies "All Clients" (Agency Overview)
+        if user_client_id is not None:
+            selected_client_id = user_client_id
         
         # Build Settings Button HTML
-        if selected_client_id == 0:
+        if selected_client_id == 0 or user_role == "read":
             settings_btn_html = ''
         else:
             settings_btn_html = f'<a href="/dashboard/settings?client_id={selected_client_id}" class="btn-settings">⚙️ Client Settings</a>'
+            
+        onboard_btn_html = f'{onboard_btn_html}' if is_manager and user_client_id is None else ''
         
         # 2. Query Dashboard Rows and Calculations
         if selected_client_id == 0:
@@ -1098,10 +1207,16 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
     exportable_microsoft = sum(1 for r in rows if r[15] and (r[7] == 'YES' or r[8] == 'YES'))
 
     # Generate the Selector Dropdown Options
-    dropdown_options = f'<option value="0" {"selected" if selected_client_id == 0 else ""}>📂 [Show All Clients / Agency View]</option>'
-    for c_id, c_name, c_ads, c_fb, c_li, c_ms in clients:
-        is_selected = "selected" if selected_client_id == c_id else ""
-        dropdown_options += f'<option value="{c_id}" {is_selected}>👤 {c_name} (Ads: {c_ads})</option>'
+    dropdown_options = ""
+    if user_client_id is not None:
+        restricted_clients = [c for c in clients if c[0] == user_client_id]
+        for c_id, c_name, c_ads, c_fb, c_li, c_ms in restricted_clients:
+            dropdown_options += f'<option value="{c_id}" selected>👤 {c_name} (Ads: {c_ads})</option>'
+    else:
+        dropdown_options = f'<option value="0" {"selected" if selected_client_id == 0 else ""}>📂 [Show All Clients / Agency View]</option>'
+        for c_id, c_name, c_ads, c_fb, c_li, c_ms in clients:
+            is_selected = "selected" if selected_client_id == c_id else ""
+            dropdown_options += f'<option value="{c_id}" {is_selected}>👤 {c_name} (Ads: {c_ads})</option>'
 
     # Convert rows to table items
     table_rows_html = ""
@@ -1251,7 +1366,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                             </select>
                         </div>
                         {settings_btn_html}
-                        <a href="/dashboard/add-client" class="btn-add-client">➕ Onboard Client</a>
+                        {onboard_btn_html}
                     </div>
                 </header>
 
@@ -1344,6 +1459,11 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
 
 
 
+class UserInvite(BaseModel):
+    email: str
+    role: str
+    client_id: Optional[int] = None
+
 class ClientUpdate(BaseModel):
     id: int
     name: str
@@ -1378,6 +1498,15 @@ def view_settings(request: Request, client_id: Optional[int] = None):
     if not email:
         return RedirectResponse(url="/login", status_code=303)
     """Page to manage and update client account configuration settings."""
+    user_role, user_client_id = get_user_role_and_client(email)
+    if user_role == "read":
+        raise HTTPException(status_code=403, detail="Unauthorized: Access to client configuration settings is restricted to managers and administrators.")
+        
+    if user_client_id is not None:
+        if client_id is not None and client_id != user_client_id:
+            raise HTTPException(status_code=403, detail="Unauthorized: You do not have permission to access settings for this client account.")
+        client_id = user_client_id
+
     try:
         conn = db_router.connect()
         cursor = conn.cursor()
@@ -1392,6 +1521,8 @@ def view_settings(request: Request, client_id: Optional[int] = None):
             
         # Determine which client to edit
         active_client_id = client_id if client_id is not None else all_clients[0][0]
+        if user_client_id is not None:
+            active_client_id = user_client_id
         
         # Extract column names dynamically first to guarantee matching order during SELECT
         cursor.execute("PRAGMA table_info(clients)")
@@ -1529,15 +1660,62 @@ def view_settings(request: Request, client_id: Optional[int] = None):
         cursor.execute("SELECT COUNT(*) FROM excluded_customers WHERE client_id = ?", (active_client_id,))
         exclusion_count = cursor.fetchone()[0]
         
+        # Query collaborators (users associated with this client_id)
+        cursor.execute("SELECT email, role FROM users WHERE client_id = ? ORDER BY email ASC", (active_client_id,))
+        users_list = cursor.fetchall()
+        
+        # Query active pending invitations for this client_id
+        cursor.execute("SELECT email, role, token FROM user_invitations WHERE client_id = ? AND is_used = 'NO' ORDER BY created_at DESC", (active_client_id,))
+        invites_list = cursor.fetchall()
+        
         conn.close()
     except Exception as e:
         return f"<html><body><h3>❌ Database Error: {e}</h3></body></html>"
 
+    # Generate collaborators HTML rows
+    collaborators_list = []
+    for u_email, u_role in users_list:
+        role_desc = "Full Function (Manager)" if u_role == "full" else "Read-Only (Viewer)"
+        role_badge = f'<span style="background: #e8f5e9; color: #2e7d32; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 11px; border: 1px solid #c8e6c9;">{role_desc}</span>'
+        status_badge = '<span style="color: #2e7d32; font-weight: bold;">● Active Member</span>'
+        collaborators_list.append(f"""
+        <tr style="border-bottom: 1px solid #eaeaea;">
+            <td style="padding: 12px 15px;"><code>{u_email}</code></td>
+            <td style="padding: 12px 15px;">{role_badge}</td>
+            <td style="padding: 12px 15px;">{status_badge}</td>
+        </tr>
+        """)
+        
+    for i_email, i_role, i_token in invites_list:
+        role_desc = "Full Function (Manager)" if i_role == "full" else "Read-Only (Viewer)"
+        role_badge = f'<span style="background: #fff3cd; color: #856404; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 11px; border: 1px solid #ffe0b2;">{role_desc}</span>'
+        status_badge = f'<span style="color: #ff9100; font-weight: bold;">⏳ Pending Invite</span><br><span style="font-size: 10px; color: #666; font-family: monospace;">token: {i_token[:8]}...</span>'
+        collaborators_list.append(f"""
+        <tr style="border-bottom: 1px solid #eaeaea;">
+            <td style="padding: 12px 15px;"><code>{i_email}</code></td>
+            <td style="padding: 12px 15px;">{role_badge}</td>
+            <td style="padding: 12px 15px;">{status_badge}</td>
+        </tr>
+        """)
+        
+    if not collaborators_list:
+        collaborator_rows_html = '<tr><td colspan="3" style="text-align: center; color: #888; padding: 20px;">No additional collaborators registered yet.</td></tr>'
+    else:
+        collaborator_rows_html = "".join(collaborators_list)
+
+    # Determine invite form visibility
+    invite_form_display = 'block' if user_role == 'full' else 'none'
+
     # Generate the Selector Dropdown Options for the Settings Header
     dropdown_options = ""
-    for c_id, c_name, c_ads in all_clients:
-        is_selected = "selected" if active_client_id == c_id else ""
-        dropdown_options += f'<option value="{c_id}" {is_selected}>👤 {c_name} (Ads: {c_ads})</option>'
+    if user_client_id is not None:
+        restricted_clients = [c for c in all_clients if c[0] == user_client_id]
+        for c_id, c_name, c_ads in restricted_clients:
+            dropdown_options += f'<option value="{c_id}" selected>👤 {c_name} (Ads: {c_ads})</option>'
+    else:
+        for c_id, c_name, c_ads in all_clients:
+            is_selected = "selected" if active_client_id == c_id else ""
+            dropdown_options += f'<option value="{c_id}" {is_selected}>👤 {c_name} (Ads: {c_ads})</option>'
 
     # Handle dropdown lists with pre-selected options
     lead_gen_both_checked = "checked" if client_data.get("lead_gen_method") == "both" else ""
@@ -2335,6 +2513,65 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         <button type="submit" id="btn-settings-submit" class="btn-submit">💾 Save Configuration Changes</button>
                     </div>
                 </form>
+
+                <hr style="border: 0; height: 1px; background: #eaeaea; margin: 40px 0;">
+
+                <div class="section-title" style="margin-bottom: 20px; color: #1a237e; font-size: 20px; font-weight: bold; display: flex; align-items: center; gap: 8px;">
+                    👥 Account Collaborators & Invitations
+                </div>
+                <p style="color: #666; font-size: 13px; margin-top: -10px; margin-bottom: 20px;">
+                    Invite and manage team members who can access this client's tracking dashboard.
+                </p>
+
+                <!-- Table of Active Users & Pending Invites -->
+                <div style="background: #fafafa; border: 1px solid #eaeaea; border-radius: 8px; padding: 20px; margin-bottom: 30px;">
+                    <h3 style="margin-top: 0; color: #1a237e; font-size: 15px; border-bottom: 1px solid #eaeaea; padding-bottom: 10px;">Active Collaborators & Pending Invites</h3>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 13px; text-align: left;">
+                        <thead>
+                            <tr style="border-bottom: 2px solid #eaeaea; color: #495057;">
+                                <th style="padding: 10px;">Email / User</th>
+                                <th style="padding: 10px;">Access Level</th>
+                                <th style="padding: 10px;">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {collaborator_rows_html}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Invite Form -->
+                <div id="invite-box" style="background: #e8eaf6; border: 1px solid #c5cae9; border-radius: 8px; padding: 20px; display: {invite_form_display};">
+                    <h3 style="margin-top: 0; color: #1a237e; font-size: 15px;">✉️ Invite a New Collaborator</h3>
+                    <div id="invite-alert" class="alert" style="margin-bottom: 15px; padding: 10px; font-size: 12px;"></div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; flex-wrap: wrap;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label for="invite_email" style="font-weight: bold; font-size: 11px;">RECIPIENT EMAIL ADDRESS</label>
+                            <input type="email" id="invite_email" placeholder="e.g. employee@clientcompany.com" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ced4da; font-size: 13px; background: white;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label for="invite_role" style="font-weight: bold; font-size: 11px;">ACCESS LEVEL</label>
+                            <select id="invite_role" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ced4da; font-size: 13px; background: white;">
+                                <option value="read">Read-Only (Viewer)</option>
+                                <option value="full">Full Function (Manager)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <button type="button" onclick="generateInvitationLink()" class="btn-submit" style="margin-top: 15px; width: auto; font-size: 13px; padding: 10px 20px; background-color: #2e7d32;">
+                        ✉️ Generate Invitation Link
+                    </button>
+                    
+                    <div id="invite-link-container" style="display: none; margin-top: 20px; background: white; padding: 15px; border-radius: 6px; border: 1px dashed #2e7d32;">
+                        <span style="font-weight: bold; color: #2e7d32; font-size: 13px; display: block; margin-bottom: 5px;">🎉 Invitation Link Generated!</span>
+                        <p style="color: #555; font-size: 12px; margin: 0 0 10px 0;">Copy this link and send it directly to your collaborator to register:</p>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="text" id="invite-url-output" readonly style="flex: 1; padding: 8px; border-radius: 4px; border: 1px solid #ced4da; font-family: monospace; font-size: 11px; background-color: #f8f9fa;">
+                            <button type="button" onclick="copyText('invite-url-output', 'invite-copy-btn')" id="invite-copy-btn" class="btn-copy" style="margin: 0; width: auto; font-size: 12px; background-color: #2e7d32; color: white; padding: 0 12px; border: none; border-radius: 4px; cursor: pointer;">📋 Copy Link</button>
+                        </div>
+                    </div>
+                </div>
             </div>
             
             <script>
@@ -2651,6 +2888,57 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     }}, 2000);
                 }}
                 
+                async function generateInvitationLink() {{
+                    const emailInput = document.getElementById('invite_email');
+                    const roleInput = document.getElementById('invite_role');
+                    const alertBox = document.getElementById('invite-alert');
+                    const linkContainer = document.getElementById('invite-link-container');
+                    const urlOutput = document.getElementById('invite-url-output');
+                    
+                    alertBox.style.display = 'none';
+                    linkContainer.style.display = 'none';
+                    
+                    const email = emailInput.value.trim();
+                    const role = roleInput.value;
+                    
+                    if (!email) {{
+                        alertBox.innerText = 'Please enter a valid email address.';
+                        alertBox.className = 'alert alert-error';
+                        alertBox.style.display = 'block';
+                        return;
+                    }}
+                    
+                    try {{
+                        const response = await fetch('/dashboard/invite', {{
+                            method: 'POST',
+                            headers: {{
+                                'Content-Type': 'application/json'
+                            }},
+                            body: JSON.stringify({{
+                                email: email,
+                                role: role,
+                                client_id: {active_client_id}
+                            }})
+                        }});
+                        
+                        const data = await response.json();
+                        
+                        if (response.ok) {{
+                            const origin = window.location.origin;
+                            const inviteUrl = `${{origin}}/register?invite_token=${{data.token}}`;
+                            urlOutput.value = inviteUrl;
+                            linkContainer.style.display = 'block';
+                            emailInput.value = '';
+                        }} else {{
+                            throw new Error(data.detail || 'Failed to generate invitation.');
+                        }}
+                    }} catch (error) {{
+                        alertBox.innerText = 'Error: ' + error.message;
+                        alertBox.className = 'alert alert-error';
+                        alertBox.style.display = 'block';
+                    }}
+                }}
+
                 async function submitSettings(event) {{
                     event.preventDefault();
                     const alertBox = document.getElementById('alert-box');
@@ -2728,7 +3016,15 @@ def view_settings(request: Request, client_id: Optional[int] = None):
 
 
 @app.post("/dashboard/settings")
-def update_client_settings(client: ClientUpdate):
+def update_client_settings(request: Request, client: ClientUpdate):
+    email = is_authenticated(request)
+    if not email:
+        raise HTTPException(status_code=401, detail="Session expired. Please log in again.")
+    user_role, user_client_id = get_user_role_and_client(email)
+    if user_role != "full":
+        raise HTTPException(status_code=403, detail="Unauthorized: Client setting modifications are restricted to managers and administrators.")
+    if user_client_id is not None and client.id != user_client_id:
+        raise HTTPException(status_code=403, detail="Unauthorized: You do not have permission to modify settings for this client account.")
     """Endpoint to handle questionnaire form settings update."""
     try:
         conn = db_router.connect()
@@ -2837,6 +3133,9 @@ def add_client_page(request: Request):
     email = is_authenticated(request)
     if not email:
         return RedirectResponse(url="/login", status_code=303)
+    user_role, user_client_id = get_user_role_and_client(email)
+    if user_role != "full" or user_client_id is not None:
+        raise HTTPException(status_code=403, detail="Unauthorized: Client onboarding is restricted to Agency Administrators.")
     """Page to onboard a new client with complete wizard properties."""
     try:
         conn = db_router.connect()
@@ -4385,6 +4684,9 @@ def create_client(request: Request, client: ClientCreate):
     email = is_authenticated(request)
     if not email:
         raise HTTPException(status_code=401, detail="Session expired. Please log in again.")
+    user_role, user_client_id = get_user_role_and_client(email)
+    if user_role != "full" or user_client_id is not None:
+        raise HTTPException(status_code=403, detail="Unauthorized: Client onboarding is restricted to Agency Administrators.")
     """Endpoint to handle questionnaire form submission."""
     try:
         conn = db_router.connect()
