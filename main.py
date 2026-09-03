@@ -3153,15 +3153,17 @@ def update_client_settings(request: Request, client: ClientUpdate):
         conn = db_router.connect()
         cursor = conn.cursor()
         
-        # Verify client exists and fetch old settings
-        cursor.execute("SELECT * FROM clients WHERE id = ?", (client.id,))
+        # Extract column names dynamically
+        cursor.execute("PRAGMA table_info(clients)")
+        cols = [col[1] for col in cursor.fetchall()]
+        
+        # Verify client exists and fetch old settings using explicit columns order to avoid zip misalignment on PostgreSQL
+        cols_formatted = ", ".join([f'"{c}"' for c in cols])
+        cursor.execute(f"SELECT {cols_formatted} FROM clients WHERE id = ?", (client.id,))
         client_row = cursor.fetchone()
         if not client_row:
             raise HTTPException(status_code=404, detail="Client not found")
             
-        # Extract column names dynamically
-        cursor.execute("PRAGMA table_info(clients)")
-        cols = [col[1] for col in cursor.fetchall()]
         old_data = dict(zip(cols, client_row))
         
         # Field label mappings for change history log
