@@ -1340,11 +1340,11 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
     dropdown_options = ""
     if user_client_id is not None:
         restricted_clients = [c for c in clients if c[0] == user_client_id]
-        for c_id, c_name, c_ads, c_fb, c_li, c_ms in restricted_clients:
+        for c_id, c_name, c_ads, c_fb, c_li, c_ms, c_tt, c_tw, c_pin in restricted_clients:
             dropdown_options += f'<option value="{c_id}" selected>👤 {c_name} (Ads: {c_ads})</option>'
     else:
         dropdown_options = f'<option value="0" {"selected" if selected_client_id == 0 else ""}>📂 [Show All Clients / Agency View]</option>'
-        for c_id, c_name, c_ads, c_fb, c_li, c_ms in clients:
+        for c_id, c_name, c_ads, c_fb, c_li, c_ms, c_tt, c_tw, c_pin in clients:
             is_selected = "selected" if selected_client_id == c_id else ""
             dropdown_options += f'<option value="{c_id}" {is_selected}>👤 {c_name} (Ads: {c_ads})</option>'
 
@@ -1450,7 +1450,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                 <span style="font-weight: bold; color: #1a237e; font-size: 13px;">Target Client Account:</span>
                 <select id="upload_client_id" style="padding: 6px 12px; font-size: 13px; border-radius: 4px; border: 1px solid #9fa8da; font-weight: 600; outline: none; cursor: pointer; color: #1a237e; background: white;">
             """
-            for c_id, c_name, _, _, _, _ in clients:
+            for c_id, c_name, _, _, _, _, _, _, _ in clients:
                 upload_client_selector_html += f'<option value="{c_id}">👤 {c_name}</option>'
             upload_client_selector_html += """
                 </select>
