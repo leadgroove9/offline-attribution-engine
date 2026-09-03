@@ -790,6 +790,12 @@ SOT_MAP = {
     "housecallpro": "Housecall Pro CRM",
     "quickbooks": "QuickBooks Billing",
     "xero": "Xero Accounting",
+    "zoho_books": "Zoho Books Accounting",
+    "netsuite": "NetSuite ERP/Accounting",
+    "sage": "Sage Accounting",
+    "freshbooks": "FreshBooks Billing",
+    "google_sheets": "Google Sheets (Live Sync)",
+    "zapier": "Zapier Custom Integration",
     "ai_rating": "AI Rating (Direct Call Audits & Dynamic Form-Email Monitoring)"
 }
 
@@ -3012,6 +3018,123 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                 </div>
                             </div>
     
+                            <!-- CONDITIONAL: Zoho Books Setup Instructions -->
+                            <div id="sot-zoho_books-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px;">
+                                <div style="background-color: #e8f5e9; border-left: 4px solid #2e7d32; padding: 15px; border-radius: 4px; color: #1b5e20; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                    💡 <strong>Zoho Books Webhooks Quick Setup Guide:</strong><br>
+                                    <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #1b5e20;">
+                                        <li>Log into your <strong>Zoho Books Account</strong>.</li>
+                                        <li>Go to <strong>Settings (Gear Icon) ➡️ Developer Space ➡️ Webhooks</strong>.</li>
+                                        <li>Click <strong>+ New Webhook</strong>.</li>
+                                        <li>Set Name to <code>LeadGroove Sales Sync</code> and set Module to <strong>Invoices</strong> or <strong>Customer Payments</strong>.</li>
+                                        <li>In the <strong>URL to Notify</strong> field, paste your custom live endpoint (provided above on this screen):
+                                            <code style="display: block; background: #fff; border: 1px solid #a5d6a7; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #1b5e20;">https://your-agency-app.onrender.com/webhooks/billing?client_id=conversions-{active_client_id}</code>
+                                        </li>
+                                        <li>Select trigger events: **Invoice Paid** or **Payment Recorded**. Save your Webhook!</li>
+                                    </ol>
+                                </div>
+                            </div>
+
+                            <!-- CONDITIONAL: NetSuite Setup Instructions -->
+                            <div id="sot-netsuite-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px;">
+                                <div style="background-color: #eceff1; border-left: 4px solid #455a64; padding: 15px; border-radius: 4px; color: #263238; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                    💡 <strong>NetSuite SuiteScript Quick Integration Guide:</strong><br>
+                                    <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #37474f;">
+                                        <li>Deploy a minimal **SuiteScript 2.x User Event Script** on your `Invoice` or `CustomerPayment` records.</li>
+                                        <li>On the `afterSubmit` hook, write a script that triggers an outbound HTTP POST to our web receiver:
+                                            <code style="display: block; background: #fff; border: 1px solid #b0bec5; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #37474f;">https://your-agency-app.onrender.com/webhooks/billing?client_id=conversions-{active_client_id}</code>
+                                        </li>
+                                        <li>Format your JSON payload to include: `{"customer_name": invoice.entity, "email": invoice.email, "invoice_number": invoice.id, "amount": invoice.total}`.</li>
+                                    </ol>
+                                </div>
+                            </div>
+
+                            <!-- CONDITIONAL: Sage Setup Instructions -->
+                            <div id="sot-sage-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px;">
+                                <div style="background-color: #fff3e0; border-left: 4px solid #e65100; padding: 15px; border-radius: 4px; color: #e65100; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                    💡 <strong>Sage Accounting Webhooks Setup Guide:</strong><br>
+                                    <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #e65100;">
+                                        <li>Log into your <strong>Sage Developer Account</strong>.</li>
+                                        <li>Configure webhooks under your Active Integration profile.</li>
+                                        <li>Set the destination endpoint URL to your dynamic LeadGrove billing webhook:
+                                            <code style="display: block; background: #fff; border: 1px solid #ffcc80; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #d84315;">https://your-agency-app.onrender.com/webhooks/billing?client_id=conversions-{active_client_id}</code>
+                                        </li>
+                                        <li>Subscribe to **sales_invoice.paid** and **payment_received** webhook events to track real-time conversions.</li>
+                                    </ol>
+                                </div>
+                            </div>
+
+                            <!-- CONDITIONAL: FreshBooks Setup Instructions -->
+                            <div id="sot-freshbooks-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px;">
+                                <div style="background-color: #f3e5f5; border-left: 4px solid #4a148c; padding: 15px; border-radius: 4px; color: #4a148c; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                    💡 <strong>FreshBooks Billing Webhooks Guide:</strong><br>
+                                    <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #4a148c;">
+                                        <li>Register your application inside the <strong>FreshBooks Developer Center</strong>.</li>
+                                        <li>Subscribe to webhook notifications for your production account.</li>
+                                        <li>Set the webhook URL endpoint directly to:
+                                            <code style="display: block; background: #fff; border: 1px solid #e1bee7; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #4a148c;">https://your-agency-app.onrender.com/webhooks/billing?client_id=conversions-{active_client_id}</code>
+                                        </li>
+                                        <li>Choose trigger event: <code>invoice.payment.create</code> to synchronize billing revenue.</li>
+                                    </ol>
+                                </div>
+                            </div>
+
+                            <!-- CONDITIONAL: Google Sheets Setup Instructions -->
+                            <div id="sot-google_sheets-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px;">
+                                <div style="background-color: #efebe9; border-left: 4px solid #4e342e; padding: 15px; border-radius: 4px; color: #4e342e; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                    💡 <strong>Google Sheets (Live Sync via Apps Script) Guide:</strong><br>
+                                    <p style="margin: 5px 0; font-size: 12px;">Sync your spreadsheet rows instantly with this pre-built script:</p>
+                                    <ol style="padding-left: 20px; font-size: 12px; color: #4e342e;">
+                                        <li>Open your Google Sheet, click on <strong>Extensions ➡️ Apps Script</strong>.</li>
+                                        <li>Wipe any default code and copy-paste the snippet below:
+                                            <pre style="background: white; border: 1px solid #d7ccc8; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 10px; overflow-x: auto; color: #3e2723; max-height: 160px;">function onEdit(e) {{
+  var sheet = e.source.getActiveSheet();
+  var range = e.range;
+  if (range.getColumn() == 5 && range.getValue() == "Paid") {{
+    var row = range.getRow();
+    var payload = {{
+      customer_name: sheet.getRange(row, 1).getValue(),
+      email: sheet.getRange(row, 2).getValue(),
+      invoice_number: sheet.getRange(row, 3).getValue(),
+      amount: parseFloat(sheet.getRange(row, 4).getValue())
+    }};
+    UrlFetchApp.fetch("https://your-agency-app.onrender.com/webhooks/billing?client_id=conversions-{active_client_id}", {{
+      method: "POST",
+      contentType: "application/json",
+      payload: JSON.stringify(payload)
+    }});
+  }}
+}}</pre>
+                                        </li>
+                                        <li>Replace the placeholders inside quotes with your actual row indexes, and hit Save! When a row's column 5 updates to "Paid", it sends the conversion instantly!</li>
+                                    </ol>
+                                </div>
+                            </div>
+
+                            <!-- CONDITIONAL: Zapier Setup Instructions -->
+                            <div id="sot-zapier-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px;">
+                                <div style="background-color: #fffde7; border-left: 4px solid #fbc02d; padding: 15px; border-radius: 4px; color: #f57f17; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                    💡 <strong>Webhooks by Zapier Custom Setup Guide:</strong><br>
+                                    <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #e65100;">
+                                        <li>In your Zapier account, create a new Zap.</li>
+                                        <li>**Trigger:** Select any platform of choice (e.g. Stripe, PayPal, Shopify).</li>
+                                        <li>**Action:** Search for **"Webhooks by Zapier"** and select **Custom Request** or **POST**.</li>
+                                        <li>**URL Endpoint:** Paste your dynamic tracking endpoint:
+                                            <code style="display: block; background: #fff; border: 1px solid #fff59d; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #e65100;">https://your-agency-app.onrender.com/webhooks/billing?client_id=conversions-{active_client_id}</code>
+                                            <small style="color: #666;">(Use `/webhooks/crm` if setting up lead qualification steps rather than sales)</small>
+                                        </li>
+                                        <li>**Payload Mapping:** Map your trigger's payload attributes into our standard database keys:
+                                            <ul style="list-style-type: disc; padding-left: 15px; margin-top: 4px;">
+                                                <li><code>customer_name</code>: Name of the contact</li>
+                                                <li><code>email</code>: Email of the customer</li>
+                                                <li><code>phone</code>: Customer phone number</li>
+                                                <li><code>amount</code>: The numeric value of the sale</li>
+                                            </ul>
+                                        </li>
+                                    </ol>
+                                </div>
+                            </div>
+    
                             <!-- CONDITIONAL: CRM Lead status tags -->
                             <div id="sot-lead-tags-box" class="conditional-box">
                                 <label for="crm_lead_tags">Which statuses under <strong>Leads</strong> signify qualification?</label>
@@ -3579,6 +3702,12 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     const housecallproBox = document.getElementById('sot-housecallpro-instructions-box');
                     const quickbooksBox = document.getElementById('sot-quickbooks-instructions-box');
                     const xeroBox = document.getElementById('sot-xero-instructions-box');
+                    const zohoBooksBox = document.getElementById('sot-zoho_books-instructions-box');
+                    const netsuiteBox = document.getElementById('sot-netsuite-instructions-box');
+                    const sageBox = document.getElementById('sot-sage-instructions-box');
+                    const freshbooksBox = document.getElementById('sot-freshbooks-instructions-box');
+                    const googleSheetsBox = document.getElementById('sot-google_sheets-instructions-box');
+                    const zapierBox = document.getElementById('sot-zapier-instructions-box');
                     
                     // Hide all by default
                     dealBox.style.display = 'none';
@@ -3591,6 +3720,12 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     if (housecallproBox) housecallproBox.style.display = 'none';
                     if (quickbooksBox) quickbooksBox.style.display = 'none';
                     if (xeroBox) xeroBox.style.display = 'none';
+                    if (zohoBooksBox) zohoBooksBox.style.display = 'none';
+                    if (netsuiteBox) netsuiteBox.style.display = 'none';
+                    if (sageBox) sageBox.style.display = 'none';
+                    if (freshbooksBox) freshbooksBox.style.display = 'none';
+                    if (googleSheetsBox) googleSheetsBox.style.display = 'none';
+                    if (zapierBox) zapierBox.style.display = 'none';
                     
                     crmCard.style.display = 'none';
                     billingCard.style.display = 'none';
@@ -3614,12 +3749,24 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         }} else if (sot === 'housecallpro' && housecallproBox) {{
                             housecallproBox.style.display = 'block';
                         }}
-                    }} else if (['quickbooks', 'xero'].includes(sot)) {{
+                    }} else if (['quickbooks', 'xero', 'zoho_books', 'netsuite', 'sage', 'freshbooks', 'google_sheets', 'zapier'].includes(sot)) {{
                         billingCard.style.display = 'block';
                         if (sot === 'quickbooks' && quickbooksBox) {{
                             quickbooksBox.style.display = 'block';
                         }} else if (sot === 'xero' && xeroBox) {{
                             xeroBox.style.display = 'block';
+                        }} else if (sot === 'zoho_books' && zohoBooksBox) {{
+                            zohoBooksBox.style.display = 'block';
+                        }} else if (sot === 'netsuite' && netsuiteBox) {{
+                            netsuiteBox.style.display = 'block';
+                        }} else if (sot === 'sage' && sageBox) {{
+                            sageBox.style.display = 'block';
+                        }} else if (sot === 'freshbooks' && freshbooksBox) {{
+                            freshbooksBox.style.display = 'block';
+                        }} else if (sot === 'google_sheets' && googleSheetsBox) {{
+                            googleSheetsBox.style.display = 'block';
+                        }} else if (sot === 'zapier' && zapierBox) {{
+                            zapierBox.style.display = 'block';
                         }}
                     }} else if (sot === 'email' || sot === 'ai_rating') {{
                         emailBox.style.display = 'block';
@@ -4971,6 +5118,12 @@ def add_client_page(request: Request):
                                 <option value="housecallpro">Housecall Pro (Home Services)</option>
                                 <option value="quickbooks">QuickBooks Accounting</option>
                                 <option value="xero">Xero Accounting</option>
+                                <option value="zoho_books">Zoho Books Accounting</option>
+                                <option value="netsuite">NetSuite ERP/Accounting</option>
+                                <option value="sage">Sage Accounting</option>
+                                <option value="freshbooks">FreshBooks Billing</option>
+                                <option value="google_sheets">Google Sheets (Live Sync)</option>
+                                <option value="zapier">Zapier Custom Integration</option>
                                 <option value="email">Monthly Sales Spreadsheet Ingestion via Email</option>
                                 <option value="ai_rating">AI Rating (Direct Call Audits & Dynamic Form-Email Monitoring)</option>
                             </select>
@@ -5152,6 +5305,123 @@ def add_client_page(request: Request):
                                 <small style="display: block; font-style: italic; color: #00838f; line-height: 1.4; border-top: 1px solid #80deea; padding-top: 8px;">
                                     🔒 <strong>Intent-to-Receive Handshake:</strong> To complete the setup, our platform automatically responds to Xero's secure validation checks. Ensure your SSL certificate is trusted (non-self-signed) and running on port 443.
                                 </small>
+                            </div>
+                        </div>
+    
+                        <!-- CONDITIONAL INPUT: Zoho Books Setup Instructions -->
+                        <div id="sot-zoho_books-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
+                            <div style="background-color: #e8f5e9; border-left: 4px solid #2e7d32; padding: 15px; border-radius: 4px; color: #1b5e20; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                💡 <strong>Zoho Books Webhooks Quick Setup Guide:</strong><br>
+                                <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #1b5e20;">
+                                    <li>Log into your <strong>Zoho Books Account</strong>.</li>
+                                    <li>Go to <strong>Settings (Gear Icon) ➡️ Developer Space ➡️ Webhooks</strong>.</li>
+                                    <li>Click <strong>+ New Webhook</strong>.</li>
+                                    <li>Set Name to <code>LeadGroove Sales Sync</code> and set Module to <strong>Invoices</strong> or <strong>Customer Payments</strong>.</li>
+                                    <li>In the <strong>URL to Notify</strong> field, paste your custom live endpoint (which you can copy on the next success screen):
+                                        <code style="display: block; background: #fff; border: 1px solid #a5d6a7; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #1b5e20;">https://your-agency-app.onrender.com/webhooks/billing?client_id=conversions-[id]</code>
+                                    </li>
+                                    <li>Select trigger events: **Invoice Paid** or **Payment Recorded**. Save your Webhook!</li>
+                                </ol>
+                            </div>
+                        </div>
+
+                        <!-- CONDITIONAL INPUT: NetSuite Setup Instructions -->
+                        <div id="sot-netsuite-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
+                            <div style="background-color: #eceff1; border-left: 4px solid #455a64; padding: 15px; border-radius: 4px; color: #263238; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                💡 <strong>NetSuite SuiteScript Quick Integration Guide:</strong><br>
+                                <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #37474f;">
+                                    <li>Deploy a minimal **SuiteScript 2.x User Event Script** on your `Invoice` or `CustomerPayment` records.</li>
+                                    <li>On the `afterSubmit` hook, write a script that triggers an outbound HTTP POST to our web receiver:
+                                        <code style="display: block; background: #fff; border: 1px solid #b0bec5; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #37474f;">https://your-agency-app.onrender.com/webhooks/billing?client_id=conversions-[id]</code>
+                                    </li>
+                                    <li>Format your JSON payload to include: `{"customer_name": invoice.entity, "email": invoice.email, "invoice_number": invoice.id, "amount": invoice.total}`.</li>
+                                </ol>
+                            </div>
+                        </div>
+
+                        <!-- CONDITIONAL INPUT: Sage Setup Instructions -->
+                        <div id="sot-sage-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
+                            <div style="background-color: #fff3e0; border-left: 4px solid #e65100; padding: 15px; border-radius: 4px; color: #e65100; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                💡 <strong>Sage Accounting Webhooks Setup Guide:</strong><br>
+                                <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #e65100;">
+                                    <li>Log into your <strong>Sage Developer Account</strong>.</li>
+                                    <li>Configure webhooks under your Active Integration profile.</li>
+                                    <li>Set the destination endpoint URL to your dynamic LeadGrove billing webhook:
+                                        <code style="display: block; background: #fff; border: 1px solid #ffcc80; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #d84315;">https://your-agency-app.onrender.com/webhooks/billing?client_id=conversions-[id]</code>
+                                    </li>
+                                    <li>Subscribe to **sales_invoice.paid** and **payment_received** webhook events to track real-time conversions.</li>
+                                </ol>
+                            </div>
+                        </div>
+
+                        <!-- CONDITIONAL INPUT: FreshBooks Setup Instructions -->
+                        <div id="sot-freshbooks-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
+                            <div style="background-color: #f3e5f5; border-left: 4px solid #4a148c; padding: 15px; border-radius: 4px; color: #4a148c; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                💡 <strong>FreshBooks Billing Webhooks Guide:</strong><br>
+                                <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #4a148c;">
+                                    <li>Register your application inside the <strong>FreshBooks Developer Center</strong>.</li>
+                                    <li>Subscribe to webhook notifications for your production account.</li>
+                                    <li>Set the webhook URL endpoint directly to:
+                                        <code style="display: block; background: #fff; border: 1px solid #e1bee7; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #4a148c;">https://your-agency-app.onrender.com/webhooks/billing?client_id=conversions-[id]</code>
+                                    </li>
+                                    <li>Choose trigger event: <code>invoice.payment.create</code> to synchronize billing revenue.</li>
+                                </ol>
+                            </div>
+                        </div>
+
+                        <!-- CONDITIONAL INPUT: Google Sheets Setup Instructions -->
+                        <div id="sot-google_sheets-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
+                            <div style="background-color: #efebe9; border-left: 4px solid #4e342e; padding: 15px; border-radius: 4px; color: #4e342e; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                💡 <strong>Google Sheets (Live Sync via Apps Script) Guide:</strong><br>
+                                <p style="margin: 5px 0; font-size: 12px;">Sync your spreadsheet rows instantly with this pre-built script:</p>
+                                <ol style="padding-left: 20px; font-size: 12px; color: #4e342e;">
+                                    <li>Open your Google Sheet, click on <strong>Extensions ➡️ Apps Script</strong>.</li>
+                                    <li>Wipe any default code and copy-paste the snippet below:
+                                        <pre style="background: white; border: 1px solid #d7ccc8; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 10px; overflow-x: auto; color: #3e2723; max-height: 160px;">function onEdit(e) {{
+  var sheet = e.source.getActiveSheet();
+  var range = e.range;
+  if (range.getColumn() == 5 && range.getValue() == "Paid") {{
+    var row = range.getRow();
+    var payload = {{
+      customer_name: sheet.getRange(row, 1).getValue(),
+      email: sheet.getRange(row, 2).getValue(),
+      invoice_number: sheet.getRange(row, 3).getValue(),
+      amount: parseFloat(sheet.getRange(row, 4).getValue())
+    }};
+    UrlFetchApp.fetch("https://your-agency-app.onrender.com/webhooks/billing?client_id=conversions-[id]", {{
+      method: "POST",
+      contentType: "application/json",
+      payload: JSON.stringify(payload)
+    }});
+  }}
+}}</pre>
+                                    </li>
+                                    <li>Replace the placeholders inside quotes with your actual row indexes, and hit Save! When a row's column 5 updates to "Paid", it sends the conversion instantly!</li>
+                                </ol>
+                            </div>
+                        </div>
+
+                        <!-- CONDITIONAL INPUT: Zapier Setup Instructions -->
+                        <div id="sot-zapier-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
+                            <div style="background-color: #fffde7; border-left: 4px solid #fbc02d; padding: 15px; border-radius: 4px; color: #f57f17; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                💡 <strong>Webhooks by Zapier Custom Setup Guide:</strong><br>
+                                <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #e65100;">
+                                    <li>In your Zapier account, create a new Zap.</li>
+                                    <li>**Trigger:** Select any platform of choice (e.g. Stripe, PayPal, Shopify).</li>
+                                    <li>**Action:** Search for **"Webhooks by Zapier"** and select **Custom Request** or **POST**.</li>
+                                    <li>**URL Endpoint:** Paste your dynamic tracking endpoint:
+                                        <code style="display: block; background: #fff; border: 1px solid #fff59d; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #e65100;">https://your-agency-app.onrender.com/webhooks/billing?client_id=conversions-[id]</code>
+                                        <small style="color: #666;">(Use `/webhooks/crm` if setting up lead qualification steps rather than sales)</small>
+                                    </li>
+                                    <li>**Payload Mapping:** Map your trigger's payload attributes into our standard database keys:
+                                        <ul style="list-style-type: disc; padding-left: 15px; margin-top: 4px;">
+                                            <li><code>customer_name</code>: Name of the contact</li>
+                                            <li><code>email</code>: Email of the customer</li>
+                                            <li><code>phone</code>: Customer phone number</li>
+                                            <li><code>amount</code>: The numeric value of the sale</li>
+                                        </ul>
+                                    </li>
+                                </ol>
                             </div>
                         </div>
     
@@ -5912,6 +6182,12 @@ def add_client_page(request: Request):
                     const housecallproBox = document.getElementById('sot-housecallpro-instructions-box');
                     const quickbooksBox = document.getElementById('sot-quickbooks-instructions-box');
                     const xeroBox = document.getElementById('sot-xero-instructions-box');
+                    const zohoBooksBox = document.getElementById('sot-zoho_books-instructions-box');
+                    const netsuiteBox = document.getElementById('sot-netsuite-instructions-box');
+                    const sageBox = document.getElementById('sot-sage-instructions-box');
+                    const freshbooksBox = document.getElementById('sot-freshbooks-instructions-box');
+                    const googleSheetsBox = document.getElementById('sot-google_sheets-instructions-box');
+                    const zapierBox = document.getElementById('sot-zapier-instructions-box');
                     
                     dealBox.style.display = 'none';
                     leadBox.style.display = 'none';
@@ -5923,6 +6199,12 @@ def add_client_page(request: Request):
                     if (housecallproBox) housecallproBox.style.display = 'none';
                     if (quickbooksBox) quickbooksBox.style.display = 'none';
                     if (xeroBox) xeroBox.style.display = 'none';
+                    if (zohoBooksBox) zohoBooksBox.style.display = 'none';
+                    if (netsuiteBox) netsuiteBox.style.display = 'none';
+                    if (sageBox) sageBox.style.display = 'none';
+                    if (freshbooksBox) freshbooksBox.style.display = 'none';
+                    if (googleSheetsBox) googleSheetsBox.style.display = 'none';
+                    if (zapierBox) zapierBox.style.display = 'none';
                     
                     if (['hubspot', 'salesforce', 'zoho'].includes(sot)) {
                         dealBox.style.display = 'block';
@@ -5940,11 +6222,23 @@ def add_client_page(request: Request):
                         } else if (sot === 'housecallpro' && housecallproBox) {
                             housecallproBox.style.display = 'block';
                         }
-                    } else if (['quickbooks', 'xero'].includes(sot)) {
+                    } else if (['quickbooks', 'xero', 'zoho_books', 'netsuite', 'sage', 'freshbooks', 'google_sheets', 'zapier'].includes(sot)) {
                         if (sot === 'quickbooks' && quickbooksBox) {
                             quickbooksBox.style.display = 'block';
                         } else if (sot === 'xero' && xeroBox) {
                             xeroBox.style.display = 'block';
+                        } else if (sot === 'zoho_books' && zohoBooksBox) {
+                            zohoBooksBox.style.display = 'block';
+                        } else if (sot === 'netsuite' && netsuiteBox) {
+                            netsuiteBox.style.display = 'block';
+                        } else if (sot === 'sage' && sageBox) {
+                            sageBox.style.display = 'block';
+                        } else if (sot === 'freshbooks' && freshbooksBox) {
+                            freshbooksBox.style.display = 'block';
+                        } else if (sot === 'google_sheets' && googleSheetsBox) {
+                            googleSheetsBox.style.display = 'block';
+                        } else if (sot === 'zapier' && zapierBox) {
+                            zapierBox.style.display = 'block';
                         }
                     } else if (sot === 'email' || sot === 'ai_rating') {
                         emailBox.style.display = 'block';
@@ -6088,8 +6382,9 @@ def add_client_page(request: Request):
                                 sotLabel.innerHTML = `⚙️ <strong>Step 3: Connect Your ${payload.source_of_truth.toUpperCase()} CRM Webhook</strong><br>Copy this webhook URL and paste it into your CRM's Developer Settings or configure it in Zapier to trigger when a Lead or Deal is updated:`;
                                 sotUrlInput.value = `${window.location.origin}/webhooks/crm?client_id=${data.client_id}`;
                                 sotBox.style.display = 'block';
-                            } else if (['quickbooks', 'xero'].includes(payload.source_of_truth)) {
-                                sotLabel.innerHTML = `💳 <strong>Step 3: Connect Your ${payload.source_of_truth.toUpperCase()} Accounting Webhook</strong><br>Copy this webhook URL and paste it into your billing platform's developer integrations console to trigger when invoices are paid:`;
+                            } else if (['quickbooks', 'xero', 'zoho_books', 'netsuite', 'sage', 'freshbooks', 'google_sheets', 'zapier'].includes(payload.source_of_truth)) {
+                                const displayName = payload.source_of_truth.replace('_', ' ').toUpperCase();
+                                sotLabel.innerHTML = `💳 <strong>Step 3: Connect Your ${displayName} Integration Webhook</strong><br>Copy this webhook URL and paste it into your developer or integration settings console to sync transactions instantly:`;
                                 sotUrlInput.value = `${window.location.origin}/webhooks/billing?client_id=${data.client_id}`;
                                 sotBox.style.display = 'block';
                             } else if (payload.source_of_truth === 'email') {
