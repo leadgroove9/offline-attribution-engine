@@ -6359,8 +6359,8 @@ def export_facebook_conversions(request: Request, client_id: int):
     if not email:
         return RedirectResponse(url="/login", status_code=303)
     """
-    Exports qualified and closed conversions that have a valid FBCLID 
-    into a Facebook-compliant Offline Conversions CSV format.
+    Exports qualified and closed conversions (GCLID, FBCLID, etc.) with automated SHA-256
+    hashed personal identifiers alongside fbclid for maximum Meta matching rates.
     """
     try:
         conn = db_router.connect()
@@ -6375,11 +6375,11 @@ def export_facebook_conversions(request: Request, client_id: int):
         client_name = client_row[0]
         pixel_id = client_row[1] or ""
         
-        # Pull records that have a FBCLID and are either Qualified or Closed belonging to this client
+        # Pull records belonging to this client that are either Qualified or Closed (with or without fbclid)
         cursor.execute("""
-            SELECT fbclid, qualified, sale_closed, value, created_at
+            SELECT fbclid, email, phone, name, qualified, sale_closed, value, created_at
             FROM sessions
-            WHERE client_id = ? AND fbclid IS NOT NULL AND fbclid != '' AND (qualified = 'YES' OR sale_closed = 'YES')
+            WHERE client_id = ? AND (qualified = 'YES' OR sale_closed = 'YES')
             ORDER BY created_at DESC
         """, (client_id,))
         rows = cursor.fetchall()
@@ -6391,12 +6391,28 @@ def export_facebook_conversions(request: Request, client_id: int):
     output = io.StringIO()
     writer = csv.writer(output)
     
-    # Headers for Meta upload (Facebook Click ID, Event Name, Event Time, Value, Currency, Pixel ID)
-    writer.writerow(["fbclid", "Event Name", "Event Time", "Value", "Currency", "Pixel ID"])
+    # Headers for Meta upload (Facebook Click ID, hashed Email, hashed Phone, hashed First Name, hashed Last Name, Event Name, Event Time, Value, Currency, Pixel ID)
+    writer.writerow(["fbclid", "email", "phone", "fn", "ln", "Event Name", "Event Time", "Value", "Currency", "Pixel ID"])
     
     for r in rows:
-        fbclid, qualified, sale_closed, value, created_at = r
+        fbclid, email_raw, phone_raw, name_raw, qualified, sale_closed, value, created_at = r
         conv_time = f"{created_at}"
+        
+        # Normalize and hash fields using our global helpers
+        hashed_email = sha256_hash_str(email_raw) if email_raw else ""
+        hashed_phone = sha256_hash_phone_str(phone_raw) if phone_raw else ""
+        
+        first_name, last_name = "", ""
+        if name_raw:
+            parts = str(name_raw).strip().split()
+            if len(parts) == 1:
+                first_name = parts[0]
+            elif len(parts) > 1:
+                first_name = parts[0]
+                last_name = " ".join(parts[1:])
+                
+        hashed_fn = sha256_hash_str(first_name) if first_name else ""
+        hashed_ln = sha256_hash_str(last_name) if last_name else ""
         
         if sale_closed == 'YES':
             event_name = "LeadGroove Offline Sale"
@@ -6405,7 +6421,18 @@ def export_facebook_conversions(request: Request, client_id: int):
             event_name = "LeadGroove Qualified Lead"
             event_val = 1.0
             
-        writer.writerow([fbclid, event_name, conv_time, f"{event_val:.2f}", "USD", pixel_id])
+        writer.writerow([
+            fbclid or "",
+            hashed_email,
+            hashed_phone,
+            hashed_fn,
+            hashed_ln,
+            event_name,
+            conv_time,
+            f"{event_val:.2f}",
+            "USD",
+            pixel_id
+        ])
             
     output.seek(0)
     safe_filename = re.sub(r'\s+', '-', client_name.strip().lower())
