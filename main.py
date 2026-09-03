@@ -4,7 +4,9 @@ import re
 import json
 import csv
 import io
-from fastapi import FastAPI, Request, HTTPException
+import pandas as pd
+import difflib
+from fastapi import FastAPI, Request, HTTPException, File, UploadFile, Form
 from fastapi.responses import HTMLResponse, StreamingResponse, Response, RedirectResponse
 from pydantic import BaseModel
 from typing import Optional
@@ -82,6 +84,99 @@ def get_user_role_and_client(email: str) -> tuple[str, Optional[int]]:
     finally:
         conn.close()
     return "full", None
+
+
+def clean_company_name(name: str) -> str:
+    if not name:
+        return ""
+    name_clean = name.lower().strip()
+    name_clean = re.sub(r"[^\w\s]", "", name_clean)
+    noise_words = ["inc", "llc", "corp", "co", "ltd", "group", "services", "limited", "incorporated", "corporation"]
+    tokens = [w for w in name_clean.split() if w not in noise_words]
+    return " ".join(tokens)
+
+def clean_person_name(name: str) -> str:
+    if not name:
+        return ""
+    name_clean = name.lower().strip()
+    name_clean = re.sub(r"[^\w\s,]", "", name_clean)
+    return name_clean
+
+def check_name_transposition(name1: str, name2: str) -> float:
+    n1 = clean_person_name(name1)
+    n2 = clean_person_name(name2)
+    tokens1 = [t.strip() for t in n1.split(",") if t.strip()]
+    tokens2 = [t.strip() for t in n2.split(",") if t.strip()]
+    
+    if len(tokens1) > 1:
+        n1_standard = " ".join(reversed(tokens1))
+    else:
+        n1_standard = n1
+        
+    if len(tokens2) > 1:
+        n2_standard = " ".join(reversed(tokens2))
+    else:
+        n2_standard = n2
+
+    t1 = n1_standard.split()
+    t2 = n2_standard.split()
+    
+    if not t1 or not t2:
+        return 0.0
+        
+    if sorted(t1) == sorted(t2):
+        return 1.0
+        
+    if t1[-1] == t2[-1]:
+        f1, f2 = t1[0], t2[0]
+        if f1 == f2:
+            return 1.0
+        f1_clean = re.sub(r"\.", "", f1).strip()
+        f2_clean = re.sub(r"\.", "", f2).strip()
+        if f1_clean == f2_clean:
+            return 1.0
+        if len(f1_clean) == 1 and f2_clean.startswith(f1_clean):
+            return 0.90
+        if len(f2_clean) == 1 and f1_clean.startswith(f2_clean):
+            return 0.90
+        if f1_clean in f2_clean or f2_clean in f1_clean:
+            return 0.85
+            
+    return difflib.SequenceMatcher(None, n1_standard, n2_standard).ratio()
+
+def calculate_company_similarity(name1: str, name2: str) -> float:
+    c1 = clean_company_name(name1)
+    c2 = clean_company_name(name2)
+    if not c1 or not c2:
+        return 0.0
+    if c1 in c2 or c2 in c1:
+        return 1.0
+    return difflib.SequenceMatcher(None, c1, c2).ratio()
+
+def find_dynamic_columns_custom(columns: list) -> tuple:
+    phone_col = None
+    email_col = None
+    value_col = None
+    name_col = None
+    company_col = None
+    cleaned_cols = {col: re.sub(r"[\s_-]+", "", col.lower()) for col in columns}
+    for original_col, clean_col in cleaned_cols.items():
+        if not phone_col and re.search(r"(phone|tele|mobile|cell|num|contact)", clean_col):
+            phone_col = original_col
+            continue
+        if not email_col and re.search(r"(email|mail|address)", clean_col):
+            email_col = original_col
+            continue
+        if not value_col and re.search(r"(amount|value|revenue|total|price|paid|sum|invoice|sale|cost)", clean_col):
+            value_col = original_col
+            continue
+        if not name_col and re.search(r"(name|customer|client|contact|lead)", clean_col):
+            name_col = original_col
+            continue
+        if not company_col and re.search(r"(company|business|firm|org|account)", clean_col):
+            company_col = original_col
+            continue
+    return phone_col, email_col, value_col, name_col, company_col
 
 app = FastAPI(
     title="Offline Attribution Engine (Multi-Tenant Multi-Channel)",
@@ -818,6 +913,7 @@ def get_register(request: Request, error: Optional[str] = None, invite_token: Op
                     Already have an account? <a href="/login">Log In</a>
                 </div>
             </div>
+            {upload_box_script_html}
         </body>
     </html>
     """
@@ -1317,6 +1413,169 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
     if email in ADMIN_EMAILS:
         admin_link_html = ' | <a href="/admin/users" style="color: #2e7d32; text-decoration: none; font-weight: bold; margin-left: 5px;">🛡️ Admin User Directory</a>'
         
+
+    # Configure upload box visibility
+    if user_role == "full":
+        # Check target clients options
+        if selected_client_id == 0:
+            upload_client_selector_html = """
+            <div style="margin-bottom: 25px; display: flex; align-items: center; justify-content: center; gap: 10px;">
+                <span style="font-weight: bold; color: #1a237e; font-size: 13px;">Target Client Account:</span>
+                <select id="upload_client_id" style="padding: 6px 12px; font-size: 13px; border-radius: 4px; border: 1px solid #9fa8da; font-weight: 600; outline: none; cursor: pointer; color: #1a237e; background: white;">
+            """
+            for c_id, c_name, _, _, _, _ in clients:
+                upload_client_selector_html += f'<option value="{c_id}">👤 {c_name}</option>'
+            upload_client_selector_html += """
+                </select>
+            </div>
+            """
+        else:
+            upload_client_selector_html = f'<input type="hidden" id="upload_client_id" value="{selected_client_id}">'
+
+        upload_box_html = f"""
+        <!-- Drag & Drop Ingestion Box -->
+        <div id="drop-zone" style="background: #f8f9fc; border: 2px dashed #1a237e; border-radius: 8px; padding: 25px; text-align: center; margin-bottom: 30px; cursor: pointer; transition: all 0.2s; position: relative;">
+            <div id="drop-zone-content">
+                <span style="font-size: 32px; display: block; margin-bottom: 10px;">📊</span>
+                <strong style="color: #1a237e; font-size: 15px; display: block;">Drag & drop your Customer Sales Spreadsheet (CSV or Excel)</strong>
+                <span style="color: #666; font-size: 13px; display: block; margin-top: 5px;">Or click here to browse and upload from your computer</span>
+                <small style="color: #888; font-size: 11px; display: block; margin-top: 10px; font-style: italic;">Supports exact phone/email matching & smart fuzzy name/company matching</small>
+            </div>
+            <input type="file" id="csv-file-input" accept=".csv, .xlsx, .xls" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;">
+        </div>
+        
+        {{upload_client_selector_html}}
+        
+        <!-- Ingestion Success Modal Overlay -->
+        <div id="upload-success-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center;">
+            <div style="background: white; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); max-width: 480px; width: 90%; text-align: center; overflow: hidden;">
+                <!-- Header -->
+                <div style="background: #1a237e; color: white; padding: 20px;">
+                    <span style="font-size: 40px;">🎉</span>
+                    <h3 style="margin: 10px 0 0 0; font-size: 18px;">Sales Spreadsheet Processed!</h3>
+                </div>
+                <!-- Body -->
+                <div style="padding: 25px; text-align: left; font-size: 14px; color: #333; line-height: 1.6;">
+                    <p id="modal-message" style="margin-top: 0; font-weight: 600; text-align: center; color: #1b5e20;"></p>
+                    <div style="background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 8px; padding: 15px; margin-top: 15px;">
+                        <strong style="display: block; margin-bottom: 8px; font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">📊 Ingestion Stats:</strong>
+                        <ul style="margin: 0; padding-left: 20px;">
+                            <li>Processed Rows: <strong id="stat-processed">0</strong></li>
+                            <li>Successful Matches: <strong id="stat-matches" style="color: #2e7d32;">0</strong></li>
+                            <li>New Organic Logged: <strong id="stat-organic" style="color: #1565c0;">0</strong></li>
+                            <li>Row Failures/Errors: <strong id="stat-errors" style="color: #c62828;">0</strong></li>
+                        </ul>
+                    </div>
+                </div>
+                <!-- Footer -->
+                <div style="background: #f1f3f4; padding: 15px; display: flex; justify-content: center;">
+                    <button onclick="closeUploadModal()" style="background: #1a237e; color: white; border: none; padding: 10px 24px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: background 0.2s;">Great, Refresh Dashboard!</button>
+                </div>
+            </div>
+        </div>
+        """
+        upload_box_script_html = f"""
+        <script>
+            const dropZone = document.getElementById('drop-zone');
+            const fileInput = document.getElementById('csv-file-input');
+
+            // Add drag & drop event listeners
+            dropZone.addEventListener('dragover', (e) => {{{{
+                e.preventDefault();
+                dropZone.style.background = '#e8eaf6';
+                dropZone.style.borderColor = '#3f51b5';
+                dropZone.style.transform = 'scale(1.01)';
+            }}}});
+
+            dropZone.addEventListener('dragleave', (e) => {{{{
+                e.preventDefault();
+                dropZone.style.background = '#f8f9fc';
+                dropZone.style.borderColor = '#1a237e';
+                dropZone.style.transform = 'scale(1)';
+            }}}});
+
+            dropZone.addEventListener('drop', (e) => {{{{
+                e.preventDefault();
+                dropZone.style.background = '#f8f9fc';
+                dropZone.style.borderColor = '#1a237e';
+                dropZone.style.transform = 'scale(1)';
+                
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {{{{
+                    fileInput.files = files;
+                    handleFileUpload(files[0]);
+                }}}}
+            }}}});
+
+            fileInput.addEventListener('change', (e) => {{{{
+                if (fileInput.files.length > 0) {{{{
+                    handleFileUpload(fileInput.files[0]);
+                }}}}
+            }}}});
+
+            async function handleFileUpload(file) {{{{
+                const clientIdSelect = document.getElementById('upload_client_id');
+                const clientId = clientIdSelect ? clientIdSelect.value : "{selected_client_id}";
+                
+                if (clientId === "0") {{{{
+                    alert("Please select a specific client account from the Target Client selector inside the upload box first!");
+                    return;
+                }}}}
+
+                // Show visual loading
+                const content = document.getElementById('drop-zone-content');
+                const originalHTML = content.innerHTML;
+                content.innerHTML = `
+                    <span style="font-size: 32px; display: block; margin-bottom: 10px; animation: spin 2s linear infinite; width: 40px; margin: 0 auto 10px auto;">⏳</span>
+                    <strong style="color: #1a237e; font-size: 15px; display: block;">Processing spreadsheet, performing fuzzy matching audits...</strong>
+                    <span style="color: #666; font-size: 13px; display: block; margin-top: 5px;">Do not close your browser or navigate away.</span>
+                `;
+                dropZone.style.pointerEvents = 'none';
+
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('client_id', clientId);
+
+                try {{{{
+                    const response = await fetch('/dashboard/upload-sales', {{{{
+                        method: 'POST',
+                        body: formData
+                    }}}});
+
+                    const data = await response.json();
+
+                    if (response.ok) {{{{
+                        // Show success modal
+                        document.getElementById('modal-message').innerText = `Spreadsheet successfully parsed for client ID #${{{{clientId}}}}!`;
+                        document.getElementById('stat-processed').innerText = data.stats.processed;
+                        document.getElementById('stat-matches').innerText = data.stats.successful_matches;
+                        document.getElementById('stat-organic').innerText = data.stats.organic_logged;
+                        document.getElementById('stat-errors').innerText = data.stats.errors;
+
+                        document.getElementById('upload-success-modal').style.display = 'flex';
+                    }}}} else {{{{
+                        throw new Error(data.detail || 'An error occurred during file parsing.');
+                    }}}}
+                }}}} catch (error) {{{{
+                    alert('Upload Error: ' + error.message);
+                }}}} finally {{{{
+                    // Reset Drop Zone content
+                    content.innerHTML = originalHTML;
+                    dropZone.style.pointerEvents = 'auto';
+                    fileInput.value = ''; // Reset file input
+                }}}}
+            }}
+
+            function closeUploadModal() {{{{
+                document.getElementById('upload-success-modal').style.display = 'none';
+                window.location.reload();
+            }}}}
+        </script>
+        """
+    else:
+        upload_box_html = ""
+        upload_box_script_html = ""
+
     user_header_bar = f"""
     <div style="display: flex; justify-content: space-between; align-items: center; background-color: #f1f3f4; padding: 10px 15px; border-radius: 6px; margin-bottom: 20px; font-size: 13px;">
         <div>
@@ -1376,6 +1635,10 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                 .btn-settings {{ display: inline-block; background-color: #607d8b; color: white; padding: 10px 18px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 14px; border: none; transition: background 0.2s; cursor: pointer; }}
                 .btn-settings:hover {{ background-color: #455a64; }}
 
+                @keyframes spin {{
+                    0% {{ transform: rotate(0deg); }}
+                    100% {{ transform: rotate(360deg); }}
+                }}
             </style>
         </head>
         <body>
@@ -1457,6 +1720,8 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                         </div>
                     </div>
                 </div>
+
+                {upload_box_html}
 
                 <!-- Table -->
                 <h3 style="margin: 0 0 15px 0; color: #1a237e;">Lead Activity Log</h3>
@@ -3455,6 +3720,185 @@ def create_user_invitation(request: Request, invite: UserInvite):
         raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+@app.post("/dashboard/upload-sales")
+async def dashboard_upload_sales(
+    request: Request,
+    file: UploadFile = File(...),
+    client_id: int = Form(...)
+):
+    email = is_authenticated(request)
+    if not email:
+        raise HTTPException(status_code=401, detail="Session expired. Please log in again.")
+    user_role, user_client_id = get_user_role_and_client(email)
+    if user_role != "full":
+        raise HTTPException(status_code=403, detail="Unauthorized: Only managers and administrators can upload sales reports.")
+    if user_client_id is not None and client_id != user_client_id:
+        raise HTTPException(status_code=403, detail="Unauthorized: You do not have permission to upload sales for this client.")
+        
+    contents = await file.read()
+    import io
+    try:
+        if file.filename.endswith(".csv"):
+            df = pd.read_csv(io.BytesIO(contents))
+        else:
+            df = pd.read_excel(io.BytesIO(contents))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to read file: {e}")
+        
+    columns = list(df.columns)
+    phone_col, email_col, value_col, name_col, company_col = find_dynamic_columns_custom(columns)
+    
+    if not phone_col and not email_col:
+        raise HTTPException(status_code=400, detail=f"Mapping Failure: Could not locate a valid phone or email contact column in headers: {columns}")
+        
+    stats = {"processed": 0, "successful_matches": 0, "organic_logged": 0, "errors": 0}
+    
+    conn = db_router.connect()
+    cursor = conn.cursor()
+    
+    try:
+        for _, row in df.iterrows():
+            stats["processed"] += 1
+            
+            raw_phone = str(row[phone_col]) if phone_col and pd.notna(row[phone_col]) else ""
+            raw_email = str(row[email_col]) if email_col and pd.notna(row[email_col]) else ""
+            raw_value = row[value_col] if value_col and pd.notna(row[value_col]) else 0.0
+            raw_name = str(row[name_col]).strip() if name_col and pd.notna(row[name_col]) else ""
+            raw_company = str(row[company_col]).strip() if company_col and pd.notna(row[company_col]) else ""
+            
+            norm_phone = normalize_phone(raw_phone)
+            norm_email = normalize_email(raw_email)
+            
+            try:
+                clean_val_str = re.sub(r"[^\d.]", "", str(raw_value))
+                value = float(clean_val_str) if clean_val_str else 0.0
+            except (ValueError, TypeError):
+                value = 0.0
+                
+            if not norm_phone and not norm_email and not raw_name and not raw_company:
+                stats["errors"] += 1
+                continue
+                
+            matching_session_id = None
+            match_reason = ""
+            match_fuzzy = "NO"
+            certainty_score = 100
+            current_status = None
+            
+            # Tier 1: Search by Phone Match
+            if norm_phone:
+                cursor.execute("""
+                    SELECT id, gclid, fbclid, msclkid, li_fat_id, sale_closed, value 
+                    FROM sessions 
+                    WHERE client_id = ? AND phone = ?
+                    ORDER BY created_at DESC LIMIT 1
+                """, (client_id, norm_phone))
+                row_match = cursor.fetchone()
+                if row_match:
+                    matching_session_id, g, fb, ms, li, sale_closed, val = row_match
+                    current_status = (sale_closed, val)
+                    match_reason = f"Successfully matched closed transaction via spreadsheet upload (Phone Match: {norm_phone})."
+                    
+            # Tier 2: Search by Email Match
+            if not matching_session_id and norm_email:
+                cursor.execute("""
+                    SELECT id, gclid, fbclid, msclkid, li_fat_id, sale_closed, value 
+                    FROM sessions 
+                    WHERE client_id = ? AND email = ?
+                    ORDER BY created_at DESC LIMIT 1
+                """, (client_id, norm_email))
+                row_match = cursor.fetchone()
+                if row_match:
+                    matching_session_id, g, fb, ms, li, sale_closed, val = row_match
+                    current_status = (sale_closed, val)
+                    match_reason = f"Successfully matched closed transaction via spreadsheet upload (Email Match: {norm_email})."
+                    
+            # Tier 3 & 4: Fuzzy Match against Active Sessions
+            if not matching_session_id:
+                cursor.execute("""
+                    SELECT id, phone, email, name, company, gclid, fbclid, msclkid, li_fat_id, sale_closed, value 
+                    FROM sessions 
+                    WHERE client_id = ? AND (sale_closed IS NULL OR sale_closed = 'NO')
+                    ORDER BY created_at DESC
+                """)
+                unclosed_sessions = cursor.fetchall()
+                
+                best_match_id = None
+                best_score = 0
+                best_reason = ""
+                best_click_vals = None
+                
+                for sess in unclosed_sessions:
+                    s_id, s_phone, s_email, s_name, s_company, s_g, s_fb, s_ms, s_li, s_closed, s_val = sess
+                    
+                    # Fuzzy Company Matching (Tier 3)
+                    if raw_company and s_company:
+                        score = calculate_company_similarity(raw_company, s_company)
+                        if score >= 0.85 and int(score * 100) > best_score:
+                            best_score = int(score * 100)
+                            best_match_id = s_id
+                            best_reason = f"Successfully matched closed transaction via Fuzzy Company Match ('{raw_company.strip()}' ➡️ '{s_company.strip()}')."
+                            best_click_vals = (s_closed, s_val)
+                            
+                    # Fuzzy Name Matching (Tier 4)
+                    if raw_name and s_name:
+                        score = check_name_transposition(raw_name, s_name)
+                        if score >= 0.80 and int(score * 100) > best_score:
+                            best_score = int(score * 100)
+                            best_match_id = s_id
+                            best_reason = f"Successfully matched closed transaction via Fuzzy Name Match ('{raw_name.strip()}' ➡️ '{s_name.strip()}')."
+                            best_click_vals = (s_closed, s_val)
+                            
+                if best_match_id:
+                    matching_session_id = best_match_id
+                    s_closed, s_val = best_click_vals
+                    current_status = (s_closed, s_val)
+                    match_fuzzy = "YES"
+                    certainty_score = best_score
+                    match_reason = best_reason
+                    
+            # Update database
+            if not matching_session_id:
+                cursor.execute("""
+                    INSERT INTO sessions (
+                        client_id, phone, email, name, company, source, qualified, sale_closed, value, reason, model_used, match_fuzzy, certainty_score
+                    ) VALUES (?, ?, ?, ?, ?, 'dashboard_upload', 'NO', 'YES', ?, ?, 'Dashboard Spreadsheet Ingest', 'NO', 100)
+                """, (
+                    client_id,
+                    norm_phone or None,
+                    norm_email or None,
+                    raw_name or "Dashboard Export Lead",
+                    raw_company or None,
+                    value,
+                    "Organic transaction saved: No corresponding historical click-session detected.",
+                ))
+                stats["organic_logged"] += 1
+            else:
+                if current_status and current_status[0] == "YES" and current_status[1] >= value:
+                    continue
+                    
+                cursor.execute("""
+                    UPDATE sessions SET 
+                        sale_closed = 'YES',
+                        value = ?,
+                        reason = ?,
+                        model_used = 'Dashboard Spreadsheet Ingest',
+                        match_fuzzy = ?,
+                        certainty_score = ?
+                    WHERE id = ?
+                """, (value, match_reason, match_fuzzy, certainty_score, matching_session_id))
+                stats["successful_matches"] += 1
+                
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Database upload error: {str(e)}")
+    finally:
+        conn.close()
+        
+    return {"status": "success", "stats": stats}
 
 
 @app.post("/dashboard/settings")
