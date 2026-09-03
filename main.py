@@ -1787,7 +1787,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                 .form-group {{ margin-bottom: 20px; }}
                 .form-row {{ display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }}
                 label {{ display: block; font-weight: 600; margin-bottom: 8px; font-size: 13px; color: #495057; }}
-                input[type="text"], select {{ width: 100%; padding: 10px 12px; border-radius: 6px; border: 1px solid #ced4da; box-sizing: border-box; font-size: 14px; outline: none; transition: border-color 0.2s; font-family: inherit; }}
+                input[type="text"], input[type="email"], select {{ width: 100%; padding: 10px 12px; border-radius: 6px; border: 1px solid #ced4da; box-sizing: border-box; font-size: 14px; outline: none; transition: border-color 0.2s; font-family: inherit; }}
                 input[type="text"]:focus, select:focus {{ border-color: #1a237e; }}
                 
                 .section-title {{ font-size: 16px; color: #1a237e; font-weight: bold; border-bottom: 1px solid #eaeaea; padding-bottom: 8px; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px; }}
@@ -2545,14 +2545,14 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     <h3 style="margin-top: 0; color: #1a237e; font-size: 15px;">✉️ Invite a New Collaborator</h3>
                     <div id="invite-alert" class="alert" style="margin-bottom: 15px; padding: 10px; font-size: 12px;"></div>
                     
-                    <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 15px;">
+                    <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 15px; align-items: flex-end;">
                         <div class="form-group" style="flex: 1; min-width: 250px; margin-bottom: 10px;">
                             <label for="invite_email" style="font-weight: bold; font-size: 11px; margin-bottom: 8px; display: block;">RECIPIENT EMAIL ADDRESS</label>
-                            <input type="email" id="invite_email" placeholder="e.g. employee@clientcompany.com" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ced4da; font-size: 13px; background: white;">
+                            <input type="email" id="invite_email" placeholder="e.g. employee@clientcompany.com" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ced4da; font-size: 13px; background: white; box-sizing: border-box;">
                         </div>
                         <div class="form-group" style="flex: 1; min-width: 200px; margin-bottom: 10px;">
                             <label for="invite_role" style="font-weight: bold; font-size: 11px; margin-bottom: 8px; display: block;">ACCESS LEVEL</label>
-                            <select id="invite_role" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ced4da; font-size: 13px; background: white; height: auto;">
+                            <select id="invite_role" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ced4da; font-size: 13px; background: white; height: 38px; box-sizing: border-box; cursor: pointer;">
                                 <option value="read">Read-Only (Viewer)</option>
                                 <option value="full">Full Function (Manager)</option>
                             </select>
