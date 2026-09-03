@@ -3182,6 +3182,169 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     }}
                 }}
                 
+                function generateStep5Instructions() {{
+                    const instructionsContainer = document.getElementById('step-5-instructions-container');
+                    if (!instructionsContainer) return;
+                    
+                    // Clear previous dynamic content
+                    instructionsContainer.innerHTML = '';
+                    
+                    const googleAds = document.getElementById('google_ads_customer_id').value.trim();
+                    const facebookAds = document.getElementById('facebook_ads_id').value.trim();
+                    const linkedinAds = document.getElementById('linkedin_ads_id').value.trim();
+                    const microsoftAds = document.getElementById('microsoft_ads_id').value.trim();
+                    const tiktokAds = document.getElementById('tiktok_ads_id').value.trim();
+                    const twitterAds = document.getElementById('twitter_ads_id').value.trim();
+                    const pinterestAds = document.getElementById('pinterest_ads_id').value.trim();
+                    
+                    let blocks = [];
+                    
+                    if (googleAds) {{
+                        blocks.push(`
+                            <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #4285F4; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
+                                <h4 style="margin-top: 0; color: #4285F4; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                                    🔍 Google Ads Goal Setup (ID: \${googleAds})
+                                </h4>
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
+                                    <li style="margin-bottom: 8px;">Log into your <strong>Google Ads account</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Navigate to <strong>Goals ➡️ Conversions ➡️ Summary</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Click <strong>+ New conversion action</strong>, select <strong>Import</strong>, choose <strong>Other data sources or CRMs</strong>, select <strong>Track conversions from clicks</strong>, and click <strong>Continue</strong>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 1 (Qualification):</strong> Set Goal Name to <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>. Under Category, choose <strong>Qualified Lead</strong>. Set Value to use a default value of <code>$1.00</code>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 2 (Offline Sale):</strong> Create a second conversion import action. Set Goal Name to <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>. Under Category, choose <strong>Purchase</strong> or <strong>Converted Lead</strong>. Set Value to <strong>Use different values for each conversion</strong> (defaulting to <code>$0.00</code>).</li>
+                                </ol>
+                            </div>
+                        `);
+                    }}
+                    
+                    if (facebookAds) {{
+                        blocks.push(`
+                            <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #1877F2; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
+                                <h4 style="margin-top: 0; color: #1877F2; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                                    🔵 Meta / Facebook Ads Goal Setup (Pixel: \${facebookAds})
+                                </h4>
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
+                                    <li style="margin-bottom: 8px;">Log into your <strong>Meta Events Manager</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Go to <strong>Custom Conversions</strong> in the left-hand navigation and click <strong>Create Custom Conversion</strong>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 1 (Qualification):</strong> Name the conversion <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>. Choose your Pixel, set the Event to <strong>Lead</strong>, and set rules if necessary.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 2 (Offline Sale):</strong> Create another Custom Conversion. Name it <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>, set the Event to <strong>Purchase</strong>, and ensure the value is mapped from the CSV uploads.</li>
+                                </ol>
+                            </div>
+                        `);
+                    }}
+                    
+                    if (linkedinAds) {{
+                        blocks.push(`
+                            <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #0A66C2; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                                <h4 style="margin-top: 0; color: #0A66C2; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                                    🔗 LinkedIn Ads Goal Setup (Account: \${linkedinAds})
+                                </h4>
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
+                                    <li style="margin-bottom: 8px;">Log into <strong>LinkedIn Campaign Manager</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Click <strong>Analyze ➡️ Conversion Tracking</strong> in the left sidebar.</li>
+                                    <li style="margin-bottom: 8px;">Click <strong>Create Conversion</strong>, and configure:
+                                        <ul style="list-style-type: disc; padding-left: 15px; margin-top: 4px;">
+                                            <li><strong>Goal 1 (Qualification):</strong> Name it <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>, set key event to <strong>Lead</strong>, and choose <strong>Offline Upload (CSV)</strong> as your tracking method.</li>
+                                            <li><strong>Goal 2 (Offline Sale):</strong> Create another conversion. Name it <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>, set event type to <strong>Purchase</strong>, and select <strong>Offline Upload (CSV)</strong>.</li>
+                                        </ul>
+                                    </li>
+                                </ol>
+                            </div>
+                        `);
+                    }}
+                    
+                    if (microsoftAds) {{
+                        blocks.push(`
+                            <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #00A4EF; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                                <h4 style="margin-top: 0; color: #00A4EF; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                                    🟢 Microsoft (Bing) Ads Goal Setup (ID: \${microsoftAds})
+                                </h4>
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
+                                    <li style="margin-bottom: 8px;">Log into your <strong>Microsoft Advertising Dashboard</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Go to <strong>Tools ➡️ Conversion goals</strong> and click <strong>Create</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Choose <strong>Offline conversions</strong> as the goal type.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 1 (Qualification):</strong> Name the goal <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>. Choose <strong>Lead</strong> as the goal category.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 2 (Offline Sale):</strong> Create another goal. Name it <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>, category as <strong>Purchase/Sale</strong>, and select <strong>Each time it happens, the conversion value may vary</strong>.</li>
+                                </ol>
+                            </div>
+                        `);
+                    }}
+                    
+                    if (tiktokAds) {{
+                        blocks.push(`
+                            <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #010101; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                                <h4 style="margin-top: 0; color: #010101; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                                    🎵 TikTok Ads Goal Setup (Pixel: \${tiktokAds})
+                                </h4>
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
+                                    <li style="margin-bottom: 8px;">Log into your <strong>TikTok Ads Manager</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Go to <strong>Tools ➡️ Events ➡️ Offline Events</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Create a new Offline Event Set, and define conversion rules:
+                                        <ul style="list-style-type: disc; padding-left: 15px; margin-top: 4px;">
+                                            <li><strong>Goal 1 (Qualification):</strong> Name it <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>, mapped to event category <strong>Contact</strong>.</li>
+                                            <li><strong>Goal 2 (Offline Sale):</strong> Name it <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>, mapped to event category <strong>CompletePayment</strong>.</li>
+                                        </ul>
+                                    </li>
+                                </ol>
+                            </div>
+                        `);
+                    }}
+                    
+                    if (twitterAds) {{
+                        blocks.push(`
+                            <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #15202B; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                                <h4 style="margin-top: 0; color: #15202B; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                                    🐦 X (Twitter) Ads Goal Setup (Pixel: \${twitterAds})
+                                </h4>
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
+                                    <li style="margin-bottom: 8px;">Log into your <strong>X Ads Manager</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Go to <strong>Tools ➡️ Events Manager</strong> and click <strong>Add Event</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Select <strong>Offline</strong> as the conversion tracking type:
+                                        <ul style="list-style-type: disc; padding-left: 15px; margin-top: 4px;">
+                                            <li><strong>Goal 1 (Qualification):</strong> Name the event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 12px; font-family: monospace;">LeadGroove Qualified Lead</code>, event type <strong>Lead</strong>.</li>
+                                            <li><strong>Goal 2 (Offline Sale):</strong> Name the event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 12px; font-family: monospace;">LeadGroove Offline Sale</code>, event type <strong>Purchase</strong>.</li>
+                                        </ul>
+                                    </li>
+                                </ol>
+                            </div>
+                        `);
+                    }}
+                    
+                    if (pinterestAds) {{
+                        blocks.push(`
+                            <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #E60023; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                                <h4 style="margin-top: 0; color: #E60023; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                                    📌 Pinterest Ads Goal Setup (Tag: \${pinterestAds})
+                                </h4>
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
+                                    <li style="margin-bottom: 8px;">Log into your <strong>Pinterest Ads Manager</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Go to <strong>Ads ➡️ Conversions</strong> and select <strong>Offline conversions</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Click <strong>Create conversion event</strong>:
+                                        <ul style="list-style-type: disc; padding-left: 15px; margin-top: 4px;">
+                                            <li><strong>Goal 1 (Qualification):</strong> Set event name to <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>, category <strong>Lead</strong>.</li>
+                                            <li><strong>Goal 2 (Offline Sale):</strong> Set event name to <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>, category <strong>Checkout</strong>.</li>
+                                        </ul>
+                                    </li>
+                                </ol>
+                            </div>
+                        `);
+                    }}
+                    
+                    if (blocks.length === 0) {{
+                        instructionsContainer.innerHTML = `
+                            <div style="text-align: center; color: #666; padding: 30px; border: 1px dashed #ccc; border-radius: 6px; background: #fafafa;">
+                                <span style="font-size: 24px; display: block; margin-bottom: 10px;">ℹ️</span>
+                                No advertising account IDs were entered in Step 1. If you added them later, please configure custom conversions on your ad networks matching the names:
+                                <br><br>
+                                <code style="background: #f1f3f4; padding: 4px 10px; border-radius: 3px; font-weight: bold; font-size: 14px; font-family: monospace; color: #1a237e;">LeadGroove Qualified Lead</code>
+                                <br><span style="font-size: 11px; color: #888;">and</span><br>
+                                <code style="background: #f1f3f4; padding: 4px 10px; border-radius: 3px; font-weight: bold; font-size: 14px; font-family: monospace; color: #1a237e;">LeadGroove Offline Sale</code>
+                            </div>
+                        `;
+                    }} else {{
+                        instructionsContainer.innerHTML = blocks.join('');
+                    }}
+                }}
+
                 function toggleSOTFields() {{
                     const sot = document.getElementById('source_of_truth').value;
                     const leadGenRadio = document.querySelector('input[name="lead_gen_method"]:checked');
@@ -4405,6 +4568,7 @@ def add_client_page(request: Request):
                     <div class="step-circle" data-step="2">2</div>
                     <div class="step-circle" data-step="3">3</div>
                     <div class="step-circle" data-step="4">4</div>
+                    <div class="step-circle" data-step="5">5</div>
                 </div>
                 
                 <div id="alert-box" class="alert alert-error"></div>
@@ -4903,6 +5067,23 @@ def add_client_page(request: Request):
                         </div>
                     </div>
                     
+                    <!-- STEP 5: Ad Goals & Conversions Setup -->
+                    <div class="wizard-step" id="step-panel-5">
+                        <div class="instructions">
+                            🎯 <strong>Step 5: Ad Accounts Goal & Conversion Setup</strong><br>
+                            To allow conversion uploads to sync successfully, you must create these 2 matching goals/events inside your active ad networks. Use these exact, standardized goal names for consistency across all systems.
+                        </div>
+                        
+                        <div style="background: #fff8e1; border-left: 4px solid #ffb300; padding: 15px; border-radius: 6px; color: #5d4037; font-size: 13px; line-height: 1.5; margin-bottom: 25px;">
+                            📋 <strong>Ad Platform Goal Consistency Rule:</strong><br>
+                            Make sure you name these 2 custom conversions or offline goals <strong>EXACTLY</strong> as shown below in your ad managers. Our CSV spreadsheet exports write these specific, standardized names in every row to trigger conversion syncs!
+                        </div>
+                        
+                        <div id="step-5-instructions-container" style="max-height: 450px; overflow-y: auto; padding: 5px; border-radius: 6px;">
+                            <!-- Dynamically generated instructions will be injected here -->
+                        </div>
+                    </div>
+                    
                     <!-- Navigation Panel -->
                     <div class="nav-buttons">
                         <button type="button" class="btn-nav secondary" id="prev-btn" onclick="changeStep(-1)" style="visibility: hidden;">⬅️ Back</button>
@@ -5107,7 +5288,7 @@ def add_client_page(request: Request):
                 }
 
                 let currentStep = 1;
-                const totalSteps = 4;
+                const totalSteps = 5;
                 
                 function updateProgressBar() {
                     const percent = ((currentStep - 1) / (totalSteps - 1)) * 100;
@@ -5165,6 +5346,10 @@ def add_client_page(request: Request):
                     document.getElementById(`step-panel-${currentStep}`).classList.remove('active');
                     currentStep += direction;
                     document.getElementById(`step-panel-${currentStep}`).classList.add('active');
+                    
+                    if (currentStep === 5) {{
+                        generateStep5Instructions();
+                    }}
                     
                     const prevBtn = document.getElementById('prev-btn');
                     const nextBtn = document.getElementById('next-btn');
@@ -5334,6 +5519,169 @@ def add_client_page(request: Request):
                     }
                 }
                 
+                function generateStep5Instructions() {{
+                    const instructionsContainer = document.getElementById('step-5-instructions-container');
+                    if (!instructionsContainer) return;
+                    
+                    // Clear previous dynamic content
+                    instructionsContainer.innerHTML = '';
+                    
+                    const googleAds = document.getElementById('google_ads_customer_id').value.trim();
+                    const facebookAds = document.getElementById('facebook_ads_id').value.trim();
+                    const linkedinAds = document.getElementById('linkedin_ads_id').value.trim();
+                    const microsoftAds = document.getElementById('microsoft_ads_id').value.trim();
+                    const tiktokAds = document.getElementById('tiktok_ads_id').value.trim();
+                    const twitterAds = document.getElementById('twitter_ads_id').value.trim();
+                    const pinterestAds = document.getElementById('pinterest_ads_id').value.trim();
+                    
+                    let blocks = [];
+                    
+                    if (googleAds) {{
+                        blocks.push(`
+                            <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #4285F4; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
+                                <h4 style="margin-top: 0; color: #4285F4; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                                    🔍 Google Ads Goal Setup (ID: \${googleAds})
+                                </h4>
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
+                                    <li style="margin-bottom: 8px;">Log into your <strong>Google Ads account</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Navigate to <strong>Goals ➡️ Conversions ➡️ Summary</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Click <strong>+ New conversion action</strong>, select <strong>Import</strong>, choose <strong>Other data sources or CRMs</strong>, select <strong>Track conversions from clicks</strong>, and click <strong>Continue</strong>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 1 (Qualification):</strong> Set Goal Name to <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>. Under Category, choose <strong>Qualified Lead</strong>. Set Value to use a default value of <code>$1.00</code>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 2 (Offline Sale):</strong> Create a second conversion import action. Set Goal Name to <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>. Under Category, choose <strong>Purchase</strong> or <strong>Converted Lead</strong>. Set Value to <strong>Use different values for each conversion</strong> (defaulting to <code>$0.00</code>).</li>
+                                </ol>
+                            </div>
+                        `);
+                    }}
+                    
+                    if (facebookAds) {{
+                        blocks.push(`
+                            <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #1877F2; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
+                                <h4 style="margin-top: 0; color: #1877F2; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                                    🔵 Meta / Facebook Ads Goal Setup (Pixel: \${facebookAds})
+                                </h4>
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
+                                    <li style="margin-bottom: 8px;">Log into your <strong>Meta Events Manager</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Go to <strong>Custom Conversions</strong> in the left-hand navigation and click <strong>Create Custom Conversion</strong>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 1 (Qualification):</strong> Name the conversion <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>. Choose your Pixel, set the Event to <strong>Lead</strong>, and set rules if necessary.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 2 (Offline Sale):</strong> Create another Custom Conversion. Name it <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>, set the Event to <strong>Purchase</strong>, and ensure the value is mapped from the CSV uploads.</li>
+                                </ol>
+                            </div>
+                        `);
+                    }}
+                    
+                    if (linkedinAds) {{
+                        blocks.push(`
+                            <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #0A66C2; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                                <h4 style="margin-top: 0; color: #0A66C2; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                                    🔗 LinkedIn Ads Goal Setup (Account: \${linkedinAds})
+                                </h4>
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
+                                    <li style="margin-bottom: 8px;">Log into <strong>LinkedIn Campaign Manager</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Click <strong>Analyze ➡️ Conversion Tracking</strong> in the left sidebar.</li>
+                                    <li style="margin-bottom: 8px;">Click <strong>Create Conversion</strong>, and configure:
+                                        <ul style="list-style-type: disc; padding-left: 15px; margin-top: 4px;">
+                                            <li><strong>Goal 1 (Qualification):</strong> Name it <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>, set key event to <strong>Lead</strong>, and choose <strong>Offline Upload (CSV)</strong> as your tracking method.</li>
+                                            <li><strong>Goal 2 (Offline Sale):</strong> Create another conversion. Name it <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>, set event type to <strong>Purchase</strong>, and select <strong>Offline Upload (CSV)</strong>.</li>
+                                        </ul>
+                                    </li>
+                                </ol>
+                            </div>
+                        `);
+                    }}
+                    
+                    if (microsoftAds) {{
+                        blocks.push(`
+                            <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #00A4EF; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                                <h4 style="margin-top: 0; color: #00A4EF; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                                    🟢 Microsoft (Bing) Ads Goal Setup (ID: \${microsoftAds})
+                                </h4>
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
+                                    <li style="margin-bottom: 8px;">Log into your <strong>Microsoft Advertising Dashboard</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Go to <strong>Tools ➡️ Conversion goals</strong> and click <strong>Create</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Choose <strong>Offline conversions</strong> as the goal type.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 1 (Qualification):</strong> Name the goal <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>. Choose <strong>Lead</strong> as the goal category.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 2 (Offline Sale):</strong> Create another goal. Name it <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>, category as <strong>Purchase/Sale</strong>, and select <strong>Each time it happens, the conversion value may vary</strong>.</li>
+                                </ol>
+                            </div>
+                        `);
+                    }}
+                    
+                    if (tiktokAds) {{
+                        blocks.push(`
+                            <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #010101; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                                <h4 style="margin-top: 0; color: #010101; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                                    🎵 TikTok Ads Goal Setup (Pixel: \${tiktokAds})
+                                </h4>
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
+                                    <li style="margin-bottom: 8px;">Log into your <strong>TikTok Ads Manager</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Go to <strong>Tools ➡️ Events ➡️ Offline Events</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Create a new Offline Event Set, and define conversion rules:
+                                        <ul style="list-style-type: disc; padding-left: 15px; margin-top: 4px;">
+                                            <li><strong>Goal 1 (Qualification):</strong> Name it <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>, mapped to event category <strong>Contact</strong>.</li>
+                                            <li><strong>Goal 2 (Offline Sale):</strong> Name it <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>, mapped to event category <strong>CompletePayment</strong>.</li>
+                                        </ul>
+                                    </li>
+                                </ol>
+                            </div>
+                        `);
+                    }}
+                    
+                    if (twitterAds) {{
+                        blocks.push(`
+                            <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #15202B; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                                <h4 style="margin-top: 0; color: #15202B; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                                    🐦 X (Twitter) Ads Goal Setup (Pixel: \${twitterAds})
+                                </h4>
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
+                                    <li style="margin-bottom: 8px;">Log into your <strong>X Ads Manager</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Go to <strong>Tools ➡️ Events Manager</strong> and click <strong>Add Event</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Select <strong>Offline</strong> as the conversion tracking type:
+                                        <ul style="list-style-type: disc; padding-left: 15px; margin-top: 4px;">
+                                            <li><strong>Goal 1 (Qualification):</strong> Name the event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 12px; font-family: monospace;">LeadGroove Qualified Lead</code>, event type <strong>Lead</strong>.</li>
+                                            <li><strong>Goal 2 (Offline Sale):</strong> Name the event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 12px; font-family: monospace;">LeadGroove Offline Sale</code>, event type <strong>Purchase</strong>.</li>
+                                        </ul>
+                                    </li>
+                                </ol>
+                            </div>
+                        `);
+                    }}
+                    
+                    if (pinterestAds) {{
+                        blocks.push(`
+                            <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #E60023; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                                <h4 style="margin-top: 0; color: #E60023; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                                    📌 Pinterest Ads Goal Setup (Tag: \${pinterestAds})
+                                </h4>
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
+                                    <li style="margin-bottom: 8px;">Log into your <strong>Pinterest Ads Manager</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Go to <strong>Ads ➡️ Conversions</strong> and select <strong>Offline conversions</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Click <strong>Create conversion event</strong>:
+                                        <ul style="list-style-type: disc; padding-left: 15px; margin-top: 4px;">
+                                            <li><strong>Goal 1 (Qualification):</strong> Set event name to <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>, category <strong>Lead</strong>.</li>
+                                            <li><strong>Goal 2 (Offline Sale):</strong> Set event name to <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>, category <strong>Checkout</strong>.</li>
+                                        </ul>
+                                    </li>
+                                </ol>
+                            </div>
+                        `);
+                    }}
+                    
+                    if (blocks.length === 0) {{
+                        instructionsContainer.innerHTML = `
+                            <div style="text-align: center; color: #666; padding: 30px; border: 1px dashed #ccc; border-radius: 6px; background: #fafafa;">
+                                <span style="font-size: 24px; display: block; margin-bottom: 10px;">ℹ️</span>
+                                No advertising account IDs were entered in Step 1. If you added them later, please configure custom conversions on your ad networks matching the names:
+                                <br><br>
+                                <code style="background: #f1f3f4; padding: 4px 10px; border-radius: 3px; font-weight: bold; font-size: 14px; font-family: monospace; color: #1a237e;">LeadGroove Qualified Lead</code>
+                                <br><span style="font-size: 11px; color: #888;">and</span><br>
+                                <code style="background: #f1f3f4; padding: 4px 10px; border-radius: 3px; font-weight: bold; font-size: 14px; font-family: monospace; color: #1a237e;">LeadGroove Offline Sale</code>
+                            </div>
+                        `;
+                    }} else {{
+                        instructionsContainer.innerHTML = blocks.join('');
+                    }}
+                }}
+
                 function toggleSOTFields() {
                     const sot = document.getElementById('source_of_truth').value;
                     const leadGenRadio = document.querySelector('input[name="lead_gen_method"]:checked');
@@ -5938,10 +6286,10 @@ def export_google_conversions(request: Request, client_id: int):
         conv_time = f"{created_at} +0000" if created_at else ""
         
         if sale_closed == 'YES':
-            conv_name = "Converted Lead"
+            conv_name = "LeadGroove Offline Sale"
             conv_value = float(value or 0.0)
         else:
-            conv_name = "Qualified Lead"
+            conv_name = "LeadGroove Qualified Lead"
             conv_value = 1.0  # Default lead qualification value
             
         writer.writerow([gclid, conv_name, conv_time, conv_value, "USD"])
@@ -6002,10 +6350,10 @@ def export_facebook_conversions(request: Request, client_id: int):
         conv_time = f"{created_at}"
         
         if sale_closed == 'YES':
-            event_name = "Purchase"
+            event_name = "LeadGroove Offline Sale"
             event_val = float(value or 0.0)
         else:
-            event_name = "Lead"
+            event_name = "LeadGroove Qualified Lead"
             event_val = 1.0
             
         writer.writerow([fbclid, event_name, conv_time, f"{event_val:.2f}", "USD", pixel_id])
@@ -6065,10 +6413,10 @@ def export_linkedin_conversions(request: Request, client_id: int):
         conv_time = f"{created_at} +0000"
         
         if sale_closed == 'YES':
-            conv_name = "Offline Purchase"
+            conv_name = "LeadGroove Offline Sale"
             conv_val = float(value or 0.0)
         else:
-            conv_name = "Qualified Lead"
+            conv_name = "LeadGroove Qualified Lead"
             conv_val = 1.0
             
         writer.writerow([li_fat_id, conv_name, conv_time, f"{conv_val:.2f}", "USD", linkedin_account_id])
@@ -6128,10 +6476,10 @@ def export_microsoft_conversions(request: Request, client_id: int):
         conv_time = f"{created_at} +0000"
         
         if sale_closed == 'YES':
-            conv_name = "Offline Transaction"
+            conv_name = "LeadGroove Offline Sale"
             conv_val = float(value or 0.0)
         else:
-            conv_name = "Qualified Lead"
+            conv_name = "LeadGroove Qualified Lead"
             conv_val = 1.0
             
         writer.writerow([msclkid, conv_name, conv_time, f"{conv_val:.2f}", "USD", microsoft_id])
@@ -6177,10 +6525,10 @@ def export_tiktok_conversions(request: Request, client_id: int):
         ttclid, qualified, sale_closed, value, created_at = r
         conv_time = f"{created_at}"
         if sale_closed == 'YES':
-            event_name = "CompletePayment"
+            event_name = "LeadGroove Offline Sale"
             event_val = float(value or 0.0)
         else:
-            event_name = "Contact"
+            event_name = "LeadGroove Qualified Lead"
             event_val = 1.0
         writer.writerow([ttclid, event_name, conv_time, f"{event_val:.2f}", "USD", pixel_id])
     output.seek(0)
@@ -6223,10 +6571,10 @@ def export_twitter_conversions(request: Request, client_id: int):
         twclid, qualified, sale_closed, value, created_at = r
         conv_time = f"{created_at}"
         if sale_closed == 'YES':
-            event_name = "Purchase"
+            event_name = "LeadGroove Offline Sale"
             event_val = float(value or 0.0)
         else:
-            event_name = "Lead"
+            event_name = "LeadGroove Qualified Lead"
             event_val = 1.0
         writer.writerow([twclid, event_name, conv_time, f"{event_val:.2f}", "USD", pixel_id])
     output.seek(0)
@@ -6269,10 +6617,10 @@ def export_pinterest_conversions(request: Request, client_id: int):
         pin_clid, qualified, sale_closed, value, created_at = r
         conv_time = f"{created_at}"
         if sale_closed == 'YES':
-            event_name = "Checkout"
+            event_name = "LeadGroove Offline Sale"
             event_val = float(value or 0.0)
         else:
-            event_name = "Lead"
+            event_name = "LeadGroove Qualified Lead"
             event_val = 1.0
         writer.writerow([pin_clid, event_name, conv_time, f"{event_val:.2f}", "USD", tag_id])
     output.seek(0)
