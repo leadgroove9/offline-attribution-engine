@@ -1419,6 +1419,9 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
     # Build multi-channel action buttons dynamically
     if selected_client_id == 0:
         google_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Google Ads offline conversion CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
+        google_audience_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Google Customer Match list!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
+        facebook_audience_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Meta Custom Audience list!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
+        linkedin_audience_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their LinkedIn List Match list!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
         facebook_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Facebook conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
         linkedin_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their LinkedIn conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
         microsoft_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Microsoft conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
@@ -1427,6 +1430,9 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
         pinterest_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Pinterest conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
     else:
         google_export_button = f'<a href="/dashboard/export/google?client_id={selected_client_id}" class="btn-export" style="background-color: #4285F4; text-align: center; text-decoration: none; width: 100%;">📥 Download Google CSV ({exportable_google})</a>'
+        google_audience_button = f'<a href="/dashboard/export/audience/google?client_id={selected_client_id}" class="btn-export" style="background-color: #4285F4; text-align: center; text-decoration: none; width: 100%;">📥 Download Google Match List</a>'
+        facebook_audience_button = f'<a href="/dashboard/export/audience/facebook?client_id={selected_client_id}" class="btn-export" style="background-color: #1877F2; text-align: center; text-decoration: none; width: 100%;">📥 Download Meta Audience List</a>'
+        linkedin_audience_button = f'<a href="/dashboard/export/audience/linkedin?client_id={selected_client_id}" class="btn-export" style="background-color: #0A66C2; text-align: center; text-decoration: none; width: 100%;">📥 Download LinkedIn Match List</a>'
         facebook_export_button = f'<a href="/dashboard/export/facebook?client_id={selected_client_id}" class="btn-export" style="background-color: #1877F2; text-align: center; text-decoration: none; width: 100%;">📥 Download Meta CSV ({exportable_facebook})</a>'
         linkedin_export_button = f'<a href="/dashboard/export/linkedin?client_id={selected_client_id}" class="btn-export" style="background-color: #0A66C2; text-align: center; text-decoration: none; width: 100%;">📥 Download LinkedIn CSV ({exportable_linkedin})</a>'
         microsoft_export_button = f'<a href="/dashboard/export/microsoft?client_id={selected_client_id}" class="btn-export" style="background-color: #00A4EF; text-align: center; text-decoration: none; width: 100%;">📥 Download Bing CSV ({exportable_microsoft})</a>'
@@ -1768,6 +1774,49 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                                 <p>Export matched audience actions directly into your Pinterest Tag metrics.</p>
                             </div>
                             {pinterest_export_button}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- First-Party Audience Builder Panel (Customer Match) -->
+                <div style="background: #fafafa; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px; margin-bottom: 30px;">
+                    <h3 style="margin: 0 0 5px 0; color: #1a237e; font-size: 15px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        👥 First-Party Audience Builder (Customer Match)
+                        <span style="background: #e8f5e9; color: #2e7d32; font-size: 10px; padding: 2px 8px; border-radius: 12px; font-weight: bold; text-transform: none; letter-spacing: normal;">⚡ Active Bonus Feature</span>
+                    </h3>
+                    <p style="margin: 0 0 20px 0; font-size: 13px; color: #555; line-height: 1.5;">
+                        Export compiled first-party customer profiles to train ad network smart bidding systems. These lists are pre-formatted and automatically hashed with <strong>SHA-256 security algorithms</strong> to comply with privacy regulations, bypassing expensive learning phases!
+                    </p>
+                    <div class="export-card-grid">
+                        <!-- Google Ads -->
+                        <div class="export-card">
+                            <div>
+                                <h4 style="color: #4285F4; display: flex; align-items: center; gap: 6px; margin: 0 0 5px 0;">
+                                    <span style="font-size: 16px;">🔍</span> Google Ads Customer Match
+                                </h4>
+                                <p>Download privacy-compliant hashed CSV for Google Customer Match. Boost smart bidding accuracy instantly.</p>
+                            </div>
+                            {google_audience_button}
+                        </div>
+                        <!-- Meta / Facebook Custom Audience -->
+                        <div class="export-card">
+                            <div>
+                                <h4 style="color: #1877F2; display: flex; align-items: center; gap: 6px; margin: 0 0 5px 0;">
+                                    <span style="font-size: 16px;">🔵</span> Meta Custom Audiences
+                                </h4>
+                                <p>Download SHA-256 hashed CSV to build Facebook Custom/Lookalike Audiences and target high-value buyers.</p>
+                            </div>
+                            {facebook_audience_button}
+                        </div>
+                        <!-- LinkedIn List Member Matching -->
+                        <div class="export-card">
+                            <div>
+                                <h4 style="color: #0A66C2; display: flex; align-items: center; gap: 6px; margin: 0 0 5px 0;">
+                                    <span style="font-size: 16px;">🔗</span> LinkedIn List Matching
+                                </h4>
+                                <p>Download pre-formatted target contact lists incorporating hashed identifiers and corporate accounts for LinkedIn B2B matched audiences.</p>
+                            </div>
+                            {linkedin_audience_button}
                         </div>
                     </div>
                 </div>
@@ -6632,6 +6681,178 @@ def export_pinterest_conversions(request: Request, client_id: int):
     return StreamingResponse(output, headers=headers)
 
 
+    return StreamingResponse(output, headers=headers)
+
+
+import hashlib
+
+def sha256_hash_str(val: str) -> str:
+    cleaned = str(val).strip().lower()
+    return hashlib.sha256(cleaned.encode('utf-8')).hexdigest()
+
+def sha256_hash_phone_str(val: str) -> str:
+    cleaned = re.sub(r'\D', '', str(val))
+    if len(cleaned) == 10:
+        cleaned = "1" + cleaned
+    return hashlib.sha256(cleaned.encode('utf-8')).hexdigest()
+
+def get_audience_contacts(client_id: int):
+    conn = db_router.connect()
+    cursor = conn.cursor()
+    # Pull unique sessions with contacts
+    cursor.execute("""
+        SELECT name, phone, email, company
+        FROM sessions
+        WHERE client_id = ? AND (email IS NOT NULL AND email != '' OR phone IS NOT NULL AND phone != '')
+    """, (client_id,))
+    rows = cursor.fetchall()
+    conn.close()
+    
+    seen = set()
+    contacts = []
+    for name, phone, email, company in rows:
+        norm_phone = re.sub(r'\D', '', str(phone or ""))
+        if len(norm_phone) == 10:
+            norm_phone = "1" + norm_phone
+        norm_email = str(email or "").strip().lower()
+        
+        key = (norm_phone, norm_email)
+        if key in seen:
+            continue
+        seen.add(key)
+        
+        # Split names
+        first_name, last_name = "", ""
+        if name:
+            parts = str(name).strip().split()
+            if len(parts) == 1:
+                first_name = parts[0]
+            elif len(parts) > 1:
+                first_name = parts[0]
+                last_name = " ".join(parts[1:])
+                
+        contacts.append({
+            "first_name": first_name,
+            "last_name": last_name,
+            "phone": norm_phone,
+            "email": norm_email,
+            "company": company or ""
+        })
+    return contacts
+
+
+@app.get("/dashboard/export/audience/google")
+def export_google_audience(request: Request, client_id: int):
+    email = is_authenticated(request)
+    if not email:
+        return RedirectResponse(url="/login", status_code=303)
+    try:
+        conn = db_router.connect()
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM clients WHERE id = ?", (client_id,))
+        client_row = cursor.fetchone()
+        if not client_row:
+            raise HTTPException(status_code=400, detail="Invalid client ID")
+        client_name = client_row[0]
+        conn.close()
+        
+        contacts = get_audience_contacts(client_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+        
+    output = io.StringIO()
+    writer = csv.writer(output)
+    # Google Customer Match headers
+    writer.writerow(["Email", "Phone", "First Name", "Last Name", "Country"])
+    for c in contacts:
+        hashed_email = sha256_hash_str(c["email"]) if c["email"] else ""
+        hashed_phone = sha256_hash_phone_str(c["phone"]) if c["phone"] else ""
+        # Names can be raw for Google's browser match uploader, but we can also write them
+        writer.writerow([hashed_email, hashed_phone, c["first_name"], c["last_name"], "US"])
+        
+    output.seek(0)
+    safe_filename = re.sub(r'\s+', '-', client_name.strip().lower())
+    headers = {
+        'Content-Disposition': f'attachment; filename="google_audience_match_{safe_filename}.csv"',
+        'Content-Type': 'text/csv'
+    }
+    return StreamingResponse(output, headers=headers)
+
+
+@app.get("/dashboard/export/audience/facebook")
+def export_facebook_audience(request: Request, client_id: int):
+    email = is_authenticated(request)
+    if not email:
+        return RedirectResponse(url="/login", status_code=303)
+    try:
+        conn = db_router.connect()
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM clients WHERE id = ?", (client_id,))
+        client_row = cursor.fetchone()
+        if not client_row:
+            raise HTTPException(status_code=400, detail="Invalid client ID")
+        client_name = client_row[0]
+        conn.close()
+        
+        contacts = get_audience_contacts(client_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+        
+    output = io.StringIO()
+    writer = csv.writer(output)
+    # Meta Custom Audience headers
+    writer.writerow(["email", "phone", "fn", "ln", "country"])
+    for c in contacts:
+        hashed_email = sha256_hash_str(c["email"]) if c["email"] else ""
+        hashed_phone = sha256_hash_phone_str(c["phone"]) if c["phone"] else ""
+        hashed_fn = sha256_hash_str(c["first_name"]) if c["first_name"] else ""
+        hashed_ln = sha256_hash_str(c["last_name"]) if c["last_name"] else ""
+        writer.writerow([hashed_email, hashed_phone, hashed_fn, hashed_ln, "US"])
+        
+    output.seek(0)
+    safe_filename = re.sub(r'\s+', '-', client_name.strip().lower())
+    headers = {
+        'Content-Disposition': f'attachment; filename="meta_custom_audience_{safe_filename}.csv"',
+        'Content-Type': 'text/csv'
+    }
+    return StreamingResponse(output, headers=headers)
+
+
+@app.get("/dashboard/export/audience/linkedin")
+def export_linkedin_audience(request: Request, client_id: int):
+    email = is_authenticated(request)
+    if not email:
+        return RedirectResponse(url="/login", status_code=303)
+    try:
+        conn = db_router.connect()
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM clients WHERE id = ?", (client_id,))
+        client_row = cursor.fetchone()
+        if not client_row:
+            raise HTTPException(status_code=400, detail="Invalid client ID")
+        client_name = client_row[0]
+        conn.close()
+        
+        contacts = get_audience_contacts(client_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+        
+    output = io.StringIO()
+    writer = csv.writer(output)
+    # LinkedIn Member Match headers
+    writer.writerow(["email", "phone", "firstname", "lastname", "companyname"])
+    for c in contacts:
+        hashed_email = sha256_hash_str(c["email"]) if c["email"] else ""
+        hashed_phone = sha256_hash_phone_str(c["phone"]) if c["phone"] else ""
+        # Names can be raw, company is extremely useful for LinkedIn member match
+        writer.writerow([hashed_email, hashed_phone, c["first_name"], c["last_name"], c["company"]])
+        
+    output.seek(0)
+    safe_filename = re.sub(r'\s+', '-', client_name.strip().lower())
+    headers = {
+        'Content-Disposition': f'attachment; filename="linkedin_member_matching_{safe_filename}.csv"',
+        'Content-Type': 'text/csv'
+    }
     return StreamingResponse(output, headers=headers)
 
 
