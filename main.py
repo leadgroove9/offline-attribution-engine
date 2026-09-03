@@ -437,6 +437,9 @@ def init_db():
     
     cols_to_verify = [
         ("facebook_ads_id", "TEXT"),
+        ("tiktok_ads_id", "TEXT"),
+        ("twitter_ads_id", "TEXT"),
+        ("pinterest_ads_id", "TEXT"),
         ("linkedin_ads_id", "TEXT"),
         ("microsoft_ads_id", "TEXT"),
         ("lead_gen_method", "TEXT"),
@@ -529,6 +532,9 @@ def init_db():
     existing_session_cols = [col[1] for col in cursor.fetchall()]
     session_cols_to_verify = [
         ("fbclid", "TEXT"),
+        ("ttclid", "TEXT"),
+        ("twclid", "TEXT"),
+        ("pin_clid", "TEXT"),
         ("li_fat_id", "TEXT"),
         ("msclkid", "TEXT"),
         ("match_fuzzy", "TEXT DEFAULT 'NO'"),
@@ -797,6 +803,9 @@ class FormLead(BaseModel):
     fbclid: Optional[str] = None
     li_fat_id: Optional[str] = None
     msclkid: Optional[str] = None
+    ttclid: Optional[str] = None
+    twclid: Optional[str] = None
+    pin_clid: Optional[str] = None
 
 
 class ExcludedCustomer(BaseModel):
@@ -817,6 +826,9 @@ class ClientCreate(BaseModel):
     wc_profile_id: Optional[str] = "" 
     google_ads_customer_id: str
     facebook_ads_id: Optional[str] = ""
+    tiktok_ads_id: Optional[str] = ""
+    twitter_ads_id: Optional[str] = ""
+    pinterest_ads_id: Optional[str] = ""
     linkedin_ads_id: Optional[str] = ""
     microsoft_ads_id: Optional[str] = ""
     lead_gen_method: str
@@ -1259,7 +1271,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
         cursor = conn.cursor()
         
         # 1. Fetch All Available Clients for the Dropdown Selector
-        cursor.execute("SELECT id, name, google_ads_customer_id, facebook_ads_id, linkedin_ads_id, microsoft_ads_id FROM clients ORDER BY name ASC")
+        cursor.execute("SELECT id, name, google_ads_customer_id, facebook_ads_id, linkedin_ads_id, microsoft_ads_id, tiktok_ads_id, twitter_ads_id, pinterest_ads_id FROM clients ORDER BY name ASC")
         clients = cursor.fetchall()
         
         # Determine filtering
@@ -1280,7 +1292,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
         if selected_client_id == 0:
             # Multi-Client (All Clients) View - Join with clients table to display client names
             cursor.execute("""
-                SELECT s.id, s.phone, s.email, s.name, s.company, s.gclid, s.source, s.qualified, s.sale_closed, s.value, s.reason, s.created_at, c.name, s.fbclid, s.li_fat_id, s.msclkid, s.match_fuzzy, s.certainty_score
+                SELECT s.id, s.phone, s.email, s.name, s.company, s.gclid, s.source, s.qualified, s.sale_closed, s.value, s.reason, s.created_at, c.name, s.fbclid, s.li_fat_id, s.msclkid, s.match_fuzzy, s.certainty_score, s.ttclid, s.twclid, s.pin_clid
                 FROM sessions s
                 LEFT JOIN clients c ON s.client_id = c.id
                 ORDER BY s.created_at DESC
@@ -1291,7 +1303,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
         else:
             # Single-Client Filtered View
             cursor.execute("""
-                SELECT s.id, s.phone, s.email, s.name, s.company, s.gclid, s.source, s.qualified, s.sale_closed, s.value, s.reason, s.created_at, c.name, s.fbclid, s.li_fat_id, s.msclkid, s.match_fuzzy, s.certainty_score
+                SELECT s.id, s.phone, s.email, s.name, s.company, s.gclid, s.source, s.qualified, s.sale_closed, s.value, s.reason, s.created_at, c.name, s.fbclid, s.li_fat_id, s.msclkid, s.match_fuzzy, s.certainty_score, s.ttclid, s.twclid, s.pin_clid
                 FROM sessions s
                 LEFT JOIN clients c ON s.client_id = c.id
                 WHERE s.client_id = ?
@@ -1320,6 +1332,9 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
     exportable_facebook = sum(1 for r in rows if r[13] and (r[7] == 'YES' or r[8] == 'YES'))
     exportable_linkedin = sum(1 for r in rows if r[14] and (r[7] == 'YES' or r[8] == 'YES'))
     exportable_microsoft = sum(1 for r in rows if r[15] and (r[7] == 'YES' or r[8] == 'YES'))
+    exportable_tiktok = sum(1 for r in rows if len(r) > 18 and r[18] and (r[7] == 'YES' or r[8] == 'YES'))
+    exportable_twitter = sum(1 for r in rows if len(r) > 19 and r[19] and (r[7] == 'YES' or r[8] == 'YES'))
+    exportable_pinterest = sum(1 for r in rows if len(r) > 20 and r[20] and (r[7] == 'YES' or r[8] == 'YES'))
 
     # Generate the Selector Dropdown Options
     dropdown_options = ""
@@ -1336,7 +1351,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
     # Convert rows to table items
     table_rows_html = ""
     for r in rows:
-        id_val, phone, email, name, company, gclid, source, qualified, sale_closed, value, reason, created_at, client_name_linked, fbclid, li_fat_id, msclkid, match_fuzzy, certainty_score = r
+        id_val, phone, email, name, company, gclid, source, qualified, sale_closed, value, reason, created_at, client_name_linked, fbclid, li_fat_id, msclkid, match_fuzzy, certainty_score, ttclid, twclid, pin_clid = r
         
         qual_badge = '<span style="background: #e8f5e9; color: #2e7d32; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 12px;">YES</span>' if qualified == 'YES' else '<span style="background: #ffebee; color: #c62828; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 12px;">NO</span>'
         closed_badge = '<span style="background: #e8f5e9; color: #2e7d32; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 12px;">YES</span>' if sale_closed == 'YES' else '<span style="background: #ffebee; color: #c62828; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 12px;">NO</span>'
@@ -1351,6 +1366,12 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
             click_ids_list.append(f'<span style="display:inline-block; margin-bottom: 2px;"><strong style="color: #0A66C2; font-size: 10px;">L:</strong> <code style="background: #f1f3f4; padding: 1px 4px; border-radius: 3px; font-size: 11px;">{li_fat_id}</code></span>')
         if msclkid:
             click_ids_list.append(f'<span style="display:inline-block; margin-bottom: 2px;"><strong style="color: #00A4EF; font-size: 10px;">M:</strong> <code style="background: #f1f3f4; padding: 1px 4px; border-radius: 3px; font-size: 11px;">{msclkid}</code></span>')
+        if ttclid:
+            click_ids_list.append(f'<span style="display:inline-block; margin-bottom: 2px;"><strong style="color: #000000; font-size: 10px;">TT:</strong> <code style="background: #f1f3f4; padding: 1px 4px; border-radius: 3px; font-size: 11px;">{ttclid}</code></span>')
+        if twclid:
+            click_ids_list.append(f'<span style="display:inline-block; margin-bottom: 2px;"><strong style="color: #1DA1F2; font-size: 10px;">X:</strong> <code style="background: #f1f3f4; padding: 1px 4px; border-radius: 3px; font-size: 11px;">{twclid}</code></span>')
+        if pin_clid:
+            click_ids_list.append(f'<span style="display:inline-block; margin-bottom: 2px;"><strong style="color: #E60023; font-size: 10px;">P:</strong> <code style="background: #f1f3f4; padding: 1px 4px; border-radius: 3px; font-size: 11px;">{pin_clid}</code></span>')
             
         click_ids_display = "<br>".join(click_ids_list) if click_ids_list else '<span style="color: #999; font-style: italic;">None detected</span>'
         value_display = f"<strong>${value:,.2f}</strong>" if value and value > 0 else '<span style="color: #999;">$0.00</span>'
@@ -1401,11 +1422,17 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
         facebook_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Facebook conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
         linkedin_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their LinkedIn conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
         microsoft_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Microsoft conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
+        tiktok_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their TikTok conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
+        twitter_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their X Ads conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
+        pinterest_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Pinterest conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
     else:
         google_export_button = f'<a href="/dashboard/export/google?client_id={selected_client_id}" class="btn-export" style="background-color: #4285F4; text-align: center; text-decoration: none; width: 100%;">📥 Download Google CSV ({exportable_google})</a>'
         facebook_export_button = f'<a href="/dashboard/export/facebook?client_id={selected_client_id}" class="btn-export" style="background-color: #1877F2; text-align: center; text-decoration: none; width: 100%;">📥 Download Meta CSV ({exportable_facebook})</a>'
         linkedin_export_button = f'<a href="/dashboard/export/linkedin?client_id={selected_client_id}" class="btn-export" style="background-color: #0A66C2; text-align: center; text-decoration: none; width: 100%;">📥 Download LinkedIn CSV ({exportable_linkedin})</a>'
         microsoft_export_button = f'<a href="/dashboard/export/microsoft?client_id={selected_client_id}" class="btn-export" style="background-color: #00A4EF; text-align: center; text-decoration: none; width: 100%;">📥 Download Bing CSV ({exportable_microsoft})</a>'
+        tiktok_export_button = f'<a href="/dashboard/export/tiktok?client_id={selected_client_id}" class="btn-export" style="background-color: #010101; text-align: center; text-decoration: none; width: 100%;">📥 Download TikTok CSV ({exportable_tiktok})</a>'
+        twitter_export_button = f'<a href="/dashboard/export/twitter?client_id={selected_client_id}" class="btn-export" style="background-color: #15202B; text-align: center; text-decoration: none; width: 100%;">📥 Download X Ads CSV ({exportable_twitter})</a>'
+        pinterest_export_button = f'<a href="/dashboard/export/pinterest?client_id={selected_client_id}" class="btn-export" style="background-color: #E60023; text-align: center; text-decoration: none; width: 100%;">📥 Download Pinterest CSV ({exportable_pinterest})</a>'
 
     # Conditionally show the Client header column
     client_th_html = '<th>Client Account</th>' if selected_client_id == 0 else ''
@@ -1718,6 +1745,30 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                             </div>
                             {microsoft_export_button}
                         </div>
+                        <!-- TikTok Ads -->
+                        <div class="export-card">
+                            <div>
+                                <h4 style="color: #010101;">TikTok Ads (TTCLID)</h4>
+                                <p>Export offline conversion signals and purchase revenue directly into TikTok Ads Manager.</p>
+                            </div>
+                            {tiktok_export_button}
+                        </div>
+                        <!-- X Ads -->
+                        <div class="export-card">
+                            <div>
+                                <h4 style="color: #15202B;">X (Twitter) Ads (TWCLID)</h4>
+                                <p>Export verified offline lead and sale transactions back into your X Ads campaigns.</p>
+                            </div>
+                            {twitter_export_button}
+                        </div>
+                        <!-- Pinterest Ads -->
+                        <div class="export-card">
+                            <div>
+                                <h4 style="color: #E60023;">Pinterest Ads (PIN_CLID)</h4>
+                                <p>Export matched audience actions directly into your Pinterest Tag metrics.</p>
+                            </div>
+                            {pinterest_export_button}
+                        </div>
                     </div>
                 </div>
 
@@ -1785,6 +1836,9 @@ class ClientUpdate(BaseModel):
     wc_profile_id: Optional[str] = "" 
     google_ads_customer_id: str
     facebook_ads_id: Optional[str] = ""
+    tiktok_ads_id: Optional[str] = ""
+    twitter_ads_id: Optional[str] = ""
+    pinterest_ads_id: Optional[str] = ""
     linkedin_ads_id: Optional[str] = ""
     microsoft_ads_id: Optional[str] = ""
     lead_gen_method: str
@@ -2403,6 +2457,35 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                 <div class="form-group">
                                     <label for="microsoft_ads_id">Microsoft Ads ID</label>
                                     <input type="text" id="microsoft_ads_id" value="{client_data.get("microsoft_ads_id", "") or ""}">
+                                </div>
+                            </div>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="tiktok_ads_id">TikTok Ads Pixel/Account ID</label>
+                                    <input type="text" id="tiktok_ads_id" value="{client_data.get("tiktok_ads_id", "") or ""}" placeholder="e.g. tt_pixel_123">
+                                </div>
+                                <div class="form-group">
+                                    <label for="pinterest_ads_id">Pinterest Ads ID</label>
+                                    <input type="text" id="pinterest_ads_id" value="{client_data.get("pinterest_ads_id", "") or ""}" placeholder="e.g. pin_pixel_123">
+                                </div>
+                            </div>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <label for="twitter_ads_id" style="margin-bottom: 0;">X (Twitter) Ads Pixel ID</label>
+                                        <span class="tooltip-icon">
+                                            💬
+                                            <span class="tooltip-text" style="width: 250px;">
+                                                ⚠️ <strong>Manual UTM required:</strong> To track X click IDs (twclid) via CallRail/form submissions, you must manually append <code>?twclid={{click_id}}</code> to your X Ad destination URLs.
+                                            </span>
+                                        </span>
+                                    </div>
+                                    <input type="text" id="twitter_ads_id" value="{client_data.get("twitter_ads_id", "") or ""}" placeholder="e.g. tw_pixel_123" style="margin-top: 8px;">
+                                </div>
+                                <div class="form-group" style="visibility: hidden;">
+                                    <!-- Spacer -->
                                 </div>
                             </div>
                             
@@ -3475,6 +3558,12 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         facebook_ads_id: document.getElementById('facebook_ads_id').value.trim(),
                         linkedin_ads_id: document.getElementById('linkedin_ads_id').value.trim(),
                         microsoft_ads_id: document.getElementById('microsoft_ads_id').value.trim(),
+                        tiktok_ads_id: document.getElementById('tiktok_ads_id').value.trim(),
+                        twitter_ads_id: document.getElementById('twitter_ads_id').value.trim(),
+                        pinterest_ads_id: document.getElementById('pinterest_ads_id').value.trim(),
+                        tiktok_ads_id: document.getElementById('tiktok_ads_id').value.trim(),
+                        twitter_ads_id: document.getElementById('twitter_ads_id').value.trim(),
+                        pinterest_ads_id: document.getElementById('pinterest_ads_id').value.trim(),
                         lead_gen_method: document.querySelector('input[name="lead_gen_method"]:checked').value,
                         qualification_criteria: document.getElementById('qualification_criteria').value,
                         source_of_truth: document.getElementById('source_of_truth').value,
@@ -3943,6 +4032,9 @@ def update_client_settings(request: Request, client: ClientUpdate):
             "facebook_ads_id": "Facebook Ads Pixel/Account ID",
             "linkedin_ads_id": "LinkedIn Ads Account ID",
             "microsoft_ads_id": "Microsoft Ads Account ID",
+            "tiktok_ads_id": "TikTok Ads Pixel/Account ID",
+            "twitter_ads_id": "X (Twitter) Ads Pixel ID",
+            "pinterest_ads_id": "Pinterest Ads ID",
             "lead_gen_method": "Lead Gen Method",
             "qualification_criteria": "Qualification Criteria Option",
             "source_of_truth": "Single Source of Truth",
@@ -3968,6 +4060,9 @@ def update_client_settings(request: Request, client: ClientUpdate):
             "facebook_ads_id": client.facebook_ads_id or "",
             "linkedin_ads_id": client.linkedin_ads_id or "",
             "microsoft_ads_id": client.microsoft_ads_id or "",
+            "tiktok_ads_id": client.tiktok_ads_id or "",
+            "twitter_ads_id": client.twitter_ads_id or "",
+            "pinterest_ads_id": client.pinterest_ads_id or "",
             "lead_gen_method": client.lead_gen_method,
             "qualification_criteria": client.qualification_criteria,
             "source_of_truth": client.source_of_truth,
@@ -4000,6 +4095,9 @@ def update_client_settings(request: Request, client: ClientUpdate):
                 facebook_ads_id = ?,
                 linkedin_ads_id = ?,
                 microsoft_ads_id = ?,
+                tiktok_ads_id = ?,
+                twitter_ads_id = ?,
+                pinterest_ads_id = ?,
                 lead_gen_method = ?,
                 qualification_criteria = ?,
                 source_of_truth = ?,
@@ -4024,6 +4122,9 @@ def update_client_settings(request: Request, client: ClientUpdate):
             client.facebook_ads_id,
             client.linkedin_ads_id,
             client.microsoft_ads_id,
+            client.tiktok_ads_id or "",
+            client.twitter_ads_id or "",
+            client.pinterest_ads_id or "",
             client.lead_gen_method,
             client.qualification_criteria,
             client.source_of_truth,
@@ -4384,6 +4485,35 @@ def add_client_page(request: Request):
                             <div class="form-group">
                                 <label for="microsoft_ads_id">Microsoft (Bing) Ads ID</label>
                                 <input type="text" id="microsoft_ads_id" placeholder="e.g. ms_campaign_45">
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="tiktok_ads_id">TikTok Ads Pixel/Account ID</label>
+                                <input type="text" id="tiktok_ads_id" placeholder="e.g. tt_pixel_123">
+                            </div>
+                            <div class="form-group">
+                                <label for="pinterest_ads_id">Pinterest Ads ID</label>
+                                <input type="text" id="pinterest_ads_id" placeholder="e.g. pin_pixel_123">
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <label for="twitter_ads_id" style="margin-bottom: 0;">X (Twitter) Ads Pixel ID</label>
+                                    <span class="tooltip-icon">
+                                        💬
+                                        <span class="tooltip-text" style="width: 250px;">
+                                            ⚠️ <strong>Manual UTM required:</strong> To track X click IDs (twclid) via CallRail/form submissions, you must manually append <code>?twclid={{click_id}}</code> to your X Ad destination URLs.
+                                        </span>
+                                    </span>
+                                </div>
+                                <input type="text" id="twitter_ads_id" placeholder="e.g. tw_pixel_123" style="margin-top: 8px;">
+                            </div>
+                            <div class="form-group" style="visibility: hidden;">
+                                <!-- Spacer -->
                             </div>
                         </div>
                     </div>
@@ -5301,6 +5431,12 @@ def add_client_page(request: Request):
                         facebook_ads_id: document.getElementById('facebook_ads_id').value.trim(),
                         linkedin_ads_id: document.getElementById('linkedin_ads_id').value.trim(),
                         microsoft_ads_id: document.getElementById('microsoft_ads_id').value.trim(),
+                        tiktok_ads_id: document.getElementById('tiktok_ads_id').value.trim(),
+                        twitter_ads_id: document.getElementById('twitter_ads_id').value.trim(),
+                        pinterest_ads_id: document.getElementById('pinterest_ads_id').value.trim(),
+                        tiktok_ads_id: document.getElementById('tiktok_ads_id').value.trim(),
+                        twitter_ads_id: document.getElementById('twitter_ads_id').value.trim(),
+                        pinterest_ads_id: document.getElementById('pinterest_ads_id').value.trim(),
                         lead_gen_method: document.querySelector('input[name="lead_gen_method"]:checked').value,
                         qualification_criteria: document.getElementById('qualification_criteria').value,
                         source_of_truth: document.getElementById('source_of_truth').value,
@@ -5609,9 +5745,9 @@ def backfill_historical_callrail_leads(client_id: int, qualification_criteria_co
         
         cursor.execute("""
             INSERT INTO sessions (
-                client_id, phone, name, gclid, fbclid, li_fat_id, msclkid, source, qualified, sale_closed, value, reason, model_used, raw_data, created_at
+                client_id, phone, name, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, source, qualified, sale_closed, value, reason, model_used, raw_data, created_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             client_id,
             normalized_phone,
@@ -5620,6 +5756,9 @@ def backfill_historical_callrail_leads(client_id: int, qualification_criteria_co
             fbclid or None,
             li_fat_id or None,
             msclkid or None,
+            None, # ttclid
+            None, # twclid
+            None, # pin_clid
             provider,
             qualified,
             sale_closed,
@@ -5673,9 +5812,10 @@ def create_client(request: Request, client: ClientCreate):
                 name, callrail_account_id, callrail_company_id, google_ads_customer_id, facebook_ads_id, linkedin_ads_id, microsoft_ads_id,
                 lead_gen_method, qualification_criteria, source_of_truth, email_provider, email_account,
                 crm_deal_tags, crm_won_deal_tags, crm_lead_tags, lead_count_rule, exclude_past_customers,
-                call_tracking_provider, ctm_account_id, ctm_profile_id, wc_account_id, wc_profile_id
+                call_tracking_provider, ctm_account_id, ctm_profile_id, wc_account_id, wc_profile_id,
+                tiktok_ads_id, twitter_ads_id, pinterest_ads_id
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             client.name, 
             client.callrail_account_id or None,
@@ -5684,6 +5824,9 @@ def create_client(request: Request, client: ClientCreate):
             client.facebook_ads_id,
             client.linkedin_ads_id,
             client.microsoft_ads_id,
+            client.tiktok_ads_id or "",
+            client.twitter_ads_id or "",
+            client.pinterest_ads_id or "",
             client.lead_gen_method,
             client.qualification_criteria,
             client.source_of_truth,
@@ -5698,7 +5841,10 @@ def create_client(request: Request, client: ClientCreate):
             client.ctm_account_id or "",
             client.ctm_profile_id or "",
             client.wc_account_id or "",
-            client.wc_profile_id or ""
+            client.wc_profile_id or "",
+            client.tiktok_ads_id or "",
+            client.twitter_ads_id or "",
+            client.pinterest_ads_id or ""
         ))
         
         client_id = cursor.lastrowid
@@ -6000,6 +6146,147 @@ def export_microsoft_conversions(request: Request, client_id: int):
     return StreamingResponse(output, headers=headers)
 
 
+@app.get("/dashboard/export/tiktok")
+def export_tiktok_conversions(request: Request, client_id: int):
+    email = is_authenticated(request)
+    if not email:
+        return RedirectResponse(url="/login", status_code=303)
+    try:
+        conn = db_router.connect()
+        cursor = conn.cursor()
+        cursor.execute("SELECT name, tiktok_ads_id FROM clients WHERE id = ?", (client_id,))
+        client_row = cursor.fetchone()
+        if not client_row:
+            raise HTTPException(status_code=400, detail="Invalid client ID")
+        client_name = client_row[0]
+        pixel_id = client_row[1] or ""
+        cursor.execute("""
+            SELECT ttclid, qualified, sale_closed, value, created_at
+            FROM sessions
+            WHERE client_id = ? AND ttclid IS NOT NULL AND ttclid != '' AND (qualified = 'YES' OR sale_closed = 'YES')
+            ORDER BY created_at DESC
+        """, (client_id,))
+        rows = cursor.fetchall()
+        conn.close()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Tiktok Click ID", "Event Name", "Event Time", "Value", "Currency", "TikTok Pixel ID"])
+    for r in rows:
+        ttclid, qualified, sale_closed, value, created_at = r
+        conv_time = f"{created_at}"
+        if sale_closed == 'YES':
+            event_name = "CompletePayment"
+            event_val = float(value or 0.0)
+        else:
+            event_name = "Contact"
+            event_val = 1.0
+        writer.writerow([ttclid, event_name, conv_time, f"{event_val:.2f}", "USD", pixel_id])
+    output.seek(0)
+    safe_filename = re.sub(r'\s+', '-', client_name.strip().lower())
+    headers = {
+        'Content-Disposition': f'attachment; filename="tiktok_conversions_{safe_filename}.csv"',
+        'Content-Type': 'text/csv'
+    }
+    return StreamingResponse(output, headers=headers)
+
+
+@app.get("/dashboard/export/twitter")
+def export_twitter_conversions(request: Request, client_id: int):
+    email = is_authenticated(request)
+    if not email:
+        return RedirectResponse(url="/login", status_code=303)
+    try:
+        conn = db_router.connect()
+        cursor = conn.cursor()
+        cursor.execute("SELECT name, twitter_ads_id FROM clients WHERE id = ?", (client_id,))
+        client_row = cursor.fetchone()
+        if not client_row:
+            raise HTTPException(status_code=400, detail="Invalid client ID")
+        client_name = client_row[0]
+        pixel_id = client_row[1] or ""
+        cursor.execute("""
+            SELECT twclid, qualified, sale_closed, value, created_at
+            FROM sessions
+            WHERE client_id = ? AND twclid IS NOT NULL AND twclid != '' AND (qualified = 'YES' OR sale_closed = 'YES')
+            ORDER BY created_at DESC
+        """, (client_id,))
+        rows = cursor.fetchall()
+        conn.close()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["twclid", "Event Name", "Event Time", "Conversion Value", "Currency", "X Ads Pixel ID"])
+    for r in rows:
+        twclid, qualified, sale_closed, value, created_at = r
+        conv_time = f"{created_at}"
+        if sale_closed == 'YES':
+            event_name = "Purchase"
+            event_val = float(value or 0.0)
+        else:
+            event_name = "Lead"
+            event_val = 1.0
+        writer.writerow([twclid, event_name, conv_time, f"{event_val:.2f}", "USD", pixel_id])
+    output.seek(0)
+    safe_filename = re.sub(r'\s+', '-', client_name.strip().lower())
+    headers = {
+        'Content-Disposition': f'attachment; filename="x_conversions_{safe_filename}.csv"',
+        'Content-Type': 'text/csv'
+    }
+    return StreamingResponse(output, headers=headers)
+
+
+@app.get("/dashboard/export/pinterest")
+def export_pinterest_conversions(request: Request, client_id: int):
+    email = is_authenticated(request)
+    if not email:
+        return RedirectResponse(url="/login", status_code=303)
+    try:
+        conn = db_router.connect()
+        cursor = conn.cursor()
+        cursor.execute("SELECT name, pinterest_ads_id FROM clients WHERE id = ?", (client_id,))
+        client_row = cursor.fetchone()
+        if not client_row:
+            raise HTTPException(status_code=400, detail="Invalid client ID")
+        client_name = client_row[0]
+        tag_id = client_row[1] or ""
+        cursor.execute("""
+            SELECT pin_clid, qualified, sale_closed, value, created_at
+            FROM sessions
+            WHERE client_id = ? AND pin_clid IS NOT NULL AND pin_clid != '' AND (qualified = 'YES' OR sale_closed = 'YES')
+            ORDER BY created_at DESC
+        """, (client_id,))
+        rows = cursor.fetchall()
+        conn.close()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["pin_clid", "Event Name", "Event Time", "Value", "Currency", "Pinterest Tag ID"])
+    for r in rows:
+        pin_clid, qualified, sale_closed, value, created_at = r
+        conv_time = f"{created_at}"
+        if sale_closed == 'YES':
+            event_name = "Checkout"
+            event_val = float(value or 0.0)
+        else:
+            event_name = "Lead"
+            event_val = 1.0
+        writer.writerow([pin_clid, event_name, conv_time, f"{event_val:.2f}", "USD", tag_id])
+    output.seek(0)
+    safe_filename = re.sub(r'\s+', '-', client_name.strip().lower())
+    headers = {
+        'Content-Disposition': f'attachment; filename="pinterest_conversions_{safe_filename}.csv"',
+        'Content-Type': 'text/csv'
+    }
+    return StreamingResponse(output, headers=headers)
+
+
+    return StreamingResponse(output, headers=headers)
+
+
 @app.get("/dashboard/export/exclusions")
 def export_client_exclusions(request: Request, client_id: int):
     email = is_authenticated(request)
@@ -6221,6 +6508,9 @@ async def receive_calltrackingmetrics_webhook(request: Request, client_id: Optio
         fbclid = payload.get('fbclid') or payload.get('facebook_click_id')
         li_fat_id = payload.get('li_fat_id') or payload.get('linkedin_click_id')
         msclkid = payload.get('msclkid') or payload.get('microsoft_click_id')
+        ttclid = payload.get('ttclid') or payload.get('tiktok_click_id')
+        twclid = payload.get('twclid') or payload.get('twitter_click_id') or payload.get('twitter_ads_id') or payload.get('x_click_id')
+        pin_clid = payload.get('pin_clid') or payload.get('pinterest_click_id')
         
         landing_page = payload.get('landing_page_url') or payload.get('landing_page') or ""
         referrer_url = payload.get('referrer_url') or payload.get('referring_url') or ""
@@ -6233,6 +6523,24 @@ async def receive_calltrackingmetrics_webhook(request: Request, client_id: Optio
             li_fat_id = extract_param_from_url(landing_page, 'li_fat_id') or extract_param_from_url(referrer_url, 'li_fat_id')
         if not msclkid:
             msclkid = extract_param_from_url(landing_page, 'msclkid') or extract_param_from_url(referrer_url, 'msclkid')
+        if not ttclid:
+            ttclid = extract_param_from_url(landing_page, 'ttclid') or extract_param_from_url(referrer_url, 'ttclid')
+        if not twclid:
+            twclid = extract_param_from_url(landing_page, 'twclid') or extract_param_from_url(referrer_url, 'twclid')
+        if not pin_clid:
+            pin_clid = extract_param_from_url(landing_page, 'pin_clid') or extract_param_from_url(landing_page, 'p_clid') or extract_param_from_url(referrer_url, 'pin_clid') or extract_param_from_url(referrer_url, 'p_clid')
+        if not ttclid:
+            ttclid = extract_param_from_url(landing_page, 'ttclid') or extract_param_from_url(referrer_url, 'ttclid')
+        if not twclid:
+            twclid = extract_param_from_url(landing_page, 'twclid') or extract_param_from_url(referrer_url, 'twclid')
+        if not pin_clid:
+            pin_clid = extract_param_from_url(landing_page, 'pin_clid') or extract_param_from_url(landing_page, 'p_clid') or extract_param_from_url(referrer_url, 'pin_clid') or extract_param_from_url(referrer_url, 'p_clid')
+        if not ttclid:
+            ttclid = extract_param_from_url(landing_page, 'ttclid') or extract_param_from_url(referrer_url, 'ttclid')
+        if not twclid:
+            twclid = extract_param_from_url(landing_page, 'twclid') or extract_param_from_url(referrer_url, 'twclid')
+        if not pin_clid:
+            pin_clid = extract_param_from_url(landing_page, 'pin_clid') or extract_param_from_url(landing_page, 'p_clid') or extract_param_from_url(referrer_url, 'pin_clid') or extract_param_from_url(referrer_url, 'p_clid')
             
         caller_name = payload.get('caller_name') or payload.get('customer_name') or payload.get('name', 'Unknown Caller')
         raw_phone = payload.get('caller_number') or payload.get('customer_phone_number') or payload.get('phone')
@@ -6296,9 +6604,9 @@ async def receive_calltrackingmetrics_webhook(request: Request, client_id: Optio
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO sessions (
-                client_id, phone, name, gclid, fbclid, li_fat_id, msclkid, source, qualified, sale_closed, value, reason, model_used, raw_data
+                client_id, phone, name, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, source, qualified, sale_closed, value, reason, model_used, raw_data
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             resolved_client_id,
             normalized_phone, 
@@ -6307,6 +6615,9 @@ async def receive_calltrackingmetrics_webhook(request: Request, client_id: Optio
             fbclid,
             li_fat_id,
             msclkid,
+            ttclid,
+            twclid,
+            pin_clid,
             "calltrackingmetrics", 
             ai_qualified, 
             ai_sale_closed, 
@@ -6378,6 +6689,9 @@ async def receive_whatconverts_webhook(request: Request, client_id: Optional[int
         fbclid = payload.get('fbclid') or payload.get('facebook_click_id')
         li_fat_id = payload.get('li_fat_id') or payload.get('linkedin_click_id')
         msclkid = payload.get('msclkid') or payload.get('microsoft_click_id')
+        ttclid = payload.get('ttclid') or payload.get('tiktok_click_id')
+        twclid = payload.get('twclid') or payload.get('twitter_click_id') or payload.get('twitter_ads_id') or payload.get('x_click_id')
+        pin_clid = payload.get('pin_clid') or payload.get('pinterest_click_id')
         
         landing_page = payload.get('landing_page_url') or payload.get('landing_page') or ""
         referrer_url = payload.get('referrer_url') or payload.get('referring_url') or ""
@@ -6390,6 +6704,24 @@ async def receive_whatconverts_webhook(request: Request, client_id: Optional[int
             li_fat_id = extract_param_from_url(landing_page, 'li_fat_id') or extract_param_from_url(referrer_url, 'li_fat_id')
         if not msclkid:
             msclkid = extract_param_from_url(landing_page, 'msclkid') or extract_param_from_url(referrer_url, 'msclkid')
+        if not ttclid:
+            ttclid = extract_param_from_url(landing_page, 'ttclid') or extract_param_from_url(referrer_url, 'ttclid')
+        if not twclid:
+            twclid = extract_param_from_url(landing_page, 'twclid') or extract_param_from_url(referrer_url, 'twclid')
+        if not pin_clid:
+            pin_clid = extract_param_from_url(landing_page, 'pin_clid') or extract_param_from_url(landing_page, 'p_clid') or extract_param_from_url(referrer_url, 'pin_clid') or extract_param_from_url(referrer_url, 'p_clid')
+        if not ttclid:
+            ttclid = extract_param_from_url(landing_page, 'ttclid') or extract_param_from_url(referrer_url, 'ttclid')
+        if not twclid:
+            twclid = extract_param_from_url(landing_page, 'twclid') or extract_param_from_url(referrer_url, 'twclid')
+        if not pin_clid:
+            pin_clid = extract_param_from_url(landing_page, 'pin_clid') or extract_param_from_url(landing_page, 'p_clid') or extract_param_from_url(referrer_url, 'pin_clid') or extract_param_from_url(referrer_url, 'p_clid')
+        if not ttclid:
+            ttclid = extract_param_from_url(landing_page, 'ttclid') or extract_param_from_url(referrer_url, 'ttclid')
+        if not twclid:
+            twclid = extract_param_from_url(landing_page, 'twclid') or extract_param_from_url(referrer_url, 'twclid')
+        if not pin_clid:
+            pin_clid = extract_param_from_url(landing_page, 'pin_clid') or extract_param_from_url(landing_page, 'p_clid') or extract_param_from_url(referrer_url, 'pin_clid') or extract_param_from_url(referrer_url, 'p_clid')
             
         caller_name = payload.get('caller_name') or payload.get('customer_name') or payload.get('name', 'Unknown Caller')
         raw_phone = payload.get('caller_phone') or payload.get('caller_number') or payload.get('phone_number') or payload.get('phone')
@@ -6453,9 +6785,9 @@ async def receive_whatconverts_webhook(request: Request, client_id: Optional[int
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO sessions (
-                client_id, phone, name, gclid, fbclid, li_fat_id, msclkid, source, qualified, sale_closed, value, reason, model_used, raw_data
+                client_id, phone, name, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, source, qualified, sale_closed, value, reason, model_used, raw_data
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             resolved_client_id,
             normalized_phone, 
@@ -6464,6 +6796,9 @@ async def receive_whatconverts_webhook(request: Request, client_id: Optional[int
             fbclid,
             li_fat_id,
             msclkid,
+            ttclid,
+            twclid,
+            pin_clid,
             "whatconverts", 
             ai_qualified, 
             ai_sale_closed, 
@@ -6538,6 +6873,9 @@ async def receive_callrail_webhook(request: Request, client_id: Optional[int] = 
         fbclid = payload.get('facebook_click_id') or payload.get('fbclid') or referrer_dict.get('fbclid')
         li_fat_id = payload.get('linkedin_click_id') or payload.get('li_fat_id') or referrer_dict.get('li_fat_id')
         msclkid = payload.get('microsoft_click_id') or payload.get('msclkid') or referrer_dict.get('msclkid')
+        ttclid = payload.get('ttclid') or payload.get('tiktok_click_id')
+        twclid = payload.get('twclid') or payload.get('twitter_click_id') or payload.get('twitter_ads_id') or payload.get('x_click_id')
+        pin_clid = payload.get('pin_clid') or payload.get('pinterest_click_id')
         
         # Fallback to milestones block if top-level fields are missing in payload
         milestones = payload.get("milestones")
@@ -6552,6 +6890,12 @@ async def receive_callrail_webhook(request: Request, client_id: Optional[int] = 
                         li_fat_id = m_data.get("li_fat_id") or m_data.get("linkedin_click_id")
                     if not msclkid:
                         msclkid = m_data.get("msclkid") or m_data.get("microsoft_click_id")
+                    if not ttclid:
+                        ttclid = m_data.get("ttclid") or m_data.get("tiktok_click_id")
+                    if not twclid:
+                        twclid = m_data.get("twclid") or m_data.get("twitter_click_id") or m_data.get("x_click_id")
+                    if not pin_clid:
+                        pin_clid = m_data.get("pin_clid") or m_data.get("pinterest_click_id")
         
         # Advanced dynamic regex URL extraction (for redundancy / fallback)
         landing_page = payload.get('landing_page_url') or referrer_dict.get('landing_page_url') or ""
@@ -6565,6 +6909,24 @@ async def receive_callrail_webhook(request: Request, client_id: Optional[int] = 
             li_fat_id = extract_param_from_url(landing_page, 'li_fat_id') or extract_param_from_url(referrer_url, 'li_fat_id')
         if not msclkid:
             msclkid = extract_param_from_url(landing_page, 'msclkid') or extract_param_from_url(referrer_url, 'msclkid')
+        if not ttclid:
+            ttclid = extract_param_from_url(landing_page, 'ttclid') or extract_param_from_url(referrer_url, 'ttclid')
+        if not twclid:
+            twclid = extract_param_from_url(landing_page, 'twclid') or extract_param_from_url(referrer_url, 'twclid')
+        if not pin_clid:
+            pin_clid = extract_param_from_url(landing_page, 'pin_clid') or extract_param_from_url(landing_page, 'p_clid') or extract_param_from_url(referrer_url, 'pin_clid') or extract_param_from_url(referrer_url, 'p_clid')
+        if not ttclid:
+            ttclid = extract_param_from_url(landing_page, 'ttclid') or extract_param_from_url(referrer_url, 'ttclid')
+        if not twclid:
+            twclid = extract_param_from_url(landing_page, 'twclid') or extract_param_from_url(referrer_url, 'twclid')
+        if not pin_clid:
+            pin_clid = extract_param_from_url(landing_page, 'pin_clid') or extract_param_from_url(landing_page, 'p_clid') or extract_param_from_url(referrer_url, 'pin_clid') or extract_param_from_url(referrer_url, 'p_clid')
+        if not ttclid:
+            ttclid = extract_param_from_url(landing_page, 'ttclid') or extract_param_from_url(referrer_url, 'ttclid')
+        if not twclid:
+            twclid = extract_param_from_url(landing_page, 'twclid') or extract_param_from_url(referrer_url, 'twclid')
+        if not pin_clid:
+            pin_clid = extract_param_from_url(landing_page, 'pin_clid') or extract_param_from_url(landing_page, 'p_clid') or extract_param_from_url(referrer_url, 'pin_clid') or extract_param_from_url(referrer_url, 'p_clid')
             
         caller_name = payload.get('customer_name', 'Unknown Caller')
         raw_phone = payload.get('customer_phone_number')
@@ -6644,9 +7006,9 @@ async def receive_callrail_webhook(request: Request, client_id: Optional[int] = 
         
         cursor.execute("""
             INSERT INTO sessions (
-                client_id, phone, name, gclid, fbclid, li_fat_id, msclkid, source, qualified, sale_closed, value, reason, model_used, raw_data
+                client_id, phone, name, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, source, qualified, sale_closed, value, reason, model_used, raw_data
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             resolved_client_id,
             normalized_phone, 
@@ -6655,6 +7017,9 @@ async def receive_callrail_webhook(request: Request, client_id: Optional[int] = 
             fbclid,
             li_fat_id,
             msclkid,
+            ttclid,
+            twclid,
+            pin_clid,
             "callrail", 
             ai_qualified, 
             ai_sale_closed, 
@@ -6722,8 +7087,8 @@ async def receive_form_lead(lead: FormLead, client_id: Optional[int] = None):
         conn = db_router.connect()
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO sessions (client_id, phone, email, name, company, gclid, fbclid, li_fat_id, msclkid, source, qualified, sale_closed, reason)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO sessions (client_id, phone, email, name, company, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, source, qualified, sale_closed, reason)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             resolved_client_id, 
             normalized_phone, 
@@ -6734,6 +7099,9 @@ async def receive_form_lead(lead: FormLead, client_id: Optional[int] = None):
             lead.fbclid, 
             lead.li_fat_id, 
             lead.msclkid, 
+            lead.ttclid,
+            lead.twclid,
+            lead.pin_clid,
             "form",
             qualified_val,
             sale_closed_val,
