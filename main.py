@@ -3142,9 +3142,12 @@ def create_user_invitation(request: Request, invite: UserInvite):
         import secrets
         token = secrets.token_hex(16)
         
-        # Insert the invitation (UPSERT style or simple REPLACE/INSERT)
+        # Delete any existing invitation for this email first (to simulate REPLACE/UPSERT on both SQLite & Postgres)
+        cursor.execute("DELETE FROM user_invitations WHERE email = ?", (invite.email.strip().lower(),))
+        
+        # Insert the invitation cleanly
         cursor.execute("""
-            INSERT OR REPLACE INTO user_invitations (email, role, client_id, token, invited_by)
+            INSERT INTO user_invitations (email, role, client_id, token, invited_by)
             VALUES (?, ?, ?, ?, ?)
         """, (invite.email.strip().lower(), invite.role, resolved_client_id, token, email))
         
