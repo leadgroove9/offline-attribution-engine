@@ -1875,6 +1875,8 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                 .btn-copy {{ background-color: #2e7d32; color: white; padding: 6px 12px; border: none; border-radius: 5px; font-weight: bold; font-size: 12px; cursor: pointer; transition: background 0.2s; white-space: nowrap; }}
                 .btn-copy:hover {{ background-color: #1b5e20; }}
                 
+                .btn-back {{ display: inline-block; background-color: #1a237e; color: white !important; padding: 10px 18px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px; transition: background 0.2s; border: none; cursor: pointer; text-align: center; }}
+                .btn-back:hover {{ background-color: #0d1b2a; }}
                 .btn-submit {{ background-color: #1a237e; color: white; padding: 12px 24px; border: none; border-radius: 6px; font-weight: bold; font-size: 15px; cursor: pointer; transition: background 0.2s; }}
                 .btn-submit:hover {{ background-color: #0d1b2a; }}
                 .btn-cancel {{ color: #666; text-decoration: none; font-size: 14px; font-weight: bold; }}
@@ -2000,11 +2002,14 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">Update dynamic rules, ad accounts, and system webhooks.</p>
                     </div>
                     
-                    <div class="client-selector-container">
-                        <span class="client-label">Editing Client:</span>
-                        <select class="client-select" onchange="window.location.href='/dashboard/settings?client_id='+this.value">
-                            {dropdown_options}
-                        </select>
+                    <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                        <a href="/dashboard?client_id={active_client_id}" class="btn-back">⬅️ Return to Dashboard</a>
+                        <div class="client-selector-container">
+                            <span class="client-label">Editing Client:</span>
+                            <select class="client-select" onchange="window.location.href='/dashboard/settings?client_id='+this.value">
+                                {dropdown_options}
+                            </select>
+                        </div>
                     </div>
                 </header>
 
