@@ -1359,19 +1359,19 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
         # Build multi-channel click ID display blocks
         click_ids_list = []
         if gclid:
-            click_ids_list.append(f'<span style="display:inline-block; margin-bottom: 2px;"><strong style="color: #4285F4; font-size: 10px;">G:</strong> <code style="background: #f1f3f4; padding: 1px 4px; border-radius: 3px; font-size: 11px;">{gclid}</code></span>')
+            click_ids_list.append(f'<span style="display:inline-block; margin-bottom: 2px;"><strong style="color: #4285F4; font-size: 10px;">G:</strong> <code style="background: #f1f3f4; padding: 1px 4px; border-radius: 3px; font-size: 11px; display: inline-block; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;" title="{gclid}">{gclid}</code></span>')
         if fbclid:
-            click_ids_list.append(f'<span style="display:inline-block; margin-bottom: 2px;"><strong style="color: #1877F2; font-size: 10px;">F:</strong> <code style="background: #f1f3f4; padding: 1px 4px; border-radius: 3px; font-size: 11px;">{fbclid}</code></span>')
+            click_ids_list.append(f'<span style="display:inline-block; margin-bottom: 2px;"><strong style="color: #1877F2; font-size: 10px;">F:</strong> <code style="background: #f1f3f4; padding: 1px 4px; border-radius: 3px; font-size: 11px; display: inline-block; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;" title="{fbclid}">{fbclid}</code></span>')
         if li_fat_id:
-            click_ids_list.append(f'<span style="display:inline-block; margin-bottom: 2px;"><strong style="color: #0A66C2; font-size: 10px;">L:</strong> <code style="background: #f1f3f4; padding: 1px 4px; border-radius: 3px; font-size: 11px;">{li_fat_id}</code></span>')
+            click_ids_list.append(f'<span style="display:inline-block; margin-bottom: 2px;"><strong style="color: #0A66C2; font-size: 10px;">L:</strong> <code style="background: #f1f3f4; padding: 1px 4px; border-radius: 3px; font-size: 11px; display: inline-block; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;" title="{li_fat_id}">{li_fat_id}</code></span>')
         if msclkid:
-            click_ids_list.append(f'<span style="display:inline-block; margin-bottom: 2px;"><strong style="color: #00A4EF; font-size: 10px;">M:</strong> <code style="background: #f1f3f4; padding: 1px 4px; border-radius: 3px; font-size: 11px;">{msclkid}</code></span>')
+            click_ids_list.append(f'<span style="display:inline-block; margin-bottom: 2px;"><strong style="color: #00A4EF; font-size: 10px;">M:</strong> <code style="background: #f1f3f4; padding: 1px 4px; border-radius: 3px; font-size: 11px; display: inline-block; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;" title="{msclkid}">{msclkid}</code></span>')
         if ttclid:
-            click_ids_list.append(f'<span style="display:inline-block; margin-bottom: 2px;"><strong style="color: #000000; font-size: 10px;">TT:</strong> <code style="background: #f1f3f4; padding: 1px 4px; border-radius: 3px; font-size: 11px;">{ttclid}</code></span>')
+            click_ids_list.append(f'<span style="display:inline-block; margin-bottom: 2px;"><strong style="color: #000000; font-size: 10px;">TT:</strong> <code style="background: #f1f3f4; padding: 1px 4px; border-radius: 3px; font-size: 11px; display: inline-block; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;" title="{ttclid}">{ttclid}</code></span>')
         if twclid:
-            click_ids_list.append(f'<span style="display:inline-block; margin-bottom: 2px;"><strong style="color: #1DA1F2; font-size: 10px;">X:</strong> <code style="background: #f1f3f4; padding: 1px 4px; border-radius: 3px; font-size: 11px;">{twclid}</code></span>')
+            click_ids_list.append(f'<span style="display:inline-block; margin-bottom: 2px;"><strong style="color: #1DA1F2; font-size: 10px;">X:</strong> <code style="background: #f1f3f4; padding: 1px 4px; border-radius: 3px; font-size: 11px; display: inline-block; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;" title="{twclid}">{twclid}</code></span>')
         if pin_clid:
-            click_ids_list.append(f'<span style="display:inline-block; margin-bottom: 2px;"><strong style="color: #E60023; font-size: 10px;">P:</strong> <code style="background: #f1f3f4; padding: 1px 4px; border-radius: 3px; font-size: 11px;">{pin_clid}</code></span>')
+            click_ids_list.append(f'<span style="display:inline-block; margin-bottom: 2px;"><strong style="color: #E60023; font-size: 10px;">P:</strong> <code style="background: #f1f3f4; padding: 1px 4px; border-radius: 3px; font-size: 11px; display: inline-block; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;" title="{pin_clid}">{pin_clid}</code></span>')
             
         click_ids_display = "<br>".join(click_ids_list) if click_ids_list else '<span style="color: #999; font-style: italic;">None detected</span>'
         value_display = f"<strong>${value:,.2f}</strong>" if value and value > 0 else '<span style="color: #999;">$0.00</span>'
@@ -1785,7 +1785,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                                 <th>Timestamp</th>
                                 <th>Source</th>
                                 <th>Lead Contact</th>
-                                <th>Click IDs Detected</th>
+                                <th style="width: 140px; min-width: 140px; max-width: 140px;">Click IDs Detected</th>
                                 <th>Qualified</th>
                                 <th>Closed</th>
                                 <th>Value</th>
