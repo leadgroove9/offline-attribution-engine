@@ -279,6 +279,20 @@ def init_db():
     """)
 
     
+    # 8. Create Client Configuration Change History Table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS client_config_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            client_id INTEGER,
+            changed_by TEXT NOT NULL,
+            feature_name TEXT NOT NULL,
+            old_value TEXT,
+            new_value TEXT,
+            changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (client_id) REFERENCES clients (id)
+        )
+    """)
+
     # 2. Create Clients Table with complete questionnaire fields
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS clients (
@@ -1154,10 +1168,11 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
             selected_client_id = user_client_id
         
         # Build Settings Button HTML
-        if selected_client_id == 0 or user_role == "read":
+        if selected_client_id == 0:
             settings_btn_html = ''
         else:
-            settings_btn_html = f'<a href="/dashboard/settings?client_id={selected_client_id}" class="btn-settings">⚙️ Client Settings</a>'
+            settings_label = "⚙️ Client Settings" if user_role == "full" else "⚙️ View Settings & History"
+            settings_btn_html = f'<a href="/dashboard/settings?client_id={selected_client_id}" class="btn-settings">{settings_label}</a>'
             
         onboard_btn_html = '<a href="/dashboard/add-client" class="btn-add-client">➕ Onboard Client</a>' if is_manager and user_client_id is None else ''
         
@@ -1499,8 +1514,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
         return RedirectResponse(url="/login", status_code=303)
     """Page to manage and update client account configuration settings."""
     user_role, user_client_id = get_user_role_and_client(email)
-    if user_role == "read":
-        raise HTTPException(status_code=403, detail="Unauthorized: Access to client configuration settings is restricted to managers and administrators.")
+    is_readonly = (user_role == "read")
         
     if user_client_id is not None:
         if client_id is not None and client_id != user_client_id:
@@ -1660,6 +1674,32 @@ def view_settings(request: Request, client_id: Optional[int] = None):
         cursor.execute("SELECT COUNT(*) FROM excluded_customers WHERE client_id = ?", (active_client_id,))
         exclusion_count = cursor.fetchone()[0]
         
+        # Query configuration change history for active_client_id
+        cursor.execute("""
+            SELECT feature_name, old_value, new_value, datetime(changed_at, 'localtime'), changed_by
+            FROM client_config_history
+            WHERE client_id = ?
+            ORDER BY changed_at DESC
+        """, (active_client_id,))
+        history_list = cursor.fetchall()
+        
+        change_history_rows_html = ""
+        for feat, old_val, new_val, ts, changed_by in history_list:
+            old_display = f'<span style="color: #777; font-family: monospace;">{old_val}</span>' if old_val else '<span style="color: #bbb; font-style: italic;">(empty)</span>'
+            new_display = f'<strong style="color: #1a237e; font-family: monospace;">{new_val}</strong>' if new_val else '<span style="color: #bbb; font-style: italic;">(empty)</span>'
+            change_history_rows_html += f"""
+            <tr style="border-bottom: 1px solid #eee;">
+                <td style="padding: 10px;"><small>{ts}</small></td>
+                <td style="padding: 10px;"><strong>{feat}</strong></td>
+                <td style="padding: 10px;">{old_display}</td>
+                <td style="padding: 10px;">{new_display}</td>
+                <td style="padding: 10px;"><code>{changed_by}</code></td>
+            </tr>
+            """
+            
+        if not change_history_rows_html:
+            change_history_rows_html = '<tr><td colspan="5" style="text-align: center; color: #888; padding: 40px; font-style: italic;">No configuration changes recorded for this client yet.</td></tr>'
+        
         # Query collaborators (users associated with this client_id)
         cursor.execute("SELECT email, role FROM users WHERE client_id = ? ORDER BY email ASC", (active_client_id,))
         users_list = cursor.fetchall()
@@ -1704,7 +1744,16 @@ def view_settings(request: Request, client_id: Optional[int] = None):
         collaborator_rows_html = "".join(collaborators_list)
 
     # Determine invite form visibility
-    invite_form_display = 'block' if user_role == 'full' else 'none'
+    invite_form_display = "block" if user_role == "full" else "none"
+    
+    # Configure read-only form elements mapping
+    if is_readonly:
+        save_btn_html = "<div style=\"background-color: #fff3cd; color: #856404; padding: 15px; border-radius: 6px; font-weight: bold; font-size: 13px; border: 1px solid #ffeeba; display: flex; align-items: center; gap: 8px;\">🔒 Read-Only: You have view-only access to this client's configurations.</div>"
+        fieldset_disabled_attr = "disabled"
+        invite_form_display = "none"
+    else:
+        save_btn_html = "<button type=\"submit\" id=\"btn-settings-submit\" class=\"btn-submit\">💾 Save Configuration Changes</button>"
+        fieldset_disabled_attr = "" 
 
     # Generate the Selector Dropdown Options for the Settings Header
     dropdown_options = ""
@@ -1947,6 +1996,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                 <div id="alert-box" class="alert"></div>
                 
                 <form id="settings-form" onsubmit="submitSettings(event)">
+                    <fieldset {fieldset_disabled_attr} style="border: 0; padding: 0; margin: 0;">
                     <div class="settings-layout">
                         
                         <!-- LEFT COLUMN: Configurations -->
@@ -2510,8 +2560,9 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     <!-- Form Buttons -->
                     <div style="display:flex; justify-content: space-between; align-items: center; margin-top: 40px; border-top: 1px solid #eaeaea; padding-top: 20px;">
                         <a href="/dashboard?client_id={active_client_id}" class="btn-cancel">⬅️ Return to Dashboard</a>
-                        <button type="submit" id="btn-settings-submit" class="btn-submit">💾 Save Configuration Changes</button>
+                        {save_btn_html}
                     </div>
+                    </fieldset>
                 </form>
 
                 <hr style="border: 0; height: 1px; background: #eaeaea; margin: 40px 0;">
@@ -2536,6 +2587,33 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         </thead>
                         <tbody>
                             {collaborator_rows_html}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Configuration Change History Log Table -->
+                <hr style="border: 0; height: 1px; background: #eaeaea; margin: 40px 0;">
+
+                <div class="section-title" style="margin-bottom: 20px; color: #1a237e; font-size: 20px; font-weight: bold; display: flex; align-items: center; gap: 8px;">
+                    📜 Configuration Change History Log
+                </div>
+                <p style="color: #666; font-size: 13px; margin-top: -10px; margin-bottom: 20px;">
+                    Audit trail of all updates and changes made within this client's configuration section.
+                </p>
+
+                <div style="background: #fafafa; border: 1px solid #eaeaea; border-radius: 8px; padding: 20px; margin-bottom: 30px; max-height: 400px; overflow-y: auto;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 13px; text-align: left;">
+                        <thead>
+                            <tr style="border-bottom: 2px solid #eaeaea; color: #495057;">
+                                <th style="padding: 10px;">Date & Time</th>
+                                <th style="padding: 10px;">Updated Feature</th>
+                                <th style="padding: 10px;">Old Option</th>
+                                <th style="padding: 10px;">New Option Selected</th>
+                                <th style="padding: 10px;">Updated By</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {change_history_rows_html}
                         </tbody>
                     </table>
                 </div>
@@ -3015,6 +3093,51 @@ def view_settings(request: Request, client_id: Optional[int] = None):
     """
 
 
+@app.post("/dashboard/invite")
+def create_user_invitation(request: Request, invite: UserInvite):
+    email = is_authenticated(request)
+    if not email:
+        raise HTTPException(status_code=401, detail="Session expired. Please log in again.")
+    user_role, user_client_id = get_user_role_and_client(email)
+    if user_role != "full":
+        raise HTTPException(status_code=403, detail="Unauthorized: Only managers and administrators can invite collaborators.")
+    
+    # If the user is a restricted client manager, they can only invite users to their own client_id
+    resolved_client_id = invite.client_id
+    if user_client_id is not None:
+        resolved_client_id = user_client_id
+        
+    try:
+        conn = db_router.connect()
+        cursor = conn.cursor()
+        
+        # Verify the client exists
+        if resolved_client_id is not None:
+            cursor.execute("SELECT id FROM clients WHERE id = ?", (resolved_client_id,))
+            if not cursor.fetchone():
+                conn.close()
+                raise HTTPException(status_code=400, detail="Invalid client ID.")
+                
+        # Generate a secure 32-character token
+        import secrets
+        token = secrets.token_hex(16)
+        
+        # Insert the invitation (UPSERT style or simple REPLACE/INSERT)
+        cursor.execute("""
+            INSERT OR REPLACE INTO user_invitations (email, role, client_id, token, invited_by)
+            VALUES (?, ?, ?, ?, ?)
+        """, (invite.email.strip().lower(), invite.role, resolved_client_id, token, email))
+        
+        conn.commit()
+        conn.close()
+        
+        return {"status": "success", "token": token}
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
 @app.post("/dashboard/settings")
 def update_client_settings(request: Request, client: ClientUpdate):
     email = is_authenticated(request)
@@ -3030,10 +3153,77 @@ def update_client_settings(request: Request, client: ClientUpdate):
         conn = db_router.connect()
         cursor = conn.cursor()
         
-        # Verify client exists
-        cursor.execute("SELECT id FROM clients WHERE id = ?", (client.id,))
-        if not cursor.fetchone():
+        # Verify client exists and fetch old settings
+        cursor.execute("SELECT * FROM clients WHERE id = ?", (client.id,))
+        client_row = cursor.fetchone()
+        if not client_row:
             raise HTTPException(status_code=404, detail="Client not found")
+            
+        # Extract column names dynamically
+        cursor.execute("PRAGMA table_info(clients)")
+        cols = [col[1] for col in cursor.fetchall()]
+        old_data = dict(zip(cols, client_row))
+        
+        # Field label mappings for change history log
+        FIELD_LABELS = {
+            "name": "Client Business Name",
+            "call_tracking_provider": "Call Tracking Provider",
+            "callrail_account_id": "CallRail Account ID",
+            "callrail_company_id": "CallRail Client ID",
+            "ctm_account_id": "CallTrackingMetrics Account ID",
+            "ctm_profile_id": "CallTrackingMetrics Client ID",
+            "wc_account_id": "WhatConverts Account ID",
+            "wc_profile_id": "WhatConverts Client ID",
+            "google_ads_customer_id": "Google Ads Customer ID",
+            "facebook_ads_id": "Facebook Ads Pixel/Account ID",
+            "linkedin_ads_id": "LinkedIn Ads Account ID",
+            "microsoft_ads_id": "Microsoft Ads Account ID",
+            "lead_gen_method": "Lead Gen Method",
+            "qualification_criteria": "Qualification Criteria Option",
+            "source_of_truth": "Single Source of Truth",
+            "email_provider": "Email Provider",
+            "email_account": "Email Integration Account",
+            "crm_deal_tags": "CRM Deal Tags",
+            "crm_won_deal_tags": "CRM Won Deal Tags",
+            "crm_lead_tags": "CRM Lead Qualification Tags",
+            "lead_count_rule": "Lead Count Optimization Rule",
+            "exclude_past_customers": "Exclude Past Customers Setting"
+        }
+        
+        new_data = {
+            "name": client.name,
+            "call_tracking_provider": client.call_tracking_provider or "callrail",
+            "callrail_account_id": client.callrail_account_id or "",
+            "callrail_company_id": client.callrail_company_id or "",
+            "ctm_account_id": client.ctm_account_id or "",
+            "ctm_profile_id": client.ctm_profile_id or "",
+            "wc_account_id": client.wc_account_id or "",
+            "wc_profile_id": client.wc_profile_id or "",
+            "google_ads_customer_id": client.google_ads_customer_id,
+            "facebook_ads_id": client.facebook_ads_id or "",
+            "linkedin_ads_id": client.linkedin_ads_id or "",
+            "microsoft_ads_id": client.microsoft_ads_id or "",
+            "lead_gen_method": client.lead_gen_method,
+            "qualification_criteria": client.qualification_criteria,
+            "source_of_truth": client.source_of_truth,
+            "email_provider": client.email_provider or "",
+            "email_account": client.email_account or "",
+            "crm_deal_tags": client.crm_deal_tags or "",
+            "crm_won_deal_tags": client.crm_won_deal_tags or "",
+            "crm_lead_tags": client.crm_lead_tags or "",
+            "lead_count_rule": client.lead_count_rule,
+            "exclude_past_customers": client.exclude_past_customers
+        }
+
+        # Scan each field and write updates to client_config_history
+        for field, label in FIELD_LABELS.items():
+            old_val = str(old_data.get(field) or "").strip()
+            new_val = str(new_data.get(field) or "").strip()
+            if old_val != new_val:
+                cursor.execute("""
+                    INSERT INTO client_config_history (client_id, changed_by, feature_name, old_value, new_value)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (client.id, email, label, old_val, new_val))
             
         # Update settings
         cursor.execute("""
