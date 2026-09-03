@@ -538,7 +538,11 @@ def init_db():
         ("li_fat_id", "TEXT"),
         ("msclkid", "TEXT"),
         ("match_fuzzy", "TEXT DEFAULT 'NO'"),
-        ("certainty_score", "INTEGER DEFAULT 100")
+        ("certainty_score", "INTEGER DEFAULT 100"),
+        ("adjusted", "TEXT DEFAULT 'NO'"),
+        ("adjusted_value", "REAL DEFAULT 0.0"),
+        ("adjustment_type", "TEXT"),
+        ("adjusted_at", "TIMESTAMP")
     ]
     for col_name, col_type in session_cols_to_verify:
         if col_name not in existing_session_cols:
@@ -1292,7 +1296,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
         if selected_client_id == 0:
             # Multi-Client (All Clients) View - Join with clients table to display client names
             cursor.execute("""
-                SELECT s.id, s.phone, s.email, s.name, s.company, s.gclid, s.source, s.qualified, s.sale_closed, s.value, s.reason, s.created_at, c.name, s.fbclid, s.li_fat_id, s.msclkid, s.match_fuzzy, s.certainty_score, s.ttclid, s.twclid, s.pin_clid
+                SELECT s.id, s.phone, s.email, s.name, s.company, s.gclid, s.source, s.qualified, s.sale_closed, s.value, s.reason, s.created_at, c.name, s.fbclid, s.li_fat_id, s.msclkid, s.match_fuzzy, s.certainty_score, s.ttclid, s.twclid, s.pin_clid, s.adjusted, s.adjusted_value, s.adjustment_type, s.adjusted_at
                 FROM sessions s
                 LEFT JOIN clients c ON s.client_id = c.id
                 ORDER BY s.created_at DESC
@@ -1303,7 +1307,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
         else:
             # Single-Client Filtered View
             cursor.execute("""
-                SELECT s.id, s.phone, s.email, s.name, s.company, s.gclid, s.source, s.qualified, s.sale_closed, s.value, s.reason, s.created_at, c.name, s.fbclid, s.li_fat_id, s.msclkid, s.match_fuzzy, s.certainty_score, s.ttclid, s.twclid, s.pin_clid
+                SELECT s.id, s.phone, s.email, s.name, s.company, s.gclid, s.source, s.qualified, s.sale_closed, s.value, s.reason, s.created_at, c.name, s.fbclid, s.li_fat_id, s.msclkid, s.match_fuzzy, s.certainty_score, s.ttclid, s.twclid, s.pin_clid, s.adjusted, s.adjusted_value, s.adjustment_type, s.adjusted_at
                 FROM sessions s
                 LEFT JOIN clients c ON s.client_id = c.id
                 WHERE s.client_id = ?
@@ -1351,10 +1355,19 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
     # Convert rows to table items
     table_rows_html = ""
     for r in rows:
-        id_val, phone, email, name, company, gclid, source, qualified, sale_closed, value, reason, created_at, client_name_linked, fbclid, li_fat_id, msclkid, match_fuzzy, certainty_score, ttclid, twclid, pin_clid = r
+        id_val, phone, email, name, company, gclid, source, qualified, sale_closed, value, reason, created_at, client_name_linked, fbclid, li_fat_id, msclkid, match_fuzzy, certainty_score, ttclid, twclid, pin_clid, adjusted, adjusted_value, adjustment_type, adjusted_at = r
         
         qual_badge = '<span style="background: #e8f5e9; color: #2e7d32; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 12px;">YES</span>' if qualified == 'YES' else '<span style="background: #ffebee; color: #c62828; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 12px;">NO</span>'
-        closed_badge = '<span style="background: #e8f5e9; color: #2e7d32; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 12px;">YES</span>' if sale_closed == 'YES' else '<span style="background: #ffebee; color: #c62828; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 12px;">NO</span>'
+        
+        if sale_closed == 'YES':
+            if adjusted == 'YES' and adjustment_type == 'RETRACT':
+                closed_badge = '<span style="background: #ffebee; color: #c62828; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 11px; text-decoration: line-through;">YES</span><br><small style="color: #c62828; font-weight: bold;">🚫 Retracted</small>'
+            elif adjusted == 'YES' and adjustment_type == 'RESTATE':
+                closed_badge = '<span style="background: #e8f5e9; color: #2e7d32; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 11px;">YES</span><br><small style="color: #f57c00; font-weight: bold;">🔄 Restated</small>'
+            else:
+                closed_badge = '<span style="background: #e8f5e9; color: #2e7d32; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 12px;">YES</span>'
+        else:
+            closed_badge = '<span style="background: #ffebee; color: #c62828; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 12px;">NO</span>'
         
         # Build multi-channel click ID display blocks
         click_ids_list = []
@@ -1374,7 +1387,24 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
             click_ids_list.append(f'<span style="display:inline-block; margin-bottom: 2px;"><strong style="color: #E60023; font-size: 10px;">P:</strong> <code style="background: #f1f3f4; padding: 1px 4px; border-radius: 3px; font-size: 11px; display: inline-block; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;" title="{pin_clid}">{pin_clid}</code></span>')
             
         click_ids_display = "<br>".join(click_ids_list) if click_ids_list else '<span style="color: #999; font-style: italic;">None detected</span>'
-        value_display = f"<strong>${value:,.2f}</strong>" if value and value > 0 else '<span style="color: #999;">$0.00</span>'
+        if adjusted == 'YES' and adjustment_type == 'RETRACT':
+            value_display = f'<span style="text-decoration: line-through; color: #999; font-size: 11px;">${value:,.2f}</span><br><strong style="color: #c62828;">$0.00</strong>'
+        elif adjusted == 'YES' and adjustment_type == 'RESTATE':
+            value_display = f'<span style="text-decoration: line-through; color: #999; font-size: 11px;">${value:,.2f}</span><br><strong style="color: #2e7d32;">${adjusted_value:,.2f}</strong>'
+        else:
+            value_display = f"<strong>${value:,.2f}</strong>" if value and value > 0 else '<span style="color: #999;">$0.00</span>'
+            
+        # Determine Adjustment Action button
+        if sale_closed == 'YES':
+            if adjusted == 'YES':
+                action_btn_html = f'<span style="color: #666; font-weight: bold; font-size: 11px; white-space: nowrap;">✏️ Adjusted ({adjustment_type})</span>'
+            elif user_role == 'full':
+                escaped_name = (name or 'Unknown').replace("'", "\\'")
+                action_btn_html = f'<button onclick="openAdjustmentModal({id_val}, \'{escaped_name}\', {value})" style="background-color: #1a237e; color: white; border: none; padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer; font-weight: bold; white-space: nowrap; transition: background 0.2s;">✏️ Adjust</button>'
+            else:
+                action_btn_html = '<span style="color: #999; font-size: 11px; font-style: italic;">Read-Only</span>'
+        else:
+            action_btn_html = '<span style="color: #bbb; font-size: 11px; font-style: italic;">N/A</span>'
         
         # Display the client column only in the multi-client view
         client_column_html = f'<td><span class="client-badge">{client_name_linked}</span></td>' if selected_client_id == 0 else ''
@@ -1410,15 +1440,20 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
             <td>{value_display}</td>
             {matching_badge}
             <td><small>{reason or 'N/A'}</small></td>
+            <td>{action_btn_html}</td>
         </tr>
         """
 
     if not table_rows_html:
-        table_rows_html = f'<tr><td colspan="{"11" if selected_client_id == 0 else "10"}" style="text-align: center; color: #888; padding: 40px;">No lead sessions recorded for this client. Set up their CallRail webhook to populate this space!</td></tr>'
+        table_rows_html = f'<tr><td colspan="{"12" if selected_client_id == 0 else "11"}" style="text-align: center; color: #888; padding: 40px;">No lead sessions recorded for this client. Set up their CallRail webhook to populate this space!</td></tr>'
+
+    # Calculate adjustments count
+    exportable_adjustments = sum(1 for r in rows if len(r) > 21 and r[21] == 'YES')
 
     # Build multi-channel action buttons dynamically
     if selected_client_id == 0:
         google_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Google Ads offline conversion CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
+        google_adjustments_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Google Ads offline conversion adjustments CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
         google_audience_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Google Customer Match list!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
         facebook_audience_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Meta Custom Audience list!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
         linkedin_audience_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their LinkedIn List Match list!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
@@ -1430,6 +1465,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
         pinterest_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Pinterest conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
     else:
         google_export_button = f'<a href="/dashboard/export/google?client_id={selected_client_id}" class="btn-export" style="background-color: #4285F4; text-align: center; text-decoration: none; width: 100%;">📥 Download Google CSV ({exportable_google})</a>'
+        google_adjustments_button = f'<a href="/dashboard/export/google-adjustments?client_id={selected_client_id}" class="btn-export" style="background-color: #37474F; text-align: center; text-decoration: none; width: 100%;">📥 Download Google Adjustments CSV ({exportable_adjustments})</a>'
         google_audience_button = f'<a href="/dashboard/export/audience/google?client_id={selected_client_id}" class="btn-export" style="background-color: #4285F4; text-align: center; text-decoration: none; width: 100%;">📥 Download Google Match List</a>'
         facebook_audience_button = f'<a href="/dashboard/export/audience/facebook?client_id={selected_client_id}" class="btn-export" style="background-color: #1877F2; text-align: center; text-decoration: none; width: 100%;">📥 Download Meta Audience List</a>'
         linkedin_audience_button = f'<a href="/dashboard/export/audience/linkedin?client_id={selected_client_id}" class="btn-export" style="background-color: #0A66C2; text-align: center; text-decoration: none; width: 100%;">📥 Download LinkedIn Match List</a>'
@@ -1504,6 +1540,61 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                 <div style="background: #f1f3f4; padding: 15px; display: flex; justify-content: center;">
                     <button onclick="closeUploadModal()" style="background: #1a237e; color: white; border: none; padding: 10px 24px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: background 0.2s;">Great, Refresh Dashboard!</button>
                 </div>
+            </div>
+        </div>
+
+        <!-- Conversion Adjustment Modal -->
+        <div id="adjustment-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center;">
+            <div style="background: white; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); max-width: 480px; width: 90%; text-align: left; overflow: hidden;">
+                <!-- Header -->
+                <div style="background: #1a237e; color: white; padding: 20px; display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="margin: 0; font-size: 16px; color: white; display: flex; align-items: center; gap: 8px;">✏️ Adjust Offline Conversion</h3>
+                    <span onclick="closeAdjustmentModal()" style="font-size: 24px; font-weight: bold; cursor: pointer; color: white; opacity: 0.8;">&times;</span>
+                </div>
+                <!-- Body -->
+                <form id="adjustment-form" onsubmit="submitAdjustment(event)" style="padding: 25px; font-size: 14px; color: #333; margin: 0;">
+                    <input type="hidden" id="adj_session_id">
+                    
+                    <div style="margin-bottom: 15px;">
+                        <span style="color: #666; font-size: 13px;">Customer Lead:</span>
+                        <strong id="adj_customer_name" style="display: block; font-size: 15px; color: #1a237e; margin-top: 4px;"></strong>
+                    </div>
+                    
+                    <div style="margin-bottom: 15px;">
+                        <span style="color: #666; font-size: 13px;">Original Recorded Sale Value:</span>
+                        <strong id="adj_original_value" style="display: block; font-size: 15px; color: #2e7d32; margin-top: 4px;"></strong>
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <label style="font-weight: bold; font-size: 13px; display: block; color: #1a237e; margin-bottom: 8px;">Select Adjustment Strategy:</label>
+                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                            <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; background: #fdfdfd; border: 1px solid #e0e0e0; padding: 10px 12px; border-radius: 6px; margin: 0;">
+                                <input type="radio" name="adj_strategy" value="RETRACT" onclick="toggleAdjValueField(false)" checked style="margin-top: 3px;">
+                                <div>
+                                    <strong style="color: #c62828; font-size: 13px;">🚫 Refund / Cancel Sale (Retract)</strong>
+                                    <span style="display: block; font-size: 11px; color: #666; margin-top: 2px;">Instructs Google to completely delete/cancel this conversion from your ad optimization datasets.</span>
+                                </div>
+                            </label>
+                            <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; background: #fdfdfd; border: 1px solid #e0e0e0; padding: 10px 12px; border-radius: 6px; margin: 0;">
+                                <input type="radio" name="adj_strategy" value="RESTATE" onclick="toggleAdjValueField(true)" style="margin-top: 3px;">
+                                <div>
+                                    <strong style="color: #2e7d32; font-size: 13px;">🔄 Restate Transaction Value (Restate)</strong>
+                                    <span style="display: block; font-size: 11px; color: #666; margin-top: 2px;">Corrects or updates the transaction revenue value. Perfect for partial refunds or contract upsells.</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div id="adj_value_container" style="display: none; margin-bottom: 20px;">
+                        <label for="adj_new_value" style="font-weight: bold; font-size: 13px; display: block; color: #1a237e; margin-bottom: 6px;">New Corrected Value ($ USD):</label>
+                        <input type="number" id="adj_new_value" step="0.01" min="0" placeholder="e.g. 1200.00" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ced4da; box-sizing: border-box; font-weight: bold;">
+                    </div>
+                    
+                    <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #eaeaea; padding-top: 20px; margin-top: 20px;">
+                        <button type="button" onclick="closeAdjustmentModal()" style="background: #f1f3f4; color: #333; border: none; padding: 10px 18px; border-radius: 6px; font-weight: bold; cursor: pointer;">Cancel</button>
+                        <button type="submit" style="background: #1a237e; color: white; border: none; padding: 10px 24px; border-radius: 6px; font-weight: bold; cursor: pointer;">💾 Save Adjustment</button>
+                    </div>
+                </form>
             </div>
         </div>
         """
@@ -1603,6 +1694,67 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                 document.getElementById('upload-success-modal').style.display = 'none';
                 window.location.reload();
             }}}}
+
+            function openAdjustmentModal(sessionId, customerName, originalValue) {{{{
+                document.getElementById('adj_session_id').value = sessionId;
+                document.getElementById('adj_customer_name').innerText = customerName;
+                document.getElementById('adj_original_value').innerText = `$$${{{{originalValue.toFixed(2)}}}}`;
+                document.getElementById('adj_new_value').value = '';
+                document.querySelectorAll('input[name="adj_strategy"]')[0].checked = true;
+                document.getElementById('adj_value_container').style.display = 'none';
+                document.getElementById('adjustment-modal').style.display = 'flex';
+            }}}}
+
+            function closeAdjustmentModal() {{{{
+                document.getElementById('adjustment-modal').style.display = 'none';
+            }}}}
+
+            function toggleAdjValueField(show) {{{{
+                document.getElementById('adj_value_container').style.display = show ? 'block' : 'none';
+                if (show) {{{{
+                    document.getElementById('adj_new_value').required = true;
+                    document.getElementById('adj_new_value').focus();
+                }}}} else {{{{
+                    document.getElementById('adj_new_value').required = false;
+                }}}}
+            }}}}
+
+            async function submitAdjustment(event) {{{{
+                event.preventDefault();
+                const sessionId = document.getElementById('adj_session_id').value;
+                const strategy = document.querySelector('input[name="adj_strategy"]:checked').value;
+                const newValue = strategy === 'RESTATE' ? parseFloat(document.getElementById('adj_new_value').value) : 0.0;
+                
+                if (strategy === 'RESTATE' && (isNaN(newValue) || newValue < 0)) {{{{
+                    alert('Please enter a valid positive number for the restated value.');
+                    return;
+                }}}}
+                
+                try {{{{
+                    const response = await fetch('/dashboard/adjust-sale', {{{{
+                        method: 'POST',
+                        headers: {{{{
+                            'Content-Type': 'application/json'
+                        }}}},
+                        body: JSON.stringify({{{{
+                            session_id: parseInt(sessionId),
+                            adjustment_type: strategy,
+                            adjusted_value: newValue
+                        }}}})
+                    }}}});
+                    
+                    const data = await response.json();
+                    if (response.ok) {{{{
+                        alert('Success: Sale conversion adjustment saved cleanly! This correction will be uploaded to Google Ads next time you run adjustments sync.');
+                        closeAdjustmentModal();
+                        window.location.reload();
+                    }}}} else {{{{
+                        throw new Error(data.detail || 'Failed to submit adjustment.');
+                    }}}}
+                }}}} catch (error) {{{{
+                    alert('Error submitting adjustment: ' + error.message);
+                }}}}
+            }}
         </script>
         """
     else:
@@ -1775,6 +1927,14 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                             </div>
                             {pinterest_export_button}
                         </div>
+                        <!-- Google Ads Adjustments -->
+                        <div class="export-card">
+                            <div>
+                                <h4 style="color: #37474F;">Google Ads Adjustments (Offline)</h4>
+                                <p>Export conversion adjustments (retractions and value restatements) to optimize bid accuracy.</p>
+                            </div>
+                            {google_adjustments_button}
+                        </div>
                     </div>
                 </div>
 
@@ -1840,6 +2000,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                                 <th>Value</th>
                                 <th>Matching Method</th>
                                 <th>Claude Decision Reasoning</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1872,6 +2033,11 @@ class InviteRoleUpdate(BaseModel):
 
 class InviteDelete(BaseModel):
     token: str
+
+class SaleAdjustment(BaseModel):
+    session_id: int
+    adjustment_type: str # 'RETRACT' or 'RESTATE'
+    adjusted_value: Optional[float] = 0.0
 
 class ClientUpdate(BaseModel):
     id: int
@@ -6283,6 +6449,132 @@ def create_client(request: Request, client: ClientCreate):
         raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database insertion error: {str(e)}")
+
+
+@app.post("/dashboard/adjust-sale")
+def adjust_offline_sale(request: Request, adjustment: SaleAdjustment):
+    email = is_authenticated(request)
+    if not email:
+        raise HTTPException(status_code=401, detail="Session expired. Please log in again.")
+    user_role, user_client_id = get_user_role_and_client(email)
+    if user_role != "full":
+        raise HTTPException(status_code=403, detail="Unauthorized: Only managers and administrators can perform conversion adjustments.")
+        
+    try:
+        conn = db_router.connect()
+        cursor = conn.cursor()
+        
+        # Check if session exists and belongs to user_client_id (if restricted)
+        cursor.execute("SELECT id, client_id, sale_closed, value, gclid FROM sessions WHERE id = ?", (adjustment.session_id,))
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Session record not found.")
+            
+        sess_id, client_id, sale_closed, orig_value, gclid = row
+        if user_client_id is not None and client_id != user_client_id:
+            conn.close()
+            raise HTTPException(status_code=403, detail="Unauthorized: This session does not belong to your client account.")
+            
+        if sale_closed != 'YES':
+            conn.close()
+            raise HTTPException(status_code=400, detail="Only closed sales conversions can be adjusted.")
+            
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        cursor.execute("""
+            UPDATE sessions SET
+                adjusted = 'YES',
+                adjustment_type = ?,
+                adjusted_value = ?,
+                adjusted_at = ?
+            WHERE id = ?
+        """, (adjustment.adjustment_type, adjustment.adjusted_value, now_str, adjustment.session_id))
+        
+        # Insert audit history
+        adj_label = "Google Ads Conversion Adjustment"
+        old_val = f"Closed Sale Value: ${orig_value:.2f}"
+        new_val = f"Retracted/Canceled" if adjustment.adjustment_type == 'RETRACT' else f"Restated Value: ${adjustment.adjusted_value:.2f}"
+        cursor.execute("""
+            INSERT INTO client_config_history (client_id, changed_by, feature_name, old_value, new_value)
+            VALUES (?, ?, ?, ?, ?)
+        """, (client_id, email, adj_label, old_val, new_val))
+        
+        conn.commit()
+        conn.close()
+        return {"status": "success", "message": "Sale adjustment saved successfully!"}
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+
+@app.get("/dashboard/export/google-adjustments")
+def export_google_adjustments(request: Request, client_id: int):
+    email = is_authenticated(request)
+    if not email:
+        return RedirectResponse(url="/login", status_code=303)
+    """
+    Exports adjusted conversions for Google Ads into a compliant 
+    Google Ads Offline Conversion Adjustments CSV format.
+    """
+    try:
+        conn = db_router.connect()
+        cursor = conn.cursor()
+        
+        # Verify client exists
+        cursor.execute("SELECT name, google_ads_customer_id FROM clients WHERE id = ?", (client_id,))
+        client_row = cursor.fetchone()
+        if not client_row:
+            raise HTTPException(status_code=400, detail="Invalid client ID")
+        
+        client_name = client_row[0]
+        google_ads_id = client_row[1] or ""
+        
+        # Pull adjusted records belonging to this client that have a GCLID
+        cursor.execute("""
+            SELECT gclid, adjustment_type, adjusted_value, adjusted_at, created_at
+            FROM sessions
+            WHERE client_id = ? AND gclid IS NOT NULL AND gclid != '' AND adjusted = 'YES'
+            ORDER BY adjusted_at DESC
+        """, (client_id,))
+        rows = cursor.fetchall()
+        conn.close()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+    # Generate CSV in memory
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # 1. Google Ads template parameter header with account-specific Customer ID if available
+    ads_parameter = f"Parameters:TimeZone=+0000;customerId={google_ads_id}" if google_ads_id else "Parameters:TimeZone=+0000"
+    writer.writerow([ads_parameter])
+    
+    # 2. Google Ads Adjustments headers
+    writer.writerow(["Google Click ID", "Conversion Name", "Conversion Time", "Adjustment Type", "Adjustment Time", "Adjusted Value", "Adjusted Value Currency"])
+    
+    for r in rows:
+        gclid, adj_type, adj_value, adj_at, orig_created_at = r
+        orig_conv_time = f"{orig_created_at} +0000" if orig_created_at else ""
+        adj_time = f"{adj_at} +0000" if adj_at else ""
+        
+        # Original conversion name must match exactly (which was "LeadGroove Offline Sale")
+        conv_name = "LeadGroove Offline Sale"
+        
+        val_str = f"{adj_value:.2f}" if adj_type == 'RESTATE' else ""
+        curr_str = "USD" if adj_type == 'RESTATE' else ""
+        
+        writer.writerow([gclid, conv_name, orig_conv_time, adj_type, adj_time, val_str, curr_str])
+            
+    output.seek(0)
+    safe_filename = re.sub(r'\s+', '-', client_name.strip().lower())
+    
+    headers = {
+        'Content-Disposition': f'attachment; filename="google_ads_adjustments_{safe_filename}.csv"',
+        'Content-Type': 'text/csv'
+    }
+    return StreamingResponse(output, headers=headers)
 
 
 @app.get("/dashboard/export/google")
