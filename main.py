@@ -1494,6 +1494,20 @@ class UserInvite(BaseModel):
     role: str
     client_id: Optional[int] = None
 
+class UserRoleUpdate(BaseModel):
+    email: str
+    role: str
+
+class UserDelete(BaseModel):
+    email: str
+
+class InviteRoleUpdate(BaseModel):
+    token: str
+    role: str
+
+class InviteDelete(BaseModel):
+    token: str
+
 class ClientUpdate(BaseModel):
     id: int
     name: str
@@ -1733,11 +1747,29 @@ def view_settings(request: Request, client_id: Optional[int] = None):
         role_desc = "Full Function (Manager)" if u_role == "full" else "Read-Only (Viewer)"
         role_badge = f'<span style="background: #e8f5e9; color: #2e7d32; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 11px; border: 1px solid #c8e6c9;">{role_desc}</span>'
         status_badge = '<span style="color: #2e7d32; font-weight: bold;">● Active Member</span>'
+        
+        # Build action controls
+        if is_readonly:
+            action_html = '<span style="color: #999; font-style: italic;">Read-Only</span>'
+        elif u_email.strip().lower() == email.strip().lower():
+            action_html = '<span style="color: #1a237e; font-weight: bold; font-size: 11px;">Current Session</span>'
+        else:
+            sel_full = 'selected' if u_role == 'full' else ''
+            sel_read = 'selected' if u_role == 'read' else ''
+            action_html = f"""
+            <select onchange="updateCollaboratorRole('{u_email}', this.value)" style="padding: 4px 8px; font-size: 11px; border-radius: 4px; border: 1px solid #ced4da; background: white; font-weight: bold; cursor: pointer; display: inline-block; vertical-align: middle; width: auto;">
+                <option value="full" {sel_full}>Full Function</option>
+                <option value="read" {sel_read}>Read-Only</option>
+            </select>
+            <button type="button" onclick="deleteCollaborator('{u_email}')" style="background-color: #c62828; color: white; padding: 5px 10px; border: none; border-radius: 4px; font-size: 11px; font-weight: bold; cursor: pointer; margin-left: 8px; display: inline-block; vertical-align: middle; transition: background 0.2s; border-color: #c62828;">Delete</button>
+            """
+            
         collaborators_list.append(f"""
         <tr style="border-bottom: 1px solid #eaeaea;">
             <td style="padding: 12px 15px;"><code>{u_email}</code></td>
             <td style="padding: 12px 15px;">{role_badge}</td>
             <td style="padding: 12px 15px;">{status_badge}</td>
+            <td style="padding: 12px 15px;">{action_html}</td>
         </tr>
         """)
         
@@ -1745,16 +1777,32 @@ def view_settings(request: Request, client_id: Optional[int] = None):
         role_desc = "Full Function (Manager)" if i_role == "full" else "Read-Only (Viewer)"
         role_badge = f'<span style="background: #fff3cd; color: #856404; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 11px; border: 1px solid #ffe0b2;">{role_desc}</span>'
         status_badge = f'<span style="color: #ff9100; font-weight: bold;">⏳ Pending Invite</span><br><span style="font-size: 10px; color: #666; font-family: monospace;">token: {i_token[:8]}...</span>'
+        
+        # Build action controls
+        if is_readonly:
+            action_html = '<span style="color: #999; font-style: italic;">Read-Only</span>'
+        else:
+            sel_full = 'selected' if i_role == 'full' else ''
+            sel_read = 'selected' if i_role == 'read' else ''
+            action_html = f"""
+            <select onchange="updateInviteRole('{i_token}', this.value)" style="padding: 4px 8px; font-size: 11px; border-radius: 4px; border: 1px solid #ced4da; background: white; font-weight: bold; cursor: pointer; display: inline-block; vertical-align: middle; width: auto;">
+                <option value="full" {sel_full}>Full Function</option>
+                <option value="read" {sel_read}>Read-Only</option>
+            </select>
+            <button type="button" onclick="deleteInvite('{i_token}')" style="background-color: #c62828; color: white; padding: 5px 10px; border: none; border-radius: 4px; font-size: 11px; font-weight: bold; cursor: pointer; margin-left: 8px; display: inline-block; vertical-align: middle; transition: background 0.2s; border-color: #c62828;">Cancel Invite</button>
+            """
+            
         collaborators_list.append(f"""
         <tr style="border-bottom: 1px solid #eaeaea;">
             <td style="padding: 12px 15px;"><code>{i_email}</code></td>
             <td style="padding: 12px 15px;">{role_badge}</td>
             <td style="padding: 12px 15px;">{status_badge}</td>
+            <td style="padding: 12px 15px;">{action_html}</td>
         </tr>
         """)
         
     if not collaborators_list:
-        collaborator_rows_html = '<tr><td colspan="3" style="text-align: center; color: #888; padding: 20px;">No additional collaborators registered yet.</td></tr>'
+        collaborator_rows_html = '<tr><td colspan="4" style="text-align: center; color: #888; padding: 20px;">No additional collaborators registered yet.</td></tr>'
     else:
         collaborator_rows_html = "".join(collaborators_list)
 
@@ -2603,6 +2651,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                 <th style="padding: 10px;">Email / User</th>
                                 <th style="padding: 10px;">Access Level</th>
                                 <th style="padding: 10px;">Status</th>
+                                <th style="padding: 10px;">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -3037,6 +3086,104 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     }}
                 }}
 
+                async function updateCollaboratorRole(email, role) {{
+                    if (!confirm(`Are you sure you want to change the access level of ${{email}} to ${{role === 'full' ? 'Full Function (Manager)' : 'Read-Only (Viewer)'}}?`)) {{
+                        location.reload();
+                        return;
+                    }}
+                    try {{
+                        const response = await fetch('/dashboard/user/update-role', {{
+                            method: 'POST',
+                            headers: {{
+                                'Content-Type': 'application/json'
+                            }},
+                            body: JSON.stringify({{ email: email, role: role }})
+                        }});
+                        const data = await response.json();
+                        if (response.ok) {{
+                            alert(data.message || 'Access level updated successfully!');
+                            location.reload();
+                        }} else {{
+                            alert('Error: ' + (data.detail || 'Failed to update access level.'));
+                            location.reload();
+                        }}
+                    }} catch (err) {{
+                        alert('Network Error: ' + err.message);
+                        location.reload();
+                    }}
+                }}
+
+                async function deleteCollaborator(email) {{
+                    if (!confirm(`⚠️ WARNING: Are you sure you want to delete ${{email}}? This will immediately revoke their access and terminate any active sessions.`)) {{
+                        return;
+                    }}
+                    try {{
+                        const response = await fetch('/dashboard/user/delete', {{
+                            method: 'POST',
+                            headers: {{
+                                'Content-Type': 'application/json'
+                            }},
+                            body: JSON.stringify({{ email: email }})
+                        }});
+                        const data = await response.json();
+                        if (response.ok) {{
+                            alert(data.message || 'User deleted successfully!');
+                            location.reload();
+                        }} else {{
+                            alert('Error: ' + (data.detail || 'Failed to delete user.'));
+                        }}
+                    }} catch (err) {{
+                        alert('Network Error: ' + err.message);
+                    }}
+                }}
+
+                async function updateInviteRole(token, role) {{
+                    try {{
+                        const response = await fetch('/dashboard/invite/update-role', {{
+                            method: 'POST',
+                            headers: {{
+                                'Content-Type': 'application/json'
+                            }},
+                            body: JSON.stringify({{ token: token, role: role }})
+                        }});
+                        const data = await response.json();
+                        if (response.ok) {{
+                            alert(data.message || 'Invitation access level updated successfully!');
+                            location.reload();
+                        }} else {{
+                            alert('Error: ' + (data.detail || 'Failed to update invitation role.'));
+                            location.reload();
+                        }}
+                    }} catch (err) {{
+                        alert('Network Error: ' + err.message);
+                        location.reload();
+                    }}
+                }}
+
+                async function deleteInvite(token) {{
+                    if (!confirm('Are you sure you want to cancel and delete this invitation? The registration link will be permanently invalidated.')) {{
+                        return;
+                    }}
+                    try {{
+                        const response = await fetch('/dashboard/invite/delete', {{
+                            method: 'POST',
+                            headers: {{
+                                'Content-Type': 'application/json'
+                            }},
+                            body: JSON.stringify({{ token: token }})
+                        }});
+                        const data = await response.json();
+                        if (response.ok) {{
+                            alert(data.message || 'Invitation deleted successfully!');
+                            location.reload();
+                        }} else {{
+                            alert('Error: ' + (data.detail || 'Failed to delete invitation.'));
+                        }}
+                    }} catch (err) {{
+                        alert('Network Error: ' + err.message);
+                    }}
+                }}
+
                 async function submitSettings(event) {{
                     event.preventDefault();
                     const alertBox = document.getElementById('alert-box');
@@ -3111,6 +3258,155 @@ def view_settings(request: Request, client_id: Optional[int] = None):
         </body>
     </html>
     """
+
+
+@app.post("/dashboard/user/update-role")
+def update_user_role(request: Request, req_data: UserRoleUpdate):
+    email = is_authenticated(request)
+    if not email:
+        raise HTTPException(status_code=401, detail="Session expired. Please log in again.")
+    user_role, user_client_id = get_user_role_and_client(email)
+    if user_role != "full":
+        raise HTTPException(status_code=403, detail="Unauthorized: Only managers and administrators can manage roles.")
+    
+    target_email = req_data.email.strip().lower()
+    if email.strip().lower() == target_email:
+        raise HTTPException(status_code=400, detail="You cannot modify your own role.")
+        
+    try:
+        conn = db_router.connect()
+        cursor = conn.cursor()
+        
+        # Verify the target user exists and belongs to the same client_id (if restricted)
+        cursor.execute("SELECT client_id FROM users WHERE LOWER(TRIM(email)) = ?", (target_email,))
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            raise HTTPException(status_code=404, detail="User not found.")
+            
+        target_client_id = row[0]
+        if user_client_id is not None and target_client_id != user_client_id:
+            conn.close()
+            raise HTTPException(status_code=403, detail="Unauthorized: You do not have permission to manage this user.")
+            
+        cursor.execute("UPDATE users SET role = ? WHERE LOWER(TRIM(email)) = ?", (req_data.role, target_email))
+        conn.commit()
+        conn.close()
+        return {"status": "success", "message": f"Successfully updated role for {target_email} to {req_data.role}."}
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+@app.post("/dashboard/user/delete")
+def delete_user(request: Request, req_data: UserDelete):
+    email = is_authenticated(request)
+    if not email:
+        raise HTTPException(status_code=401, detail="Session expired. Please log in again.")
+    user_role, user_client_id = get_user_role_and_client(email)
+    if user_role != "full":
+        raise HTTPException(status_code=403, detail="Unauthorized: Only managers and administrators can delete users.")
+    
+    target_email = req_data.email.strip().lower()
+    if email.strip().lower() == target_email:
+        raise HTTPException(status_code=400, detail="You cannot delete your own account.")
+        
+    try:
+        conn = db_router.connect()
+        cursor = conn.cursor()
+        
+        # Verify the target user exists and belongs to the same client_id (if restricted)
+        cursor.execute("SELECT client_id FROM users WHERE LOWER(TRIM(email)) = ?", (target_email,))
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            raise HTTPException(status_code=404, detail="User not found.")
+            
+        target_client_id = row[0]
+        if user_client_id is not None and target_client_id != user_client_id:
+            conn.close()
+            raise HTTPException(status_code=403, detail="Unauthorized: You do not have permission to delete this user.")
+            
+        cursor.execute("DELETE FROM users WHERE LOWER(TRIM(email)) = ?", (target_email,))
+        # Also clean up any active sessions for the deleted user
+        cursor.execute("DELETE FROM user_sessions WHERE LOWER(TRIM(email)) = ?", (target_email,))
+        
+        conn.commit()
+        conn.close()
+        return {"status": "success", "message": f"Successfully removed user {target_email} from the platform."}
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+@app.post("/dashboard/invite/update-role")
+def update_invite_role(request: Request, req_data: InviteRoleUpdate):
+    email = is_authenticated(request)
+    if not email:
+        raise HTTPException(status_code=401, detail="Session expired. Please log in again.")
+    user_role, user_client_id = get_user_role_and_client(email)
+    if user_role != "full":
+        raise HTTPException(status_code=403, detail="Unauthorized: Only managers and administrators can manage invitations.")
+        
+    try:
+        conn = db_router.connect()
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT client_id FROM user_invitations WHERE token = ? AND is_used = 'NO'", (req_data.token,))
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Active invitation not found.")
+            
+        target_client_id = row[0]
+        if user_client_id is not None and target_client_id != user_client_id:
+            conn.close()
+            raise HTTPException(status_code=403, detail="Unauthorized: You do not have permission to manage this invitation.")
+            
+        cursor.execute("UPDATE user_invitations SET role = ? WHERE token = ?", (req_data.role, req_data.token))
+        conn.commit()
+        conn.close()
+        return {"status": "success", "message": "Successfully updated invitation role."}
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+@app.post("/dashboard/invite/delete")
+def delete_invite_endpoint(request: Request, req_data: InviteDelete):
+    email = is_authenticated(request)
+    if not email:
+        raise HTTPException(status_code=401, detail="Session expired. Please log in again.")
+    user_role, user_client_id = get_user_role_and_client(email)
+    if user_role != "full":
+        raise HTTPException(status_code=403, detail="Unauthorized: Only managers and administrators can delete invitations.")
+        
+    try:
+        conn = db_router.connect()
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT client_id FROM user_invitations WHERE token = ?", (req_data.token,))
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Invitation not found.")
+            
+        target_client_id = row[0]
+        if user_client_id is not None and target_client_id != user_client_id:
+            conn.close()
+            raise HTTPException(status_code=403, detail="Unauthorized: You do not have permission to delete this invitation.")
+            
+        cursor.execute("DELETE FROM user_invitations WHERE token = ?", (req_data.token,))
+        conn.commit()
+        conn.close()
+        return {"status": "success", "message": "Successfully deleted/canceled the invitation."}
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
 @app.post("/dashboard/invite")
