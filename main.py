@@ -422,6 +422,8 @@ def init_db():
             reason TEXT, -- Claude's justification
             model_used TEXT, -- Claude model name
             raw_data TEXT, -- JSON payload for debugging
+            match_fuzzy TEXT DEFAULT 'NO',
+            certainty_score INTEGER DEFAULT 100,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (client_id) REFERENCES clients (id)
         )
@@ -433,7 +435,9 @@ def init_db():
     session_cols_to_verify = [
         ("fbclid", "TEXT"),
         ("li_fat_id", "TEXT"),
-        ("msclkid", "TEXT")
+        ("msclkid", "TEXT"),
+        ("match_fuzzy", "TEXT DEFAULT 'NO'"),
+        ("certainty_score", "INTEGER DEFAULT 100")
     ]
     for col_name, col_type in session_cols_to_verify:
         if col_name not in existing_session_cols:
@@ -1180,7 +1184,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
         if selected_client_id == 0:
             # Multi-Client (All Clients) View - Join with clients table to display client names
             cursor.execute("""
-                SELECT s.id, s.phone, s.email, s.name, s.company, s.gclid, s.source, s.qualified, s.sale_closed, s.value, s.reason, s.created_at, c.name, s.fbclid, s.li_fat_id, s.msclkid
+                SELECT s.id, s.phone, s.email, s.name, s.company, s.gclid, s.source, s.qualified, s.sale_closed, s.value, s.reason, s.created_at, c.name, s.fbclid, s.li_fat_id, s.msclkid, s.match_fuzzy, s.certainty_score
                 FROM sessions s
                 LEFT JOIN clients c ON s.client_id = c.id
                 ORDER BY s.created_at DESC
@@ -1191,7 +1195,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
         else:
             # Single-Client Filtered View
             cursor.execute("""
-                SELECT s.id, s.phone, s.email, s.name, s.company, s.gclid, s.source, s.qualified, s.sale_closed, s.value, s.reason, s.created_at, c.name, s.fbclid, s.li_fat_id, s.msclkid
+                SELECT s.id, s.phone, s.email, s.name, s.company, s.gclid, s.source, s.qualified, s.sale_closed, s.value, s.reason, s.created_at, c.name, s.fbclid, s.li_fat_id, s.msclkid, s.match_fuzzy, s.certainty_score
                 FROM sessions s
                 LEFT JOIN clients c ON s.client_id = c.id
                 WHERE s.client_id = ?
@@ -1236,7 +1240,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
     # Convert rows to table items
     table_rows_html = ""
     for r in rows:
-        id_val, phone, email, name, company, gclid, source, qualified, sale_closed, value, reason, created_at, client_name_linked, fbclid, li_fat_id, msclkid = r
+        id_val, phone, email, name, company, gclid, source, qualified, sale_closed, value, reason, created_at, client_name_linked, fbclid, li_fat_id, msclkid, match_fuzzy, certainty_score = r
         
         qual_badge = '<span style="background: #e8f5e9; color: #2e7d32; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 12px;">YES</span>' if qualified == 'YES' else '<span style="background: #ffebee; color: #c62828; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 12px;">NO</span>'
         closed_badge = '<span style="background: #e8f5e9; color: #2e7d32; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 12px;">YES</span>' if sale_closed == 'YES' else '<span style="background: #ffebee; color: #c62828; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 12px;">NO</span>'
@@ -1258,6 +1262,15 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
         # Display the client column only in the multi-client view
         client_column_html = f'<td><span class="client-badge">{client_name_linked}</span></td>' if selected_client_id == 0 else ''
         
+        # Determine Matching Method & Certainty Badge
+        if sale_closed == 'YES':
+            if match_fuzzy == 'YES':
+                matching_badge = f'<td><span style="background-color: #fff3cd; color: #856404; border: 1px solid #ffe0b2; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 11px; white-space: nowrap;">🔍 Fuzzy Match ({certainty_score or 0}%)</span></td>'
+            else:
+                matching_badge = f'<td><span style="background-color: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 11px; white-space: nowrap;">✅ Exact Match ({certainty_score or 100}%)</span></td>'
+        else:
+            matching_badge = '<td><span style="color: #666; font-style: italic; font-size: 11px; white-space: nowrap;">Direct Tracking</span></td>'
+
         # Beautiful lead source delineation (Phone Call vs Web Form)
         source_lower = str(source).lower() if source else ""
         if 'form' in source_lower:
@@ -1278,12 +1291,13 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
             <td>{qual_badge}</td>
             <td>{closed_badge}</td>
             <td>{value_display}</td>
+            {matching_badge}
             <td><small>{reason or 'N/A'}</small></td>
         </tr>
         """
 
     if not table_rows_html:
-        table_rows_html = f'<tr><td colspan="{"10" if selected_client_id == 0 else "9"}" style="text-align: center; color: #888; padding: 40px;">No lead sessions recorded for this client. Set up their CallRail webhook to populate this space!</td></tr>'
+        table_rows_html = f'<tr><td colspan="{"11" if selected_client_id == 0 else "10"}" style="text-align: center; color: #888; padding: 40px;">No lead sessions recorded for this client. Set up their CallRail webhook to populate this space!</td></tr>'
 
     # Build multi-channel action buttons dynamically
     if selected_client_id == 0:
@@ -1459,6 +1473,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                                 <th>Qualified</th>
                                 <th>Closed</th>
                                 <th>Value</th>
+                                <th>Matching Method</th>
                                 <th>Claude Decision Reasoning</th>
                             </tr>
                         </thead>
