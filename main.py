@@ -440,6 +440,7 @@ def init_db():
         ("tiktok_ads_id", "TEXT"),
         ("twitter_ads_id", "TEXT"),
         ("pinterest_ads_id", "TEXT"),
+        ("snapchat_ads_id", "TEXT"),
         ("chatgpt_ads_id", "TEXT"),
         ("linkedin_ads_id", "TEXT"),
         ("microsoft_ads_id", "TEXT"),
@@ -536,6 +537,7 @@ def init_db():
         ("ttclid", "TEXT"),
         ("twclid", "TEXT"),
         ("pin_clid", "TEXT"),
+        ("scclid", "TEXT"),
         ("gptclid", "TEXT"),
         ("li_fat_id", "TEXT"),
         ("msclkid", "TEXT"),
@@ -565,7 +567,7 @@ def init_db():
                 lead_gen_method, qualification_criteria, source_of_truth, email_provider, email_account,
                 crm_deal_tags, crm_won_deal_tags, crm_lead_tags, lead_count_rule, exclude_past_customers
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, mock_clients)
         print("Seeded 3 mock agency clients successfully!")
     
@@ -818,6 +820,7 @@ class FormLead(BaseModel):
     ttclid: Optional[str] = None
     twclid: Optional[str] = None
     pin_clid: Optional[str] = None
+    scclid: Optional[str] = None
     gptclid: Optional[str] = None
 
 
@@ -842,6 +845,8 @@ class ClientCreate(BaseModel):
     tiktok_ads_id: Optional[str] = ""
     twitter_ads_id: Optional[str] = ""
     pinterest_ads_id: Optional[str] = ""
+    snapchat_ads_id: Optional[str] = ""
+    snapchat_ads_id: Optional[str] = ""
     chatgpt_ads_id: Optional[str] = ""
     linkedin_ads_id: Optional[str] = ""
     microsoft_ads_id: Optional[str] = ""
@@ -1349,6 +1354,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
     exportable_tiktok = sum(1 for r in rows if len(r) > 18 and r[18] and (r[7] == 'YES' or r[8] == 'YES'))
     exportable_twitter = sum(1 for r in rows if len(r) > 19 and r[19] and (r[7] == 'YES' or r[8] == 'YES'))
     exportable_pinterest = sum(1 for r in rows if len(r) > 20 and r[20] and (r[7] == 'YES' or r[8] == 'YES'))
+    exportable_snapchat = sum(1 for r in rows if len(r) > 21 and r[21] and (r[7] == 'YES' or r[8] == 'YES'))
     exportable_chatgpt = sum(1 for r in rows if len(r) > 21 and r[21] and (r[7] == 'YES' or r[8] == 'YES'))
 
     # Generate the Selector Dropdown Options
@@ -1396,6 +1402,8 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
             click_ids_list.append(f'<span style="display:inline-block; margin-bottom: 2px;"><strong style="color: #1DA1F2; font-size: 10px;">X:</strong> <code style="background: #f1f3f4; padding: 1px 4px; border-radius: 3px; font-size: 11px; display: inline-block; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;" title="{twclid}">{twclid}</code></span>')
         if pin_clid:
             click_ids_list.append(f'<span style="display:inline-block; margin-bottom: 2px;"><strong style="color: #E60023; font-size: 10px;">P:</strong> <code style="background: #f1f3f4; padding: 1px 4px; border-radius: 3px; font-size: 11px; display: inline-block; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;" title="{pin_clid}">{pin_clid}</code></span>')
+        if scclid:
+            click_ids_list.append(f'<span style="display:inline-block; margin-bottom: 2px;"><strong style="color: #E9B800; background: #000; padding: 1px 3px; border-radius: 2px; font-size: 10px;">SC:</strong> <code style="background: #f1f3f4; padding: 1px 4px; border-radius: 3px; font-size: 11px; display: inline-block; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;" title="{scclid}">{scclid}</code></span>')
         if gptclid:
             click_ids_list.append(f'<span style="display:inline-block; margin-bottom: 2px;"><strong style="color: #10a37f; font-size: 10px;">GPT:</strong> <code style="background: #f1f3f4; padding: 1px 4px; border-radius: 3px; font-size: 11px; display: inline-block; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;" title="{gptclid}">{gptclid}</code></span>')
             
@@ -1476,6 +1484,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
         tiktok_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their TikTok conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
         twitter_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their X Ads conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
         pinterest_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Pinterest conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
+        snapchat_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Snapchat conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
         chatgpt_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their ChatGPT Ads conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
     else:
         google_export_button = f'<a href="/dashboard/export/google?client_id={selected_client_id}" class="btn-export" style="background-color: #4285F4; text-align: center; text-decoration: none; width: 100%;">📥 Download Google CSV ({exportable_google})</a>'
@@ -1489,6 +1498,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
         tiktok_export_button = f'<a href="/dashboard/export/tiktok?client_id={selected_client_id}" class="btn-export" style="background-color: #010101; text-align: center; text-decoration: none; width: 100%;">📥 Download TikTok CSV ({exportable_tiktok})</a>'
         twitter_export_button = f'<a href="/dashboard/export/twitter?client_id={selected_client_id}" class="btn-export" style="background-color: #15202B; text-align: center; text-decoration: none; width: 100%;">📥 Download X Ads CSV ({exportable_twitter})</a>'
         pinterest_export_button = f'<a href="/dashboard/export/pinterest?client_id={selected_client_id}" class="btn-export" style="background-color: #E60023; text-align: center; text-decoration: none; width: 100%;">📥 Download Pinterest CSV ({exportable_pinterest})</a>'
+        snapchat_export_button = f'<a href="/dashboard/export/snapchat?client_id={selected_client_id}" class="btn-export" style="background-color: #E9B800; color: #000; text-align: center; text-decoration: none; width: 100%;">📥 Download Snapchat CSV ({exportable_snapchat})</a>'
         chatgpt_export_button = f'<a href="/dashboard/export/chatgpt?client_id={selected_client_id}" class="btn-export" style="background-color: #10a37f; text-align: center; text-decoration: none; width: 100%;">📥 Download ChatGPT CSV ({exportable_chatgpt})</a>'
 
     # Conditionally show the Client header column
@@ -1934,6 +1944,14 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                             </div>
                             {twitter_export_button}
                         </div>
+                        <!-- Snapchat Ads -->
+                        <div class="export-card">
+                            <div>
+                                <h4 style="color: #000; background: #FFFC00; display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 13px;">Snapchat Ads (SCCLID)</h4>
+                                <p style="margin-top: 5px;">Export offline event transactions directly into Snapchat Ads Pixel conversions manager.</p>
+                            </div>
+                            {snapchat_export_button}
+                        </div>
                         <!-- Pinterest Ads -->
                         <div class="export-card">
                             <div>
@@ -2077,6 +2095,8 @@ class ClientUpdate(BaseModel):
     tiktok_ads_id: Optional[str] = ""
     twitter_ads_id: Optional[str] = ""
     pinterest_ads_id: Optional[str] = ""
+    snapchat_ads_id: Optional[str] = ""
+    snapchat_ads_id: Optional[str] = ""
     chatgpt_ads_id: Optional[str] = ""
     linkedin_ads_id: Optional[str] = ""
     microsoft_ads_id: Optional[str] = ""
@@ -2703,6 +2723,10 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                 <div class="form-group">
                                     <label for="tiktok_ads_id">TikTok Ads Pixel/Account ID</label>
                                     <input type="text" id="tiktok_ads_id" value="{client_data.get("tiktok_ads_id", "") or ""}" placeholder="e.g. tt_pixel_123">
+                                </div>
+                                <div class="form-group">
+                                    <label for="snapchat_ads_id">Snapchat Ads Pixel ID</label>
+                                    <input type="text" id="snapchat_ads_id" value="{client_data.get('snapchat_ads_id', '') or ''}" placeholder="e.g. snap_pixel_123">
                                 </div>
                                 <div class="form-group">
                                     <label for="pinterest_ads_id">Pinterest Ads ID</label>
@@ -3556,6 +3580,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     const tiktokAds = document.getElementById('tiktok_ads_id').value.trim();
                     const twitterAds = document.getElementById('twitter_ads_id').value.trim();
                     const pinterestAds = document.getElementById('pinterest_ads_id').value.trim();
+                    const snapchatAds = document.getElementById('snapchat_ads_id').value.trim();
                     const chatgptAds = document.getElementById('chatgpt_ads_id').value.trim();
                     
                     let blocks = [];
@@ -3766,6 +3791,22 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     }}
 
                     
+                    if (snapchatAds) {{
+                        blocks.push(`
+                            <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #FFFC00; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                                <h4 style="margin-top: 0; color: #000; background: #FFFC00; display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 14px;">
+                                    👻 Snapchat Ads Goal Setup (ID: ${snapchatAds})
+                                </h4>
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
+                                    <li style="margin-bottom: 8px;">Log into your <strong>Snapchat Ads Manager</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Go to <strong>Assets ➡️ Events Manager</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Select your Active Web Pixel and click <strong>Create Custom Goal</strong> or <strong>Offline Conversion Event</strong>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 1 (Qualification):</strong> Name your Custom Offline Event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>. Set category to <strong>SIGN_UP</strong> or <strong>PAGE_VIEW</strong>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 2 (Offline Sale):</strong> Create another custom event. Name it <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>. Set event category to <strong>PURCHASE</strong> and enable dynamic revenue tracking.</li>
+                                </ol>
+                            </div>
+                        `);
+                    }}
                     if (pinterestAds) {{
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #E60023; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
@@ -4221,11 +4262,15 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         tiktok_ads_id: document.getElementById('tiktok_ads_id').value.trim(),
                         twitter_ads_id: document.getElementById('twitter_ads_id').value.trim(),
                         pinterest_ads_id: document.getElementById('pinterest_ads_id').value.trim(),
+                        snapchat_ads_id: document.getElementById('snapchat_ads_id').value.trim(),
+                        snapchat_ads_id: document.getElementById('snapchat_ads_id').value.trim(),
                         chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
                         chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
                         tiktok_ads_id: document.getElementById('tiktok_ads_id').value.trim(),
                         twitter_ads_id: document.getElementById('twitter_ads_id').value.trim(),
                         pinterest_ads_id: document.getElementById('pinterest_ads_id').value.trim(),
+                        snapchat_ads_id: document.getElementById('snapchat_ads_id').value.trim(),
+                        snapchat_ads_id: document.getElementById('snapchat_ads_id').value.trim(),
                         chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
                         chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
                         lead_gen_method: document.querySelector('input[name="lead_gen_method"]:checked').value,
@@ -4699,6 +4744,7 @@ def update_client_settings(request: Request, client: ClientUpdate):
             "tiktok_ads_id": "TikTok Ads Pixel/Account ID",
             "twitter_ads_id": "X (Twitter) Ads Pixel ID",
             "pinterest_ads_id": "Pinterest Ads ID",
+            "snapchat_ads_id": "Snapchat Ads Pixel ID",
             "chatgpt_ads_id": "ChatGPT Ads ID",
             "lead_gen_method": "Lead Gen Method",
             "qualification_criteria": "Qualification Criteria Option",
@@ -4728,6 +4774,7 @@ def update_client_settings(request: Request, client: ClientUpdate):
             "tiktok_ads_id": client.tiktok_ads_id or "",
             "twitter_ads_id": client.twitter_ads_id or "",
             "pinterest_ads_id": client.pinterest_ads_id or "",
+            "snapchat_ads_id": client.snapchat_ads_id or "",
             "chatgpt_ads_id": client.chatgpt_ads_id or "",
             "lead_gen_method": client.lead_gen_method,
             "qualification_criteria": client.qualification_criteria,
@@ -4764,6 +4811,7 @@ def update_client_settings(request: Request, client: ClientUpdate):
                 tiktok_ads_id = ?,
                 twitter_ads_id = ?,
                 pinterest_ads_id = ?,
+                snapchat_ads_id = ?,
                 chatgpt_ads_id = ?,
                 lead_gen_method = ?,
                 qualification_criteria = ?,
@@ -4792,6 +4840,7 @@ def update_client_settings(request: Request, client: ClientUpdate):
             client.tiktok_ads_id or "",
             client.twitter_ads_id or "",
             client.pinterest_ads_id or "",
+            client.snapchat_ads_id or "",
             client.chatgpt_ads_id or "",
             client.lead_gen_method,
             client.qualification_criteria,
@@ -5177,6 +5226,15 @@ def add_client_page(request: Request):
                             </div>
                         </div>
                         
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="snapchat_ads_id">Snapchat Ads Pixel ID</label>
+                                <input type="text" id="snapchat_ads_id" placeholder="e.g. snap_pixel_123">
+                            </div>
+                            <div class="form-group" style="visibility: hidden;">
+                                <!-- Spacer -->
+                            </div>
+                        </div>
                         <div class="form-row">
                             <div class="form-group">
                                 <div style="display: flex; align-items: center; gap: 6px;">
@@ -6170,6 +6228,7 @@ def add_client_page(request: Request):
                     const tiktokAds = document.getElementById('tiktok_ads_id').value.trim();
                     const twitterAds = document.getElementById('twitter_ads_id').value.trim();
                     const pinterestAds = document.getElementById('pinterest_ads_id').value.trim();
+                    const snapchatAds = document.getElementById('snapchat_ads_id').value.trim();
                     const chatgptAds = document.getElementById('chatgpt_ads_id').value.trim();
                     
                     let blocks = [];
@@ -6380,6 +6439,22 @@ def add_client_page(request: Request):
                     }}
 
                     
+                    if (snapchatAds) {{
+                        blocks.push(`
+                            <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #FFFC00; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                                <h4 style="margin-top: 0; color: #000; background: #FFFC00; display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 14px;">
+                                    👻 Snapchat Ads Goal Setup (ID: ${snapchatAds})
+                                </h4>
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
+                                    <li style="margin-bottom: 8px;">Log into your <strong>Snapchat Ads Manager</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Go to <strong>Assets ➡️ Events Manager</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Select your Active Web Pixel and click <strong>Create Custom Goal</strong> or <strong>Offline Conversion Event</strong>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 1 (Qualification):</strong> Name your Custom Offline Event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>. Set category to <strong>SIGN_UP</strong> or <strong>PAGE_VIEW</strong>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 2 (Offline Sale):</strong> Create another custom event. Name it <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>. Set event category to <strong>PURCHASE</strong> and enable dynamic revenue tracking.</li>
+                                </ol>
+                            </div>
+                        `);
+                    }}
                     if (pinterestAds) {{
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #E60023; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
@@ -6556,11 +6631,15 @@ def add_client_page(request: Request):
                         tiktok_ads_id: document.getElementById('tiktok_ads_id').value.trim(),
                         twitter_ads_id: document.getElementById('twitter_ads_id').value.trim(),
                         pinterest_ads_id: document.getElementById('pinterest_ads_id').value.trim(),
+                        snapchat_ads_id: document.getElementById('snapchat_ads_id').value.trim(),
+                        snapchat_ads_id: document.getElementById('snapchat_ads_id').value.trim(),
                         chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
                         chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
                         tiktok_ads_id: document.getElementById('tiktok_ads_id').value.trim(),
                         twitter_ads_id: document.getElementById('twitter_ads_id').value.trim(),
                         pinterest_ads_id: document.getElementById('pinterest_ads_id').value.trim(),
+                        snapchat_ads_id: document.getElementById('snapchat_ads_id').value.trim(),
+                        snapchat_ads_id: document.getElementById('snapchat_ads_id').value.trim(),
                         chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
                         chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
                         lead_gen_method: document.querySelector('input[name="lead_gen_method"]:checked').value,
@@ -6955,6 +7034,7 @@ def create_client(request: Request, client: ClientCreate):
             client.tiktok_ads_id or "",
             client.twitter_ads_id or "",
             client.pinterest_ads_id or "",
+            client.snapchat_ads_id or "",
             client.chatgpt_ads_id or "",
             client.lead_gen_method,
             client.qualification_criteria,
@@ -7520,6 +7600,53 @@ def export_twitter_conversions(request: Request, client_id: int):
     return StreamingResponse(output, headers=headers)
 
 
+
+@app.get("/dashboard/export/snapchat")
+def export_snapchat_conversions(request: Request, client_id: int):
+    email = is_authenticated(request)
+    if not email:
+        return RedirectResponse(url="/login", status_code=303)
+    try:
+        conn = db_router.connect()
+        cursor = conn.cursor()
+        cursor.execute("SELECT name, snapchat_ads_id FROM clients WHERE id = ?", (client_id,))
+        client_row = cursor.fetchone()
+        if not client_row:
+            raise HTTPException(status_code=400, detail="Invalid client ID")
+        client_name = client_row[0]
+        pixel_id = client_row[1] or ""
+        cursor.execute("""
+            SELECT scclid, qualified, sale_closed, value, created_at
+            FROM sessions
+            WHERE client_id = ? AND scclid IS NOT NULL AND scclid != '' AND (qualified = 'YES' OR sale_closed = 'YES')
+            ORDER BY created_at DESC
+        """, (client_id,))
+        rows = cursor.fetchall()
+        conn.close()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["scclid", "Event Name", "Event Time", "Value", "Currency", "Snapchat Pixel ID"])
+    for r in rows:
+        scclid, qualified, sale_closed, value, created_at = r
+        conv_time = f"{created_at}"
+        if sale_closed == 'YES':
+            event_name = "LeadGroove Offline Sale"
+            event_val = float(value or 0.0)
+        else:
+            event_name = "LeadGroove Qualified Lead"
+            event_val = 1.0
+        writer.writerow([scclid, event_name, conv_time, f"{event_val:.2f}", "USD", pixel_id])
+    output.seek(0)
+    safe_filename = re.sub(r'\s+', '-', client_name.strip().lower())
+    headers = {
+        'Content-Disposition': f'attachment; filename="snapchat_conversions_{safe_filename}.csv"',
+        'Content-Type': 'text/csv'
+    }
+    return StreamingResponse(output, headers=headers)
+
+
 @app.get("/dashboard/export/pinterest")
 def export_pinterest_conversions(request: Request, client_id: int):
     email = is_authenticated(request)
@@ -8011,6 +8138,7 @@ async def receive_calltrackingmetrics_webhook(request: Request, client_id: Optio
         ttclid = payload.get('ttclid') or payload.get('tiktok_click_id')
         twclid = payload.get('twclid') or payload.get('twitter_click_id') or payload.get('twitter_ads_id') or payload.get('x_click_id')
         pin_clid = payload.get('pin_clid') or payload.get('pinterest_click_id')
+        scclid = payload.get('scclid') or payload.get('snapchat_click_id')
         gptclid = payload.get('gptclid') or payload.get('chatgpt_click_id')
         
         landing_page = payload.get('landing_page_url') or payload.get('landing_page') or ""
@@ -8030,6 +8158,8 @@ async def receive_calltrackingmetrics_webhook(request: Request, client_id: Optio
             twclid = extract_param_from_url(landing_page, 'twclid') or extract_param_from_url(referrer_url, 'twclid')
         if not pin_clid:
             pin_clid = extract_param_from_url(landing_page, 'pin_clid') or extract_param_from_url(landing_page, 'p_clid') or extract_param_from_url(referrer_url, 'pin_clid') or extract_param_from_url(referrer_url, 'p_clid')
+        if not scclid:
+            scclid = extract_param_from_url(landing_page, 'scclid') or extract_param_from_url(referrer_url, 'scclid')
         if not gptclid:
             gptclid = extract_param_from_url(landing_page, 'gptclid') or extract_param_from_url(referrer_url, 'gptclid')
         if not ttclid:
@@ -8038,6 +8168,8 @@ async def receive_calltrackingmetrics_webhook(request: Request, client_id: Optio
             twclid = extract_param_from_url(landing_page, 'twclid') or extract_param_from_url(referrer_url, 'twclid')
         if not pin_clid:
             pin_clid = extract_param_from_url(landing_page, 'pin_clid') or extract_param_from_url(landing_page, 'p_clid') or extract_param_from_url(referrer_url, 'pin_clid') or extract_param_from_url(referrer_url, 'p_clid')
+        if not scclid:
+            scclid = extract_param_from_url(landing_page, 'scclid') or extract_param_from_url(referrer_url, 'scclid')
         if not gptclid:
             gptclid = extract_param_from_url(landing_page, 'gptclid') or extract_param_from_url(referrer_url, 'gptclid')
         if not ttclid:
@@ -8046,6 +8178,8 @@ async def receive_calltrackingmetrics_webhook(request: Request, client_id: Optio
             twclid = extract_param_from_url(landing_page, 'twclid') or extract_param_from_url(referrer_url, 'twclid')
         if not pin_clid:
             pin_clid = extract_param_from_url(landing_page, 'pin_clid') or extract_param_from_url(landing_page, 'p_clid') or extract_param_from_url(referrer_url, 'pin_clid') or extract_param_from_url(referrer_url, 'p_clid')
+        if not scclid:
+            scclid = extract_param_from_url(landing_page, 'scclid') or extract_param_from_url(referrer_url, 'scclid')
         if not gptclid:
             gptclid = extract_param_from_url(landing_page, 'gptclid') or extract_param_from_url(referrer_url, 'gptclid')
             
@@ -8200,6 +8334,7 @@ async def receive_whatconverts_webhook(request: Request, client_id: Optional[int
         ttclid = payload.get('ttclid') or payload.get('tiktok_click_id')
         twclid = payload.get('twclid') or payload.get('twitter_click_id') or payload.get('twitter_ads_id') or payload.get('x_click_id')
         pin_clid = payload.get('pin_clid') or payload.get('pinterest_click_id')
+        scclid = payload.get('scclid') or payload.get('snapchat_click_id')
         gptclid = payload.get('gptclid') or payload.get('chatgpt_click_id')
         
         landing_page = payload.get('landing_page_url') or payload.get('landing_page') or ""
@@ -8219,6 +8354,8 @@ async def receive_whatconverts_webhook(request: Request, client_id: Optional[int
             twclid = extract_param_from_url(landing_page, 'twclid') or extract_param_from_url(referrer_url, 'twclid')
         if not pin_clid:
             pin_clid = extract_param_from_url(landing_page, 'pin_clid') or extract_param_from_url(landing_page, 'p_clid') or extract_param_from_url(referrer_url, 'pin_clid') or extract_param_from_url(referrer_url, 'p_clid')
+        if not scclid:
+            scclid = extract_param_from_url(landing_page, 'scclid') or extract_param_from_url(referrer_url, 'scclid')
         if not gptclid:
             gptclid = extract_param_from_url(landing_page, 'gptclid') or extract_param_from_url(referrer_url, 'gptclid')
         if not ttclid:
@@ -8227,6 +8364,8 @@ async def receive_whatconverts_webhook(request: Request, client_id: Optional[int
             twclid = extract_param_from_url(landing_page, 'twclid') or extract_param_from_url(referrer_url, 'twclid')
         if not pin_clid:
             pin_clid = extract_param_from_url(landing_page, 'pin_clid') or extract_param_from_url(landing_page, 'p_clid') or extract_param_from_url(referrer_url, 'pin_clid') or extract_param_from_url(referrer_url, 'p_clid')
+        if not scclid:
+            scclid = extract_param_from_url(landing_page, 'scclid') or extract_param_from_url(referrer_url, 'scclid')
         if not gptclid:
             gptclid = extract_param_from_url(landing_page, 'gptclid') or extract_param_from_url(referrer_url, 'gptclid')
         if not ttclid:
@@ -8235,6 +8374,8 @@ async def receive_whatconverts_webhook(request: Request, client_id: Optional[int
             twclid = extract_param_from_url(landing_page, 'twclid') or extract_param_from_url(referrer_url, 'twclid')
         if not pin_clid:
             pin_clid = extract_param_from_url(landing_page, 'pin_clid') or extract_param_from_url(landing_page, 'p_clid') or extract_param_from_url(referrer_url, 'pin_clid') or extract_param_from_url(referrer_url, 'p_clid')
+        if not scclid:
+            scclid = extract_param_from_url(landing_page, 'scclid') or extract_param_from_url(referrer_url, 'scclid')
         if not gptclid:
             gptclid = extract_param_from_url(landing_page, 'gptclid') or extract_param_from_url(referrer_url, 'gptclid')
             
@@ -8392,6 +8533,7 @@ async def receive_callrail_webhook(request: Request, client_id: Optional[int] = 
         ttclid = payload.get('ttclid') or payload.get('tiktok_click_id')
         twclid = payload.get('twclid') or payload.get('twitter_click_id') or payload.get('twitter_ads_id') or payload.get('x_click_id')
         pin_clid = payload.get('pin_clid') or payload.get('pinterest_click_id')
+        scclid = payload.get('scclid') or payload.get('snapchat_click_id')
         gptclid = payload.get('gptclid') or payload.get('chatgpt_click_id')
         
         # Fallback to milestones block if top-level fields are missing in payload
@@ -8434,6 +8576,8 @@ async def receive_callrail_webhook(request: Request, client_id: Optional[int] = 
             twclid = extract_param_from_url(landing_page, 'twclid') or extract_param_from_url(referrer_url, 'twclid')
         if not pin_clid:
             pin_clid = extract_param_from_url(landing_page, 'pin_clid') or extract_param_from_url(landing_page, 'p_clid') or extract_param_from_url(referrer_url, 'pin_clid') or extract_param_from_url(referrer_url, 'p_clid')
+        if not scclid:
+            scclid = extract_param_from_url(landing_page, 'scclid') or extract_param_from_url(referrer_url, 'scclid')
         if not gptclid:
             gptclid = extract_param_from_url(landing_page, 'gptclid') or extract_param_from_url(referrer_url, 'gptclid')
         if not ttclid:
@@ -8442,6 +8586,8 @@ async def receive_callrail_webhook(request: Request, client_id: Optional[int] = 
             twclid = extract_param_from_url(landing_page, 'twclid') or extract_param_from_url(referrer_url, 'twclid')
         if not pin_clid:
             pin_clid = extract_param_from_url(landing_page, 'pin_clid') or extract_param_from_url(landing_page, 'p_clid') or extract_param_from_url(referrer_url, 'pin_clid') or extract_param_from_url(referrer_url, 'p_clid')
+        if not scclid:
+            scclid = extract_param_from_url(landing_page, 'scclid') or extract_param_from_url(referrer_url, 'scclid')
         if not gptclid:
             gptclid = extract_param_from_url(landing_page, 'gptclid') or extract_param_from_url(referrer_url, 'gptclid')
         if not ttclid:
@@ -8450,6 +8596,8 @@ async def receive_callrail_webhook(request: Request, client_id: Optional[int] = 
             twclid = extract_param_from_url(landing_page, 'twclid') or extract_param_from_url(referrer_url, 'twclid')
         if not pin_clid:
             pin_clid = extract_param_from_url(landing_page, 'pin_clid') or extract_param_from_url(landing_page, 'p_clid') or extract_param_from_url(referrer_url, 'pin_clid') or extract_param_from_url(referrer_url, 'p_clid')
+        if not scclid:
+            scclid = extract_param_from_url(landing_page, 'scclid') or extract_param_from_url(referrer_url, 'scclid')
         if not gptclid:
             gptclid = extract_param_from_url(landing_page, 'gptclid') or extract_param_from_url(referrer_url, 'gptclid')
             
@@ -8614,7 +8762,7 @@ async def receive_form_lead(lead: FormLead, client_id: Optional[int] = None):
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO sessions (client_id, phone, email, name, company, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, gptclid, source, qualified, sale_closed, reason)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             resolved_client_id, 
             normalized_phone, 
