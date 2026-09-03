@@ -440,6 +440,7 @@ def init_db():
         ("tiktok_ads_id", "TEXT"),
         ("twitter_ads_id", "TEXT"),
         ("pinterest_ads_id", "TEXT"),
+        ("chatgpt_ads_id", "TEXT"),
         ("linkedin_ads_id", "TEXT"),
         ("microsoft_ads_id", "TEXT"),
         ("lead_gen_method", "TEXT"),
@@ -535,6 +536,7 @@ def init_db():
         ("ttclid", "TEXT"),
         ("twclid", "TEXT"),
         ("pin_clid", "TEXT"),
+        ("gptclid", "TEXT"),
         ("li_fat_id", "TEXT"),
         ("msclkid", "TEXT"),
         ("match_fuzzy", "TEXT DEFAULT 'NO'"),
@@ -563,7 +565,7 @@ def init_db():
                 lead_gen_method, qualification_criteria, source_of_truth, email_provider, email_account,
                 crm_deal_tags, crm_won_deal_tags, crm_lead_tags, lead_count_rule, exclude_past_customers
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, mock_clients)
         print("Seeded 3 mock agency clients successfully!")
     
@@ -816,6 +818,7 @@ class FormLead(BaseModel):
     ttclid: Optional[str] = None
     twclid: Optional[str] = None
     pin_clid: Optional[str] = None
+    gptclid: Optional[str] = None
 
 
 class ExcludedCustomer(BaseModel):
@@ -839,6 +842,7 @@ class ClientCreate(BaseModel):
     tiktok_ads_id: Optional[str] = ""
     twitter_ads_id: Optional[str] = ""
     pinterest_ads_id: Optional[str] = ""
+    chatgpt_ads_id: Optional[str] = ""
     linkedin_ads_id: Optional[str] = ""
     microsoft_ads_id: Optional[str] = ""
     lead_gen_method: str
@@ -1281,7 +1285,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
         cursor = conn.cursor()
         
         # 1. Fetch All Available Clients for the Dropdown Selector
-        cursor.execute("SELECT id, name, google_ads_customer_id, facebook_ads_id, linkedin_ads_id, microsoft_ads_id, tiktok_ads_id, twitter_ads_id, pinterest_ads_id FROM clients ORDER BY name ASC")
+        cursor.execute("SELECT id, name, google_ads_customer_id, facebook_ads_id, linkedin_ads_id, microsoft_ads_id, tiktok_ads_id, twitter_ads_id, pinterest_ads_id, chatgpt_ads_id FROM clients ORDER BY name ASC")
         clients = cursor.fetchall()
         
         # Determine filtering
@@ -1302,7 +1306,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
         if selected_client_id == 0:
             # Multi-Client (All Clients) View - Join with clients table to display client names
             cursor.execute("""
-                SELECT s.id, s.phone, s.email, s.name, s.company, s.gclid, s.source, s.qualified, s.sale_closed, s.value, s.reason, s.created_at, c.name, s.fbclid, s.li_fat_id, s.msclkid, s.match_fuzzy, s.certainty_score, s.ttclid, s.twclid, s.pin_clid, s.adjusted, s.adjusted_value, s.adjustment_type, s.adjusted_at
+                SELECT s.id, s.phone, s.email, s.name, s.company, s.gclid, s.source, s.qualified, s.sale_closed, s.value, s.reason, s.created_at, c.name, s.fbclid, s.li_fat_id, s.msclkid, s.match_fuzzy, s.certainty_score, s.ttclid, s.twclid, s.pin_clid, s.gptclid, s.adjusted, s.adjusted_value, s.adjustment_type, s.adjusted_at
                 FROM sessions s
                 LEFT JOIN clients c ON s.client_id = c.id
                 ORDER BY s.created_at DESC
@@ -1313,7 +1317,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
         else:
             # Single-Client Filtered View
             cursor.execute("""
-                SELECT s.id, s.phone, s.email, s.name, s.company, s.gclid, s.source, s.qualified, s.sale_closed, s.value, s.reason, s.created_at, c.name, s.fbclid, s.li_fat_id, s.msclkid, s.match_fuzzy, s.certainty_score, s.ttclid, s.twclid, s.pin_clid, s.adjusted, s.adjusted_value, s.adjustment_type, s.adjusted_at
+                SELECT s.id, s.phone, s.email, s.name, s.company, s.gclid, s.source, s.qualified, s.sale_closed, s.value, s.reason, s.created_at, c.name, s.fbclid, s.li_fat_id, s.msclkid, s.match_fuzzy, s.certainty_score, s.ttclid, s.twclid, s.pin_clid, s.gptclid, s.adjusted, s.adjusted_value, s.adjustment_type, s.adjusted_at
                 FROM sessions s
                 LEFT JOIN clients c ON s.client_id = c.id
                 WHERE s.client_id = ?
@@ -1345,23 +1349,24 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
     exportable_tiktok = sum(1 for r in rows if len(r) > 18 and r[18] and (r[7] == 'YES' or r[8] == 'YES'))
     exportable_twitter = sum(1 for r in rows if len(r) > 19 and r[19] and (r[7] == 'YES' or r[8] == 'YES'))
     exportable_pinterest = sum(1 for r in rows if len(r) > 20 and r[20] and (r[7] == 'YES' or r[8] == 'YES'))
+    exportable_chatgpt = sum(1 for r in rows if len(r) > 21 and r[21] and (r[7] == 'YES' or r[8] == 'YES'))
 
     # Generate the Selector Dropdown Options
     dropdown_options = ""
     if user_client_id is not None:
         restricted_clients = [c for c in clients if c[0] == user_client_id]
-        for c_id, c_name, c_ads, c_fb, c_li, c_ms, c_tt, c_tw, c_pin in restricted_clients:
+        for c_id, c_name, c_ads, c_fb, c_li, c_ms, c_tt, c_tw, c_pin, c_gpt in restricted_clients:
             dropdown_options += f'<option value="{c_id}" selected>👤 {c_name} (Ads: {c_ads})</option>'
     else:
         dropdown_options = f'<option value="0" {"selected" if selected_client_id == 0 else ""}>📂 [Show All Clients / Agency View]</option>'
-        for c_id, c_name, c_ads, c_fb, c_li, c_ms, c_tt, c_tw, c_pin in clients:
+        for c_id, c_name, c_ads, c_fb, c_li, c_ms, c_tt, c_tw, c_pin, c_gpt in clients:
             is_selected = "selected" if selected_client_id == c_id else ""
             dropdown_options += f'<option value="{c_id}" {is_selected}>👤 {c_name} (Ads: {c_ads})</option>'
 
     # Convert rows to table items
     table_rows_html = ""
     for r in rows:
-        id_val, phone, email, name, company, gclid, source, qualified, sale_closed, value, reason, created_at, client_name_linked, fbclid, li_fat_id, msclkid, match_fuzzy, certainty_score, ttclid, twclid, pin_clid, adjusted, adjusted_value, adjustment_type, adjusted_at = r
+        id_val, phone, email, name, company, gclid, source, qualified, sale_closed, value, reason, created_at, client_name_linked, fbclid, li_fat_id, msclkid, match_fuzzy, certainty_score, ttclid, twclid, pin_clid, gptclid, adjusted, adjusted_value, adjustment_type, adjusted_at = r
         
         qual_badge = '<span style="background: #e8f5e9; color: #2e7d32; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 12px;">YES</span>' if qualified == 'YES' else '<span style="background: #ffebee; color: #c62828; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 12px;">NO</span>'
         
@@ -1391,6 +1396,8 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
             click_ids_list.append(f'<span style="display:inline-block; margin-bottom: 2px;"><strong style="color: #1DA1F2; font-size: 10px;">X:</strong> <code style="background: #f1f3f4; padding: 1px 4px; border-radius: 3px; font-size: 11px; display: inline-block; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;" title="{twclid}">{twclid}</code></span>')
         if pin_clid:
             click_ids_list.append(f'<span style="display:inline-block; margin-bottom: 2px;"><strong style="color: #E60023; font-size: 10px;">P:</strong> <code style="background: #f1f3f4; padding: 1px 4px; border-radius: 3px; font-size: 11px; display: inline-block; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;" title="{pin_clid}">{pin_clid}</code></span>')
+        if gptclid:
+            click_ids_list.append(f'<span style="display:inline-block; margin-bottom: 2px;"><strong style="color: #10a37f; font-size: 10px;">GPT:</strong> <code style="background: #f1f3f4; padding: 1px 4px; border-radius: 3px; font-size: 11px; display: inline-block; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;" title="{gptclid}">{gptclid}</code></span>')
             
         click_ids_display = "<br>".join(click_ids_list) if click_ids_list else '<span style="color: #999; font-style: italic;">None detected</span>'
         if adjusted == 'YES' and adjustment_type == 'RETRACT':
@@ -1469,6 +1476,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
         tiktok_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their TikTok conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
         twitter_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their X Ads conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
         pinterest_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Pinterest conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
+        chatgpt_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their ChatGPT Ads conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
     else:
         google_export_button = f'<a href="/dashboard/export/google?client_id={selected_client_id}" class="btn-export" style="background-color: #4285F4; text-align: center; text-decoration: none; width: 100%;">📥 Download Google CSV ({exportable_google})</a>'
         google_adjustments_button = f'<a href="/dashboard/export/google-adjustments?client_id={selected_client_id}" class="btn-export" style="background-color: #37474F; text-align: center; text-decoration: none; width: 100%;">📥 Download Google Adjustments CSV ({exportable_adjustments})</a>'
@@ -1481,6 +1489,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
         tiktok_export_button = f'<a href="/dashboard/export/tiktok?client_id={selected_client_id}" class="btn-export" style="background-color: #010101; text-align: center; text-decoration: none; width: 100%;">📥 Download TikTok CSV ({exportable_tiktok})</a>'
         twitter_export_button = f'<a href="/dashboard/export/twitter?client_id={selected_client_id}" class="btn-export" style="background-color: #15202B; text-align: center; text-decoration: none; width: 100%;">📥 Download X Ads CSV ({exportable_twitter})</a>'
         pinterest_export_button = f'<a href="/dashboard/export/pinterest?client_id={selected_client_id}" class="btn-export" style="background-color: #E60023; text-align: center; text-decoration: none; width: 100%;">📥 Download Pinterest CSV ({exportable_pinterest})</a>'
+        chatgpt_export_button = f'<a href="/dashboard/export/chatgpt?client_id={selected_client_id}" class="btn-export" style="background-color: #10a37f; text-align: center; text-decoration: none; width: 100%;">📥 Download ChatGPT CSV ({exportable_chatgpt})</a>'
 
     # Conditionally show the Client header column
     client_th_html = '<th>Client Account</th>' if selected_client_id == 0 else ''
@@ -1498,7 +1507,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                 <span style="font-weight: bold; color: #1a237e; font-size: 13px;">Target Client Account:</span>
                 <select id="upload_client_id" style="padding: 6px 12px; font-size: 13px; border-radius: 4px; border: 1px solid #9fa8da; font-weight: 600; outline: none; cursor: pointer; color: #1a237e; background: white;">
             """
-            for c_id, c_name, _, _, _, _, _, _, _ in clients:
+            for c_id, c_name, _, _, _, _, _, _, _, _ in clients:
                 upload_client_selector_html += f'<option value="{c_id}">👤 {c_name}</option>'
             upload_client_selector_html += """
                 </select>
@@ -1933,6 +1942,14 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                             </div>
                             {pinterest_export_button}
                         </div>
+                        <!-- ChatGPT Ads -->
+                        <div class="export-card">
+                            <div>
+                                <h4 style="color: #10a37f;">ChatGPT Ads (GPTCLID)</h4>
+                                <p>Export verified offline lead and sale transactions back into your ChatGPT Ads metrics.</p>
+                            </div>
+                            {chatgpt_export_button}
+                        </div>
                         <!-- Google Ads Adjustments -->
                         <div class="export-card">
                             <div>
@@ -2060,6 +2077,7 @@ class ClientUpdate(BaseModel):
     tiktok_ads_id: Optional[str] = ""
     twitter_ads_id: Optional[str] = ""
     pinterest_ads_id: Optional[str] = ""
+    chatgpt_ads_id: Optional[str] = ""
     linkedin_ads_id: Optional[str] = ""
     microsoft_ads_id: Optional[str] = ""
     lead_gen_method: str
@@ -2689,6 +2707,10 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                 <div class="form-group">
                                     <label for="pinterest_ads_id">Pinterest Ads ID</label>
                                     <input type="text" id="pinterest_ads_id" value="{client_data.get("pinterest_ads_id", "") or ""}" placeholder="e.g. pin_pixel_123">
+                                </div>
+                                <div class="form-group">
+                                    <label for="chatgpt_ads_id">ChatGPT Ads ID</label>
+                                    <input type="text" id="chatgpt_ads_id" value="{client_data.get("chatgpt_ads_id", "") or ""}" placeholder="e.g. gpt_pixel_123">
                                 </div>
                             </div>
                             
@@ -3534,6 +3556,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     const tiktokAds = document.getElementById('tiktok_ads_id').value.trim();
                     const twitterAds = document.getElementById('twitter_ads_id').value.trim();
                     const pinterestAds = document.getElementById('pinterest_ads_id').value.trim();
+                    const chatgptAds = document.getElementById('chatgpt_ads_id').value.trim();
                     
                     let blocks = [];
                     
@@ -3553,6 +3576,22 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             </div>
                         `);
                     }}
+                    if (chatgptAds) {{
+                        blocks.push(`
+                            <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #10a37f; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                                <h4 style="margin-top: 0; color: #10a37f; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                                    🧠 ChatGPT Ads Goal Setup (ID: ${chatgptAds})
+                                </h4>
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
+                                    <li style="margin-bottom: 8px;">Log into your <strong>ChatGPT Ads Campaign Manager</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Go to <strong>Conversion Event Manager</strong> and click <strong>Create Custom Conversion Goal</strong>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 1 (Qualification):</strong> Name the custom offline event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>. Under action, select <strong>Lead</strong>, and set tracing to utilize secure CSV match.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 2 (Offline Sale):</strong> Create another custom event. Name it <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>, choose event type <strong>Purchase</strong>, and ensure dynamic revenue mapping is selected.</li>
+                                </ol>
+                            </div>
+                        `);
+                    }}
+
                     
                     if (facebookAds) {{
                         blocks.push(`
@@ -3569,6 +3608,22 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             </div>
                         `);
                     }}
+                    if (chatgptAds) {{
+                        blocks.push(`
+                            <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #10a37f; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                                <h4 style="margin-top: 0; color: #10a37f; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                                    🧠 ChatGPT Ads Goal Setup (ID: ${chatgptAds})
+                                </h4>
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
+                                    <li style="margin-bottom: 8px;">Log into your <strong>ChatGPT Ads Campaign Manager</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Go to <strong>Conversion Event Manager</strong> and click <strong>Create Custom Conversion Goal</strong>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 1 (Qualification):</strong> Name the custom offline event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>. Under action, select <strong>Lead</strong>, and set tracing to utilize secure CSV match.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 2 (Offline Sale):</strong> Create another custom event. Name it <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>, choose event type <strong>Purchase</strong>, and ensure dynamic revenue mapping is selected.</li>
+                                </ol>
+                            </div>
+                        `);
+                    }}
+
                     
                     if (linkedinAds) {{
                         blocks.push(`
@@ -3589,6 +3644,22 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             </div>
                         `);
                     }}
+                    if (chatgptAds) {{
+                        blocks.push(`
+                            <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #10a37f; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                                <h4 style="margin-top: 0; color: #10a37f; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                                    🧠 ChatGPT Ads Goal Setup (ID: ${chatgptAds})
+                                </h4>
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
+                                    <li style="margin-bottom: 8px;">Log into your <strong>ChatGPT Ads Campaign Manager</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Go to <strong>Conversion Event Manager</strong> and click <strong>Create Custom Conversion Goal</strong>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 1 (Qualification):</strong> Name the custom offline event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>. Under action, select <strong>Lead</strong>, and set tracing to utilize secure CSV match.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 2 (Offline Sale):</strong> Create another custom event. Name it <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>, choose event type <strong>Purchase</strong>, and ensure dynamic revenue mapping is selected.</li>
+                                </ol>
+                            </div>
+                        `);
+                    }}
+
                     
                     if (microsoftAds) {{
                         blocks.push(`
@@ -3606,6 +3677,22 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             </div>
                         `);
                     }}
+                    if (chatgptAds) {{
+                        blocks.push(`
+                            <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #10a37f; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                                <h4 style="margin-top: 0; color: #10a37f; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                                    🧠 ChatGPT Ads Goal Setup (ID: ${chatgptAds})
+                                </h4>
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
+                                    <li style="margin-bottom: 8px;">Log into your <strong>ChatGPT Ads Campaign Manager</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Go to <strong>Conversion Event Manager</strong> and click <strong>Create Custom Conversion Goal</strong>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 1 (Qualification):</strong> Name the custom offline event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>. Under action, select <strong>Lead</strong>, and set tracing to utilize secure CSV match.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 2 (Offline Sale):</strong> Create another custom event. Name it <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>, choose event type <strong>Purchase</strong>, and ensure dynamic revenue mapping is selected.</li>
+                                </ol>
+                            </div>
+                        `);
+                    }}
+
                     
                     if (tiktokAds) {{
                         blocks.push(`
@@ -3626,6 +3713,22 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             </div>
                         `);
                     }}
+                    if (chatgptAds) {{
+                        blocks.push(`
+                            <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #10a37f; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                                <h4 style="margin-top: 0; color: #10a37f; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                                    🧠 ChatGPT Ads Goal Setup (ID: ${chatgptAds})
+                                </h4>
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
+                                    <li style="margin-bottom: 8px;">Log into your <strong>ChatGPT Ads Campaign Manager</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Go to <strong>Conversion Event Manager</strong> and click <strong>Create Custom Conversion Goal</strong>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 1 (Qualification):</strong> Name the custom offline event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>. Under action, select <strong>Lead</strong>, and set tracing to utilize secure CSV match.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 2 (Offline Sale):</strong> Create another custom event. Name it <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>, choose event type <strong>Purchase</strong>, and ensure dynamic revenue mapping is selected.</li>
+                                </ol>
+                            </div>
+                        `);
+                    }}
+
                     
                     if (twitterAds) {{
                         blocks.push(`
@@ -3646,6 +3749,22 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             </div>
                         `);
                     }}
+                    if (chatgptAds) {{
+                        blocks.push(`
+                            <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #10a37f; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                                <h4 style="margin-top: 0; color: #10a37f; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                                    🧠 ChatGPT Ads Goal Setup (ID: ${chatgptAds})
+                                </h4>
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
+                                    <li style="margin-bottom: 8px;">Log into your <strong>ChatGPT Ads Campaign Manager</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Go to <strong>Conversion Event Manager</strong> and click <strong>Create Custom Conversion Goal</strong>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 1 (Qualification):</strong> Name the custom offline event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>. Under action, select <strong>Lead</strong>, and set tracing to utilize secure CSV match.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 2 (Offline Sale):</strong> Create another custom event. Name it <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>, choose event type <strong>Purchase</strong>, and ensure dynamic revenue mapping is selected.</li>
+                                </ol>
+                            </div>
+                        `);
+                    }}
+
                     
                     if (pinterestAds) {{
                         blocks.push(`
@@ -3666,6 +3785,22 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             </div>
                         `);
                     }}
+                    if (chatgptAds) {{
+                        blocks.push(`
+                            <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #10a37f; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                                <h4 style="margin-top: 0; color: #10a37f; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                                    🧠 ChatGPT Ads Goal Setup (ID: ${chatgptAds})
+                                </h4>
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
+                                    <li style="margin-bottom: 8px;">Log into your <strong>ChatGPT Ads Campaign Manager</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Go to <strong>Conversion Event Manager</strong> and click <strong>Create Custom Conversion Goal</strong>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 1 (Qualification):</strong> Name the custom offline event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>. Under action, select <strong>Lead</strong>, and set tracing to utilize secure CSV match.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 2 (Offline Sale):</strong> Create another custom event. Name it <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>, choose event type <strong>Purchase</strong>, and ensure dynamic revenue mapping is selected.</li>
+                                </ol>
+                            </div>
+                        `);
+                    }}
+
                     
                     if (blocks.length === 0) {{
                         instructionsContainer.innerHTML = `
@@ -4086,9 +4221,13 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         tiktok_ads_id: document.getElementById('tiktok_ads_id').value.trim(),
                         twitter_ads_id: document.getElementById('twitter_ads_id').value.trim(),
                         pinterest_ads_id: document.getElementById('pinterest_ads_id').value.trim(),
+                        chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
+                        chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
                         tiktok_ads_id: document.getElementById('tiktok_ads_id').value.trim(),
                         twitter_ads_id: document.getElementById('twitter_ads_id').value.trim(),
                         pinterest_ads_id: document.getElementById('pinterest_ads_id').value.trim(),
+                        chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
+                        chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
                         lead_gen_method: document.querySelector('input[name="lead_gen_method"]:checked').value,
                         qualification_criteria: document.getElementById('qualification_criteria').value,
                         source_of_truth: document.getElementById('source_of_truth').value,
@@ -4560,6 +4699,7 @@ def update_client_settings(request: Request, client: ClientUpdate):
             "tiktok_ads_id": "TikTok Ads Pixel/Account ID",
             "twitter_ads_id": "X (Twitter) Ads Pixel ID",
             "pinterest_ads_id": "Pinterest Ads ID",
+            "chatgpt_ads_id": "ChatGPT Ads ID",
             "lead_gen_method": "Lead Gen Method",
             "qualification_criteria": "Qualification Criteria Option",
             "source_of_truth": "Single Source of Truth",
@@ -4588,6 +4728,7 @@ def update_client_settings(request: Request, client: ClientUpdate):
             "tiktok_ads_id": client.tiktok_ads_id or "",
             "twitter_ads_id": client.twitter_ads_id or "",
             "pinterest_ads_id": client.pinterest_ads_id or "",
+            "chatgpt_ads_id": client.chatgpt_ads_id or "",
             "lead_gen_method": client.lead_gen_method,
             "qualification_criteria": client.qualification_criteria,
             "source_of_truth": client.source_of_truth,
@@ -4623,6 +4764,7 @@ def update_client_settings(request: Request, client: ClientUpdate):
                 tiktok_ads_id = ?,
                 twitter_ads_id = ?,
                 pinterest_ads_id = ?,
+                chatgpt_ads_id = ?,
                 lead_gen_method = ?,
                 qualification_criteria = ?,
                 source_of_truth = ?,
@@ -4650,6 +4792,7 @@ def update_client_settings(request: Request, client: ClientUpdate):
             client.tiktok_ads_id or "",
             client.twitter_ads_id or "",
             client.pinterest_ads_id or "",
+            client.chatgpt_ads_id or "",
             client.lead_gen_method,
             client.qualification_criteria,
             client.source_of_truth,
@@ -5022,6 +5165,15 @@ def add_client_page(request: Request):
                             <div class="form-group">
                                 <label for="pinterest_ads_id">Pinterest Ads ID</label>
                                 <input type="text" id="pinterest_ads_id" placeholder="e.g. pin_pixel_123">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="chatgpt_ads_id">ChatGPT Ads ID</label>
+                                <input type="text" id="chatgpt_ads_id" placeholder="e.g. gpt_pixel_123">
+                            </div>
+                            <div class="form-group" style="visibility: hidden;">
+                                <!-- Spacer -->
                             </div>
                         </div>
                         
@@ -6018,6 +6170,7 @@ def add_client_page(request: Request):
                     const tiktokAds = document.getElementById('tiktok_ads_id').value.trim();
                     const twitterAds = document.getElementById('twitter_ads_id').value.trim();
                     const pinterestAds = document.getElementById('pinterest_ads_id').value.trim();
+                    const chatgptAds = document.getElementById('chatgpt_ads_id').value.trim();
                     
                     let blocks = [];
                     
@@ -6037,6 +6190,22 @@ def add_client_page(request: Request):
                             </div>
                         `);
                     }}
+                    if (chatgptAds) {{
+                        blocks.push(`
+                            <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #10a37f; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                                <h4 style="margin-top: 0; color: #10a37f; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                                    🧠 ChatGPT Ads Goal Setup (ID: ${chatgptAds})
+                                </h4>
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
+                                    <li style="margin-bottom: 8px;">Log into your <strong>ChatGPT Ads Campaign Manager</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Go to <strong>Conversion Event Manager</strong> and click <strong>Create Custom Conversion Goal</strong>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 1 (Qualification):</strong> Name the custom offline event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>. Under action, select <strong>Lead</strong>, and set tracing to utilize secure CSV match.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 2 (Offline Sale):</strong> Create another custom event. Name it <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>, choose event type <strong>Purchase</strong>, and ensure dynamic revenue mapping is selected.</li>
+                                </ol>
+                            </div>
+                        `);
+                    }}
+
                     
                     if (facebookAds) {{
                         blocks.push(`
@@ -6053,6 +6222,22 @@ def add_client_page(request: Request):
                             </div>
                         `);
                     }}
+                    if (chatgptAds) {{
+                        blocks.push(`
+                            <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #10a37f; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                                <h4 style="margin-top: 0; color: #10a37f; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                                    🧠 ChatGPT Ads Goal Setup (ID: ${chatgptAds})
+                                </h4>
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
+                                    <li style="margin-bottom: 8px;">Log into your <strong>ChatGPT Ads Campaign Manager</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Go to <strong>Conversion Event Manager</strong> and click <strong>Create Custom Conversion Goal</strong>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 1 (Qualification):</strong> Name the custom offline event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>. Under action, select <strong>Lead</strong>, and set tracing to utilize secure CSV match.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 2 (Offline Sale):</strong> Create another custom event. Name it <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>, choose event type <strong>Purchase</strong>, and ensure dynamic revenue mapping is selected.</li>
+                                </ol>
+                            </div>
+                        `);
+                    }}
+
                     
                     if (linkedinAds) {{
                         blocks.push(`
@@ -6073,6 +6258,22 @@ def add_client_page(request: Request):
                             </div>
                         `);
                     }}
+                    if (chatgptAds) {{
+                        blocks.push(`
+                            <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #10a37f; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                                <h4 style="margin-top: 0; color: #10a37f; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                                    🧠 ChatGPT Ads Goal Setup (ID: ${chatgptAds})
+                                </h4>
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
+                                    <li style="margin-bottom: 8px;">Log into your <strong>ChatGPT Ads Campaign Manager</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Go to <strong>Conversion Event Manager</strong> and click <strong>Create Custom Conversion Goal</strong>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 1 (Qualification):</strong> Name the custom offline event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>. Under action, select <strong>Lead</strong>, and set tracing to utilize secure CSV match.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 2 (Offline Sale):</strong> Create another custom event. Name it <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>, choose event type <strong>Purchase</strong>, and ensure dynamic revenue mapping is selected.</li>
+                                </ol>
+                            </div>
+                        `);
+                    }}
+
                     
                     if (microsoftAds) {{
                         blocks.push(`
@@ -6090,6 +6291,22 @@ def add_client_page(request: Request):
                             </div>
                         `);
                     }}
+                    if (chatgptAds) {{
+                        blocks.push(`
+                            <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #10a37f; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                                <h4 style="margin-top: 0; color: #10a37f; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                                    🧠 ChatGPT Ads Goal Setup (ID: ${chatgptAds})
+                                </h4>
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
+                                    <li style="margin-bottom: 8px;">Log into your <strong>ChatGPT Ads Campaign Manager</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Go to <strong>Conversion Event Manager</strong> and click <strong>Create Custom Conversion Goal</strong>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 1 (Qualification):</strong> Name the custom offline event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>. Under action, select <strong>Lead</strong>, and set tracing to utilize secure CSV match.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 2 (Offline Sale):</strong> Create another custom event. Name it <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>, choose event type <strong>Purchase</strong>, and ensure dynamic revenue mapping is selected.</li>
+                                </ol>
+                            </div>
+                        `);
+                    }}
+
                     
                     if (tiktokAds) {{
                         blocks.push(`
@@ -6110,6 +6327,22 @@ def add_client_page(request: Request):
                             </div>
                         `);
                     }}
+                    if (chatgptAds) {{
+                        blocks.push(`
+                            <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #10a37f; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                                <h4 style="margin-top: 0; color: #10a37f; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                                    🧠 ChatGPT Ads Goal Setup (ID: ${chatgptAds})
+                                </h4>
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
+                                    <li style="margin-bottom: 8px;">Log into your <strong>ChatGPT Ads Campaign Manager</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Go to <strong>Conversion Event Manager</strong> and click <strong>Create Custom Conversion Goal</strong>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 1 (Qualification):</strong> Name the custom offline event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>. Under action, select <strong>Lead</strong>, and set tracing to utilize secure CSV match.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 2 (Offline Sale):</strong> Create another custom event. Name it <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>, choose event type <strong>Purchase</strong>, and ensure dynamic revenue mapping is selected.</li>
+                                </ol>
+                            </div>
+                        `);
+                    }}
+
                     
                     if (twitterAds) {{
                         blocks.push(`
@@ -6130,6 +6363,22 @@ def add_client_page(request: Request):
                             </div>
                         `);
                     }}
+                    if (chatgptAds) {{
+                        blocks.push(`
+                            <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #10a37f; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                                <h4 style="margin-top: 0; color: #10a37f; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                                    🧠 ChatGPT Ads Goal Setup (ID: ${chatgptAds})
+                                </h4>
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
+                                    <li style="margin-bottom: 8px;">Log into your <strong>ChatGPT Ads Campaign Manager</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Go to <strong>Conversion Event Manager</strong> and click <strong>Create Custom Conversion Goal</strong>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 1 (Qualification):</strong> Name the custom offline event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>. Under action, select <strong>Lead</strong>, and set tracing to utilize secure CSV match.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 2 (Offline Sale):</strong> Create another custom event. Name it <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>, choose event type <strong>Purchase</strong>, and ensure dynamic revenue mapping is selected.</li>
+                                </ol>
+                            </div>
+                        `);
+                    }}
+
                     
                     if (pinterestAds) {{
                         blocks.push(`
@@ -6150,6 +6399,22 @@ def add_client_page(request: Request):
                             </div>
                         `);
                     }}
+                    if (chatgptAds) {{
+                        blocks.push(`
+                            <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #10a37f; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                                <h4 style="margin-top: 0; color: #10a37f; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                                    🧠 ChatGPT Ads Goal Setup (ID: ${chatgptAds})
+                                </h4>
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
+                                    <li style="margin-bottom: 8px;">Log into your <strong>ChatGPT Ads Campaign Manager</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Go to <strong>Conversion Event Manager</strong> and click <strong>Create Custom Conversion Goal</strong>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 1 (Qualification):</strong> Name the custom offline event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>. Under action, select <strong>Lead</strong>, and set tracing to utilize secure CSV match.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 2 (Offline Sale):</strong> Create another custom event. Name it <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>, choose event type <strong>Purchase</strong>, and ensure dynamic revenue mapping is selected.</li>
+                                </ol>
+                            </div>
+                        `);
+                    }}
+
                     
                     if (blocks.length === 0) {{
                         instructionsContainer.innerHTML = `
@@ -6291,9 +6556,13 @@ def add_client_page(request: Request):
                         tiktok_ads_id: document.getElementById('tiktok_ads_id').value.trim(),
                         twitter_ads_id: document.getElementById('twitter_ads_id').value.trim(),
                         pinterest_ads_id: document.getElementById('pinterest_ads_id').value.trim(),
+                        chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
+                        chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
                         tiktok_ads_id: document.getElementById('tiktok_ads_id').value.trim(),
                         twitter_ads_id: document.getElementById('twitter_ads_id').value.trim(),
                         pinterest_ads_id: document.getElementById('pinterest_ads_id').value.trim(),
+                        chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
+                        chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
                         lead_gen_method: document.querySelector('input[name="lead_gen_method"]:checked').value,
                         qualification_criteria: document.getElementById('qualification_criteria').value,
                         source_of_truth: document.getElementById('source_of_truth').value,
@@ -6603,9 +6872,9 @@ def backfill_historical_callrail_leads(client_id: int, qualification_criteria_co
         
         cursor.execute("""
             INSERT INTO sessions (
-                client_id, phone, name, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, source, qualified, sale_closed, value, reason, model_used, raw_data, created_at
+                client_id, phone, name, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, gptclid, source, qualified, sale_closed, value, reason, model_used, raw_data, created_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             client_id,
             normalized_phone,
@@ -6617,6 +6886,7 @@ def backfill_historical_callrail_leads(client_id: int, qualification_criteria_co
             None, # ttclid
             None, # twclid
             None, # pin_clid
+            None, # gptclid
             provider,
             qualified,
             sale_closed,
@@ -6685,6 +6955,7 @@ def create_client(request: Request, client: ClientCreate):
             client.tiktok_ads_id or "",
             client.twitter_ads_id or "",
             client.pinterest_ads_id or "",
+            client.chatgpt_ads_id or "",
             client.lead_gen_method,
             client.qualification_criteria,
             client.source_of_truth,
@@ -7294,6 +7565,52 @@ def export_pinterest_conversions(request: Request, client_id: int):
     }
     return StreamingResponse(output, headers=headers)
 
+@app.get("/dashboard/export/chatgpt")
+def export_chatgpt_conversions(request: Request, client_id: int):
+    email = is_authenticated(request)
+    if not email:
+        return RedirectResponse(url="/login", status_code=303)
+    try:
+        conn = db_router.connect()
+        cursor = conn.cursor()
+        cursor.execute("SELECT name, chatgpt_ads_id FROM clients WHERE id = ?", (client_id,))
+        client_row = cursor.fetchone()
+        if not client_row:
+            raise HTTPException(status_code=400, detail="Invalid client ID")
+        client_name = client_row[0]
+        pixel_id = client_row[1] or ""
+        cursor.execute("""
+            SELECT gptclid, qualified, sale_closed, value, created_at
+            FROM sessions
+            WHERE client_id = ? AND gptclid IS NOT NULL AND gptclid != '' AND (qualified = 'YES' OR sale_closed = 'YES')
+            ORDER BY created_at DESC
+        """, (client_id,))
+        rows = cursor.fetchall()
+        conn.close()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["gptclid", "Event Name", "Event Time", "Value", "Currency", "ChatGPT Ads ID"])
+    for r in rows:
+        gptclid, qualified, sale_closed, value, created_at = r
+        conv_time = f"{created_at}"
+        if sale_closed == 'YES':
+            event_name = "LeadGroove Offline Sale"
+            event_val = float(value or 0.0)
+        else:
+            event_name = "LeadGroove Qualified Lead"
+            event_val = 1.0
+        writer.writerow([gptclid, event_name, conv_time, f"{event_val:.2f}", "USD", pixel_id])
+    output.seek(0)
+    safe_filename = re.sub(r'\s+', '-', client_name.strip().lower())
+    headers = {
+        'Content-Disposition': f'attachment; filename="chatgpt_conversions_{safe_filename}.csv"',
+        'Content-Type': 'text/csv'
+    }
+    return StreamingResponse(output, headers=headers)
+
+
 
     return StreamingResponse(output, headers=headers)
 
@@ -7694,6 +8011,7 @@ async def receive_calltrackingmetrics_webhook(request: Request, client_id: Optio
         ttclid = payload.get('ttclid') or payload.get('tiktok_click_id')
         twclid = payload.get('twclid') or payload.get('twitter_click_id') or payload.get('twitter_ads_id') or payload.get('x_click_id')
         pin_clid = payload.get('pin_clid') or payload.get('pinterest_click_id')
+        gptclid = payload.get('gptclid') or payload.get('chatgpt_click_id')
         
         landing_page = payload.get('landing_page_url') or payload.get('landing_page') or ""
         referrer_url = payload.get('referrer_url') or payload.get('referring_url') or ""
@@ -7712,18 +8030,24 @@ async def receive_calltrackingmetrics_webhook(request: Request, client_id: Optio
             twclid = extract_param_from_url(landing_page, 'twclid') or extract_param_from_url(referrer_url, 'twclid')
         if not pin_clid:
             pin_clid = extract_param_from_url(landing_page, 'pin_clid') or extract_param_from_url(landing_page, 'p_clid') or extract_param_from_url(referrer_url, 'pin_clid') or extract_param_from_url(referrer_url, 'p_clid')
+        if not gptclid:
+            gptclid = extract_param_from_url(landing_page, 'gptclid') or extract_param_from_url(referrer_url, 'gptclid')
         if not ttclid:
             ttclid = extract_param_from_url(landing_page, 'ttclid') or extract_param_from_url(referrer_url, 'ttclid')
         if not twclid:
             twclid = extract_param_from_url(landing_page, 'twclid') or extract_param_from_url(referrer_url, 'twclid')
         if not pin_clid:
             pin_clid = extract_param_from_url(landing_page, 'pin_clid') or extract_param_from_url(landing_page, 'p_clid') or extract_param_from_url(referrer_url, 'pin_clid') or extract_param_from_url(referrer_url, 'p_clid')
+        if not gptclid:
+            gptclid = extract_param_from_url(landing_page, 'gptclid') or extract_param_from_url(referrer_url, 'gptclid')
         if not ttclid:
             ttclid = extract_param_from_url(landing_page, 'ttclid') or extract_param_from_url(referrer_url, 'ttclid')
         if not twclid:
             twclid = extract_param_from_url(landing_page, 'twclid') or extract_param_from_url(referrer_url, 'twclid')
         if not pin_clid:
             pin_clid = extract_param_from_url(landing_page, 'pin_clid') or extract_param_from_url(landing_page, 'p_clid') or extract_param_from_url(referrer_url, 'pin_clid') or extract_param_from_url(referrer_url, 'p_clid')
+        if not gptclid:
+            gptclid = extract_param_from_url(landing_page, 'gptclid') or extract_param_from_url(referrer_url, 'gptclid')
             
         caller_name = payload.get('caller_name') or payload.get('customer_name') or payload.get('name', 'Unknown Caller')
         raw_phone = payload.get('caller_number') or payload.get('customer_phone_number') or payload.get('phone')
@@ -7787,9 +8111,9 @@ async def receive_calltrackingmetrics_webhook(request: Request, client_id: Optio
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO sessions (
-                client_id, phone, name, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, source, qualified, sale_closed, value, reason, model_used, raw_data
+                client_id, phone, name, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, gptclid, source, qualified, sale_closed, value, reason, model_used, raw_data
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             resolved_client_id,
             normalized_phone, 
@@ -7801,6 +8125,7 @@ async def receive_calltrackingmetrics_webhook(request: Request, client_id: Optio
             ttclid,
             twclid,
             pin_clid,
+            gptclid,
             "calltrackingmetrics", 
             ai_qualified, 
             ai_sale_closed, 
@@ -7875,6 +8200,7 @@ async def receive_whatconverts_webhook(request: Request, client_id: Optional[int
         ttclid = payload.get('ttclid') or payload.get('tiktok_click_id')
         twclid = payload.get('twclid') or payload.get('twitter_click_id') or payload.get('twitter_ads_id') or payload.get('x_click_id')
         pin_clid = payload.get('pin_clid') or payload.get('pinterest_click_id')
+        gptclid = payload.get('gptclid') or payload.get('chatgpt_click_id')
         
         landing_page = payload.get('landing_page_url') or payload.get('landing_page') or ""
         referrer_url = payload.get('referrer_url') or payload.get('referring_url') or ""
@@ -7893,18 +8219,24 @@ async def receive_whatconverts_webhook(request: Request, client_id: Optional[int
             twclid = extract_param_from_url(landing_page, 'twclid') or extract_param_from_url(referrer_url, 'twclid')
         if not pin_clid:
             pin_clid = extract_param_from_url(landing_page, 'pin_clid') or extract_param_from_url(landing_page, 'p_clid') or extract_param_from_url(referrer_url, 'pin_clid') or extract_param_from_url(referrer_url, 'p_clid')
+        if not gptclid:
+            gptclid = extract_param_from_url(landing_page, 'gptclid') or extract_param_from_url(referrer_url, 'gptclid')
         if not ttclid:
             ttclid = extract_param_from_url(landing_page, 'ttclid') or extract_param_from_url(referrer_url, 'ttclid')
         if not twclid:
             twclid = extract_param_from_url(landing_page, 'twclid') or extract_param_from_url(referrer_url, 'twclid')
         if not pin_clid:
             pin_clid = extract_param_from_url(landing_page, 'pin_clid') or extract_param_from_url(landing_page, 'p_clid') or extract_param_from_url(referrer_url, 'pin_clid') or extract_param_from_url(referrer_url, 'p_clid')
+        if not gptclid:
+            gptclid = extract_param_from_url(landing_page, 'gptclid') or extract_param_from_url(referrer_url, 'gptclid')
         if not ttclid:
             ttclid = extract_param_from_url(landing_page, 'ttclid') or extract_param_from_url(referrer_url, 'ttclid')
         if not twclid:
             twclid = extract_param_from_url(landing_page, 'twclid') or extract_param_from_url(referrer_url, 'twclid')
         if not pin_clid:
             pin_clid = extract_param_from_url(landing_page, 'pin_clid') or extract_param_from_url(landing_page, 'p_clid') or extract_param_from_url(referrer_url, 'pin_clid') or extract_param_from_url(referrer_url, 'p_clid')
+        if not gptclid:
+            gptclid = extract_param_from_url(landing_page, 'gptclid') or extract_param_from_url(referrer_url, 'gptclid')
             
         caller_name = payload.get('caller_name') or payload.get('customer_name') or payload.get('name', 'Unknown Caller')
         raw_phone = payload.get('caller_phone') or payload.get('caller_number') or payload.get('phone_number') or payload.get('phone')
@@ -7968,9 +8300,9 @@ async def receive_whatconverts_webhook(request: Request, client_id: Optional[int
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO sessions (
-                client_id, phone, name, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, source, qualified, sale_closed, value, reason, model_used, raw_data
+                client_id, phone, name, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, gptclid, source, qualified, sale_closed, value, reason, model_used, raw_data
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             resolved_client_id,
             normalized_phone, 
@@ -7982,6 +8314,7 @@ async def receive_whatconverts_webhook(request: Request, client_id: Optional[int
             ttclid,
             twclid,
             pin_clid,
+            gptclid,
             "whatconverts", 
             ai_qualified, 
             ai_sale_closed, 
@@ -8059,6 +8392,7 @@ async def receive_callrail_webhook(request: Request, client_id: Optional[int] = 
         ttclid = payload.get('ttclid') or payload.get('tiktok_click_id')
         twclid = payload.get('twclid') or payload.get('twitter_click_id') or payload.get('twitter_ads_id') or payload.get('x_click_id')
         pin_clid = payload.get('pin_clid') or payload.get('pinterest_click_id')
+        gptclid = payload.get('gptclid') or payload.get('chatgpt_click_id')
         
         # Fallback to milestones block if top-level fields are missing in payload
         milestones = payload.get("milestones")
@@ -8079,6 +8413,8 @@ async def receive_callrail_webhook(request: Request, client_id: Optional[int] = 
                         twclid = m_data.get("twclid") or m_data.get("twitter_click_id") or m_data.get("x_click_id")
                     if not pin_clid:
                         pin_clid = m_data.get("pin_clid") or m_data.get("pinterest_click_id")
+                    if not gptclid:
+                        gptclid = m_data.get("gptclid") or m_data.get("chatgpt_click_id")
         
         # Advanced dynamic regex URL extraction (for redundancy / fallback)
         landing_page = payload.get('landing_page_url') or referrer_dict.get('landing_page_url') or ""
@@ -8098,18 +8434,24 @@ async def receive_callrail_webhook(request: Request, client_id: Optional[int] = 
             twclid = extract_param_from_url(landing_page, 'twclid') or extract_param_from_url(referrer_url, 'twclid')
         if not pin_clid:
             pin_clid = extract_param_from_url(landing_page, 'pin_clid') or extract_param_from_url(landing_page, 'p_clid') or extract_param_from_url(referrer_url, 'pin_clid') or extract_param_from_url(referrer_url, 'p_clid')
+        if not gptclid:
+            gptclid = extract_param_from_url(landing_page, 'gptclid') or extract_param_from_url(referrer_url, 'gptclid')
         if not ttclid:
             ttclid = extract_param_from_url(landing_page, 'ttclid') or extract_param_from_url(referrer_url, 'ttclid')
         if not twclid:
             twclid = extract_param_from_url(landing_page, 'twclid') or extract_param_from_url(referrer_url, 'twclid')
         if not pin_clid:
             pin_clid = extract_param_from_url(landing_page, 'pin_clid') or extract_param_from_url(landing_page, 'p_clid') or extract_param_from_url(referrer_url, 'pin_clid') or extract_param_from_url(referrer_url, 'p_clid')
+        if not gptclid:
+            gptclid = extract_param_from_url(landing_page, 'gptclid') or extract_param_from_url(referrer_url, 'gptclid')
         if not ttclid:
             ttclid = extract_param_from_url(landing_page, 'ttclid') or extract_param_from_url(referrer_url, 'ttclid')
         if not twclid:
             twclid = extract_param_from_url(landing_page, 'twclid') or extract_param_from_url(referrer_url, 'twclid')
         if not pin_clid:
             pin_clid = extract_param_from_url(landing_page, 'pin_clid') or extract_param_from_url(landing_page, 'p_clid') or extract_param_from_url(referrer_url, 'pin_clid') or extract_param_from_url(referrer_url, 'p_clid')
+        if not gptclid:
+            gptclid = extract_param_from_url(landing_page, 'gptclid') or extract_param_from_url(referrer_url, 'gptclid')
             
         caller_name = payload.get('customer_name', 'Unknown Caller')
         raw_phone = payload.get('customer_phone_number')
@@ -8189,9 +8531,9 @@ async def receive_callrail_webhook(request: Request, client_id: Optional[int] = 
         
         cursor.execute("""
             INSERT INTO sessions (
-                client_id, phone, name, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, source, qualified, sale_closed, value, reason, model_used, raw_data
+                client_id, phone, name, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, gptclid, source, qualified, sale_closed, value, reason, model_used, raw_data
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             resolved_client_id,
             normalized_phone, 
@@ -8203,6 +8545,7 @@ async def receive_callrail_webhook(request: Request, client_id: Optional[int] = 
             ttclid,
             twclid,
             pin_clid,
+            gptclid,
             "callrail", 
             ai_qualified, 
             ai_sale_closed, 
@@ -8270,8 +8613,8 @@ async def receive_form_lead(lead: FormLead, client_id: Optional[int] = None):
         conn = db_router.connect()
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO sessions (client_id, phone, email, name, company, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, source, qualified, sale_closed, reason)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO sessions (client_id, phone, email, name, company, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, gptclid, source, qualified, sale_closed, reason)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             resolved_client_id, 
             normalized_phone, 
@@ -8285,6 +8628,7 @@ async def receive_form_lead(lead: FormLead, client_id: Optional[int] = None):
             lead.ttclid,
             lead.twclid,
             lead.pin_clid,
+            lead.gptclid,
             "form",
             qualified_val,
             sale_closed_val,
