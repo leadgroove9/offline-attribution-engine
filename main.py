@@ -1489,9 +1489,27 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
     else:
         google_export_button = f'<a href="/dashboard/export/google?client_id={selected_client_id}" class="btn-export" style="background-color: #4285F4; text-align: center; text-decoration: none; width: 100%;">📥 Download Google CSV ({exportable_google})</a>'
         google_adjustments_button = f'<a href="/dashboard/export/google-adjustments?client_id={selected_client_id}" class="btn-export" style="background-color: #37474F; text-align: center; text-decoration: none; width: 100%;">📥 Download Google Adjustments CSV ({exportable_adjustments})</a>'
-        google_audience_button = f'<a href="/dashboard/export/audience/google?client_id={selected_client_id}" class="btn-export" style="background-color: #4285F4; text-align: center; text-decoration: none; width: 100%;">📥 Download Google Match List</a>'
-        facebook_audience_button = f'<a href="/dashboard/export/audience/facebook?client_id={selected_client_id}" class="btn-export" style="background-color: #1877F2; text-align: center; text-decoration: none; width: 100%;">📥 Download Meta Audience List</a>'
-        linkedin_audience_button = f'<a href="/dashboard/export/audience/linkedin?client_id={selected_client_id}" class="btn-export" style="background-color: #0A66C2; text-align: center; text-decoration: none; width: 100%;">📥 Download LinkedIn Match List</a>'
+        google_audience_button = f"""
+        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px; width: 100%;">
+            <a href="/dashboard/export/audience/google?client_id={selected_client_id}&segment=all" class="btn-export" style="background-color: #4285F4; text-align: center; text-decoration: none; font-size: 12px; font-weight: bold; border-radius: 5px; padding: 10px 12px;">📥 All Profiles (Leads & Buyers)</a>
+            <a href="/dashboard/export/audience/google?client_id={selected_client_id}&segment=single" class="btn-export" style="background-color: #3b71ca; text-align: center; text-decoration: none; font-size: 12px; font-weight: bold; border-radius: 5px; padding: 10px 12px;">📥 Single-Time Buyers</a>
+            <a href="/dashboard/export/audience/google?client_id={selected_client_id}&segment=multi" class="btn-export" style="background-color: #14a44d; text-align: center; text-decoration: none; font-size: 12px; font-weight: bold; border-radius: 5px; padding: 10px 12px;">🏆 Repeat Buyers (2+ Sales)</a>
+        </div>
+        """
+        facebook_audience_button = f"""
+        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px; width: 100%;">
+            <a href="/dashboard/export/audience/facebook?client_id={selected_client_id}&segment=all" class="btn-export" style="background-color: #1877F2; text-align: center; text-decoration: none; font-size: 12px; font-weight: bold; border-radius: 5px; padding: 10px 12px;">📥 All Profiles (Leads & Buyers)</a>
+            <a href="/dashboard/export/audience/facebook?client_id={selected_client_id}&segment=single" class="btn-export" style="background-color: #3b5998; text-align: center; text-decoration: none; font-size: 12px; font-weight: bold; border-radius: 5px; padding: 10px 12px;">📥 Single-Time Buyers</a>
+            <a href="/dashboard/export/audience/facebook?client_id={selected_client_id}&segment=multi" class="btn-export" style="background-color: #2e7d32; text-align: center; text-decoration: none; font-size: 12px; font-weight: bold; border-radius: 5px; padding: 10px 12px;">🏆 Repeat Buyers (2+ Sales)</a>
+        </div>
+        """
+        linkedin_audience_button = f"""
+        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px; width: 100%;">
+            <a href="/dashboard/export/audience/linkedin?client_id={selected_client_id}&segment=all" class="btn-export" style="background-color: #0A66C2; text-align: center; text-decoration: none; font-size: 12px; font-weight: bold; border-radius: 5px; padding: 10px 12px;">📥 All Profiles (Leads & Buyers)</a>
+            <a href="/dashboard/export/audience/linkedin?client_id={selected_client_id}&segment=single" class="btn-export" style="background-color: #0077b5; text-align: center; text-decoration: none; font-size: 12px; font-weight: bold; border-radius: 5px; padding: 10px 12px;">📥 Single-Time Buyers</a>
+            <a href="/dashboard/export/audience/linkedin?client_id={selected_client_id}&segment=multi" class="btn-export" style="background-color: #155724; text-align: center; text-decoration: none; font-size: 12px; font-weight: bold; border-radius: 5px; padding: 10px 12px;">🏆 Repeat Buyers (2+ Sales)</a>
+        </div>
+        """
         facebook_export_button = f'<a href="/dashboard/export/facebook?client_id={selected_client_id}" class="btn-export" style="background-color: #1877F2; text-align: center; text-decoration: none; width: 100%;">📥 Download Meta CSV ({exportable_facebook})</a>'
         linkedin_export_button = f'<a href="/dashboard/export/linkedin?client_id={selected_client_id}" class="btn-export" style="background-color: #0A66C2; text-align: center; text-decoration: none; width: 100%;">📥 Download LinkedIn CSV ({exportable_linkedin})</a>'
         microsoft_export_button = f'<a href="/dashboard/export/microsoft?client_id={selected_client_id}" class="btn-export" style="background-color: #00A4EF; text-align: center; text-decoration: none; width: 100%;">📥 Download Bing CSV ({exportable_microsoft})</a>'
@@ -7754,53 +7772,89 @@ def sha256_hash_phone_str(val: str) -> str:
         cleaned = "1" + cleaned
     return hashlib.sha256(cleaned.encode('utf-8')).hexdigest()
 
-def get_audience_contacts(client_id: int):
+def get_audience_contacts(client_id: int, segment: str = "all"):
     conn = db_router.connect()
     cursor = conn.cursor()
-    # Pull unique sessions with contacts
+    # Pull unique sessions with contacts and their sale_closed status
     cursor.execute("""
-        SELECT name, phone, email, company
+        SELECT name, phone, email, company, sale_closed
         FROM sessions
         WHERE client_id = ? AND (email IS NOT NULL AND email != '' OR phone IS NOT NULL AND phone != '')
     """, (client_id,))
     rows = cursor.fetchall()
     conn.close()
     
-    seen = set()
-    contacts = []
-    for name, phone, email, company in rows:
+    # Pass 1: Aggregate purchase counts per customer key
+    purchase_counts = {}
+    customer_profiles = {}
+    
+    for name, phone, email, company, sale_closed in rows:
         norm_phone = re.sub(r'\D', '', str(phone or ""))
         if len(norm_phone) == 10:
             norm_phone = "1" + norm_phone
         norm_email = str(email or "").strip().lower()
         
         key = (norm_phone, norm_email)
-        if key in seen:
+        if not key[0] and not key[1]:
             continue
-        seen.add(key)
+            
+        if key not in purchase_counts:
+            purchase_counts[key] = 0
+            customer_profiles[key] = {
+                "name": name,
+                "phone": norm_phone,
+                "email": norm_email,
+                "company": company or ""
+            }
+        else:
+            if name and (not customer_profiles[key]["name"] or customer_profiles[key]["name"] == "Unknown"):
+                customer_profiles[key]["name"] = name
+            if company and not customer_profiles[key]["company"]:
+                customer_profiles[key]["company"] = company
+
+        if sale_closed == 'YES':
+            purchase_counts[key] += 1
+            
+    # Pass 2: filter according to the requested cohort segment
+    contacts = []
+    for key, count in purchase_counts.items():
+        profile = customer_profiles[key]
         
         # Split names
         first_name, last_name = "", ""
-        if name:
-            parts = str(name).strip().split()
+        if profile["name"]:
+            parts = str(profile["name"]).strip().split()
             if len(parts) == 1:
                 first_name = parts[0]
             elif len(parts) > 1:
                 first_name = parts[0]
                 last_name = " ".join(parts[1:])
                 
-        contacts.append({
+        c_dict = {
             "first_name": first_name,
             "last_name": last_name,
-            "phone": norm_phone,
-            "email": norm_email,
-            "company": company or ""
-        })
+            "phone": profile["phone"],
+            "email": profile["email"],
+            "company": profile["company"]
+        }
+        
+        if segment == "single":
+            if count == 1:
+                contacts.append(c_dict)
+        elif segment == "multi":
+            if count >= 2:
+                contacts.append(c_dict)
+        elif segment == "leads":
+            if count == 0:
+                contacts.append(c_dict)
+        else: # "all"
+            contacts.append(c_dict)
+            
     return contacts
 
 
 @app.get("/dashboard/export/audience/google")
-def export_google_audience(request: Request, client_id: int):
+def export_google_audience(request: Request, client_id: int, segment: str = "all"):
     email = is_authenticated(request)
     if not email:
         return RedirectResponse(url="/login", status_code=303)
@@ -7814,7 +7868,7 @@ def export_google_audience(request: Request, client_id: int):
         client_name = client_row[0]
         conn.close()
         
-        contacts = get_audience_contacts(client_id)
+        contacts = get_audience_contacts(client_id, segment=segment)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
         
@@ -7831,14 +7885,14 @@ def export_google_audience(request: Request, client_id: int):
     output.seek(0)
     safe_filename = re.sub(r'\s+', '-', client_name.strip().lower())
     headers = {
-        'Content-Disposition': f'attachment; filename="google_audience_match_{safe_filename}.csv"',
+        'Content-Disposition': f'attachment; filename="google_audience_match_{segment}_{safe_filename}.csv"',
         'Content-Type': 'text/csv'
     }
     return StreamingResponse(output, headers=headers)
 
 
 @app.get("/dashboard/export/audience/facebook")
-def export_facebook_audience(request: Request, client_id: int):
+def export_facebook_audience(request: Request, client_id: int, segment: str = "all"):
     email = is_authenticated(request)
     if not email:
         return RedirectResponse(url="/login", status_code=303)
@@ -7852,7 +7906,7 @@ def export_facebook_audience(request: Request, client_id: int):
         client_name = client_row[0]
         conn.close()
         
-        contacts = get_audience_contacts(client_id)
+        contacts = get_audience_contacts(client_id, segment=segment)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
         
@@ -7870,14 +7924,14 @@ def export_facebook_audience(request: Request, client_id: int):
     output.seek(0)
     safe_filename = re.sub(r'\s+', '-', client_name.strip().lower())
     headers = {
-        'Content-Disposition': f'attachment; filename="meta_custom_audience_{safe_filename}.csv"',
+        'Content-Disposition': f'attachment; filename="meta_custom_audience_{segment}_{safe_filename}.csv"',
         'Content-Type': 'text/csv'
     }
     return StreamingResponse(output, headers=headers)
 
 
 @app.get("/dashboard/export/audience/linkedin")
-def export_linkedin_audience(request: Request, client_id: int):
+def export_linkedin_audience(request: Request, client_id: int, segment: str = "all"):
     email = is_authenticated(request)
     if not email:
         return RedirectResponse(url="/login", status_code=303)
@@ -7891,7 +7945,7 @@ def export_linkedin_audience(request: Request, client_id: int):
         client_name = client_row[0]
         conn.close()
         
-        contacts = get_audience_contacts(client_id)
+        contacts = get_audience_contacts(client_id, segment=segment)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
         
@@ -7908,7 +7962,7 @@ def export_linkedin_audience(request: Request, client_id: int):
     output.seek(0)
     safe_filename = re.sub(r'\s+', '-', client_name.strip().lower())
     headers = {
-        'Content-Disposition': f'attachment; filename="linkedin_member_matching_{safe_filename}.csv"',
+        'Content-Disposition': f'attachment; filename="linkedin_member_matching_{segment}_{safe_filename}.csv"',
         'Content-Type': 'text/csv'
     }
     return StreamingResponse(output, headers=headers)
