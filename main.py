@@ -567,7 +567,7 @@ def init_db():
                 lead_gen_method, qualification_criteria, source_of_truth, email_provider, email_account,
                 crm_deal_tags, crm_won_deal_tags, crm_lead_tags, lead_count_rule, exclude_past_customers
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, mock_clients)
         print("Seeded 3 mock agency clients successfully!")
     
@@ -1311,7 +1311,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
         if selected_client_id == 0:
             # Multi-Client (All Clients) View - Join with clients table to display client names
             cursor.execute("""
-                SELECT s.id, s.phone, s.email, s.name, s.company, s.gclid, s.source, s.qualified, s.sale_closed, s.value, s.reason, s.created_at, c.name, s.fbclid, s.li_fat_id, s.msclkid, s.match_fuzzy, s.certainty_score, s.ttclid, s.twclid, s.pin_clid, s.gptclid, s.adjusted, s.adjusted_value, s.adjustment_type, s.adjusted_at
+                SELECT s.id, s.phone, s.email, s.name, s.company, s.gclid, s.source, s.qualified, s.sale_closed, s.value, s.reason, s.created_at, c.name, s.fbclid, s.li_fat_id, s.msclkid, s.match_fuzzy, s.certainty_score, s.ttclid, s.twclid, s.pin_clid, s.scclid, s.gptclid, s.adjusted, s.adjusted_value, s.adjustment_type, s.adjusted_at
                 FROM sessions s
                 LEFT JOIN clients c ON s.client_id = c.id
                 ORDER BY s.created_at DESC
@@ -1322,7 +1322,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
         else:
             # Single-Client Filtered View
             cursor.execute("""
-                SELECT s.id, s.phone, s.email, s.name, s.company, s.gclid, s.source, s.qualified, s.sale_closed, s.value, s.reason, s.created_at, c.name, s.fbclid, s.li_fat_id, s.msclkid, s.match_fuzzy, s.certainty_score, s.ttclid, s.twclid, s.pin_clid, s.gptclid, s.adjusted, s.adjusted_value, s.adjustment_type, s.adjusted_at
+                SELECT s.id, s.phone, s.email, s.name, s.company, s.gclid, s.source, s.qualified, s.sale_closed, s.value, s.reason, s.created_at, c.name, s.fbclid, s.li_fat_id, s.msclkid, s.match_fuzzy, s.certainty_score, s.ttclid, s.twclid, s.pin_clid, s.scclid, s.gptclid, s.adjusted, s.adjusted_value, s.adjustment_type, s.adjusted_at
                 FROM sessions s
                 LEFT JOIN clients c ON s.client_id = c.id
                 WHERE s.client_id = ?
@@ -1355,7 +1355,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
     exportable_twitter = sum(1 for r in rows if len(r) > 19 and r[19] and (r[7] == 'YES' or r[8] == 'YES'))
     exportable_pinterest = sum(1 for r in rows if len(r) > 20 and r[20] and (r[7] == 'YES' or r[8] == 'YES'))
     exportable_snapchat = sum(1 for r in rows if len(r) > 21 and r[21] and (r[7] == 'YES' or r[8] == 'YES'))
-    exportable_chatgpt = sum(1 for r in rows if len(r) > 21 and r[21] and (r[7] == 'YES' or r[8] == 'YES'))
+    exportable_chatgpt = sum(1 for r in rows if len(r) > 22 and r[22] and (r[7] == 'YES' or r[8] == 'YES'))
 
     # Generate the Selector Dropdown Options
     dropdown_options = ""
@@ -1372,7 +1372,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
     # Convert rows to table items
     table_rows_html = ""
     for r in rows:
-        id_val, phone, email, name, company, gclid, source, qualified, sale_closed, value, reason, created_at, client_name_linked, fbclid, li_fat_id, msclkid, match_fuzzy, certainty_score, ttclid, twclid, pin_clid, gptclid, adjusted, adjusted_value, adjustment_type, adjusted_at = r
+        id_val, phone, email, name, company, gclid, source, qualified, sale_closed, value, reason, created_at, client_name_linked, fbclid, li_fat_id, msclkid, match_fuzzy, certainty_score, ttclid, twclid, pin_clid, scclid, gptclid, adjusted, adjusted_value, adjustment_type, adjusted_at = r
         
         qual_badge = '<span style="background: #e8f5e9; color: #2e7d32; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 12px;">YES</span>' if qualified == 'YES' else '<span style="background: #ffebee; color: #c62828; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 12px;">NO</span>'
         
