@@ -1489,7 +1489,7 @@ def get_admin_users(request: Request):
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <style>
-                body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background-color: #f4f6f9; color: #333; margin: 0; padding: 20px; }}
+                * {{ box-sizing: border-box; }} body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background-color: #f4f6f9; color: #333; margin: 0; padding: 20px; }}
                 .container {{ max-width: 1000px; margin: 20px auto; background: white; padding: 40px; border-radius: 12px; box-shadow: 0px 4px 15px rgba(0,0,0,0.05); }}
                 header {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eaeaea; padding-bottom: 20px; margin-bottom: 30px; }}
                 h1 {{ margin: 0; color: #1a237e; font-size: 24px; }}
@@ -2307,7 +2307,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <style>
-                body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background-color: #f4f6f9; color: #333; margin: 0; padding: 20px; }}
+                * {{ box-sizing: border-box; }} body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background-color: #f4f6f9; color: #333; margin: 0; padding: 20px; }}
                 .container {{ max-width: 1300px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0px 4px 15px rgba(0,0,0,0.05); }}
                 header {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eaeaea; padding-bottom: 20px; margin-bottom: 30px; flex-wrap: wrap; gap: 15px; }}
                 h1 {{ margin: 0; color: #1a237e; font-size: 26px; }}
@@ -2340,7 +2340,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                 .badge-source.badge-form {{ background: #f3e5f5; color: #4a148c; border-color: #e1bee7; }}
                 .client-badge {{ background: #eceff1; color: #37474f; font-size: 11px; padding: 3px 8px; border-radius: 4px; font-weight: bold; border: 1px solid #cfd8dc; }}
                 
-                .btn-export {{ display: block; color: white; padding: 10px 12px; border-radius: 5px; font-weight: bold; font-size: 13px; border: none; transition: filter 0.2s; cursor: pointer; }}
+                .btn-export {{ display: block; color: white; padding: 10px 12px; border-radius: 5px; font-weight: bold; font-size: 13px; border: none; transition: filter 0.2s; cursor: pointer; box-sizing: border-box; width: 100%; text-align: center; }}
                 .btn-export:hover {{ filter: brightness(0.9); }}
                 .btn-add-client {{ display: inline-block; background-color: #1a237e; color: white; padding: 10px 18px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 14px; border: none; transition: background 0.2s; cursor: pointer; }}
                 .btn-add-client:hover {{ background-color: #0d1b2a; }}
@@ -2977,7 +2977,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <style>
-                body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background-color: #f4f6f9; color: #333; margin: 0; padding: 20px; }}
+                * {{ box-sizing: border-box; }} body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background-color: #f4f6f9; color: #333; margin: 0; padding: 20px; }}
                 .container {{ max-width: 1000px; margin: 20px auto; background: white; padding: 40px; border-radius: 12px; box-shadow: 0px 4px 15px rgba(0,0,0,0.05); }}
                 header {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eaeaea; padding-bottom: 20px; margin-bottom: 30px; flex-wrap: wrap; gap: 15px; }}
                 h1 {{ margin: 0; color: #1a237e; font-size: 24px; }}
