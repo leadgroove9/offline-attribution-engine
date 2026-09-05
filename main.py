@@ -373,6 +373,18 @@ def init_db():
         )
     """)
 
+    # Create Password Resets Table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS password_resets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT NOT NULL,
+            token TEXT UNIQUE NOT NULL,
+            is_used TEXT DEFAULT 'NO',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            expires_at TIMESTAMP
+        )
+    """)
+
     
     # 8. Create Client Configuration Change History Table
     cursor.execute("""
@@ -1065,6 +1077,9 @@ def get_login(request: Request, error: Optional[str] = None):
                 <div class="switch-link">
                     Don't have an account? <a href="/register">Sign Up</a>
                 </div>
+                <div class="switch-link" style="margin-top: 10px;">
+                    Forgot your password? <a href="/forgot-password">Reset it here</a>
+                </div>
             </div>
         </body>
     </html>
@@ -1115,6 +1130,307 @@ def get_logout(request: Request):
     response = RedirectResponse(url="/", status_code=303)
     response.delete_cookie("session_token")
     return response
+
+
+@app.get("/forgot-password", response_class=HTMLResponse)
+def get_forgot_password(request: Request, error: Optional[str] = None, success: Optional[str] = None, token: Optional[str] = None):
+    error_html = f'<div style="background-color: #ffebee; color: #c62828; padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; font-weight: bold; border-left: 4px solid #c62828;">❌ {error}</div>' if error else ''
+    
+    success_html = ""
+    if success:
+        success_html = f'''
+        <div style="background-color: #e8f5e9; color: #2e7d32; padding: 16px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; font-weight: bold; border-left: 4px solid #2e7d32; line-height: 1.6;">
+            ✅ {success}
+        </div>
+        '''
+        if token:
+            success_html += f'''
+            <div style="background-color: #fff9c4; border: 1px solid #fbc02d; padding: 16px; border-radius: 6px; margin-bottom: 25px; text-align: left; font-size: 13px; color: #574300; line-height: 1.5;">
+                🛠️ <strong>Developer Sandbox Notice:</strong> Since no SMTP mail server is connected, the password reset request has been printed to the server console and generated directly below:
+                <div style="margin-top: 10px; font-weight: bold; font-family: monospace; background: white; padding: 10px; border-radius: 4px; border: 1px solid #ffeb3b; word-break: break-all;">
+                    <a href="/reset-password?token={token}" style="color: #1a237e; text-decoration: underline;">Click here to reset password</a>
+                </div>
+                <small style="color: #666; display: block; margin-top: 5px;">Link URL: <code>/reset-password?token={token}</code></small>
+            </div>
+            '''
+
+    return f"""
+    <html>
+        <head>
+            <title>Reset Password - LeadGroove \U0001f916</title>
+            <style>
+                body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding-top: 120px; background-color: #f4f6f9; color: #333; }}
+                .container {{ display: inline-block; background: white; padding: 40px; border-radius: 12px; box-shadow: 0px 8px 24px rgba(0,0,0,0.08); max-width: 450px; width: 100%; text-align: left; box-sizing: border-box; }}
+                h1 {{ color: #1a237e; margin-top: 0; margin-bottom: 8px; font-size: 24px; font-weight: 700; text-align: center; }}
+                p {{ color: #666; font-size: 14px; margin-top: 0; margin-bottom: 24px; text-align: center; }}
+                .form-group {{ margin-bottom: 18px; }}
+                label {{ display: block; font-weight: bold; font-size: 12px; margin-bottom: 6px; color: #1a237e; text-transform: uppercase; letter-spacing: 0.5px; }}
+                input[type="email"] {{ width: 100%; padding: 12px; border-radius: 6px; border: 1px solid #ced4da; font-size: 14px; box-sizing: border-box; transition: border-color 0.2s; }}
+                input[type="email"]:focus {{ border-color: #1a237e; outline: none; }}
+                .btn {{ width: 100%; background-color: #1a237e; color: white; padding: 12px; border: none; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; margin-top: 10px; transition: background 0.2s; }}
+                .btn:hover {{ background-color: #0d1b2a; }}
+                .switch-link {{ text-align: center; margin-top: 20px; font-size: 13px; color: #555; }}
+                .switch-link a {{ color: #1a237e; text-decoration: none; font-weight: bold; }}
+                .switch-link a:hover {{ text-decoration: underline; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>Forgot Password</h1>
+                <p>Enter your email and we'll generate a secure password reset link.</p>
+                {error_html}
+                {success_html}
+                <form action="/forgot-password" method="POST">
+                    <div class="form-group">
+                        <label for="email">Email Address</label>
+                        <input type="email" id="email" name="email" required placeholder="e.g. corey@youragency.com">
+                    </div>
+                    <button type="submit" class="btn">\u2709\ufe0f Request Reset Link</button>
+                </form>
+                <div class="switch-link">
+                    Remember your credentials? <a href="/login">Log In</a>
+                </div>
+            </div>
+        </body>
+    </html>
+    """
+
+
+@app.post("/forgot-password")
+async def post_forgot_password(request: Request):
+    try:
+        form_data = await request.form()
+        email = form_data.get("email", "").strip().lower()
+        
+        if not email:
+            return HTMLResponse(get_forgot_password(request, error="Email is required."))
+            
+        conn = db_router.connect()
+        cursor = conn.cursor()
+        
+        # Verify user exists
+        cursor.execute("SELECT id FROM users WHERE email = ?", (email,))
+        user = cursor.fetchone()
+        if not user:
+            conn.close()
+            return HTMLResponse(get_forgot_password(request, error="No registered account found with that email address."))
+            
+        # Create reset token
+        token = uuid.uuid4().hex
+        expires_at = (datetime.now() + timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
+        
+        cursor.execute("""
+            INSERT INTO password_resets (email, token, expires_at)
+            VALUES (?, ?, ?)
+        """, (email, token, expires_at))
+        
+        conn.commit()
+        conn.close()
+        
+        # Print link to standard logs
+        print(f"🔑 [PASSWORD RESET] Link generated for {email}: http://localhost:8000/reset-password?token={token}")
+        
+        return HTMLResponse(get_forgot_password(
+            request, 
+            success="Password reset link generated successfully! This request expires in 1 hour.", 
+            token=token
+        ))
+    except Exception as e:
+        return HTMLResponse(get_forgot_password(request, error=f"Error generating reset request: {str(e)}"))
+
+
+@app.get("/reset-password", response_class=HTMLResponse)
+def get_reset_password(request: Request, token: Optional[str] = None, error: Optional[str] = None):
+    if not token:
+        return HTMLResponse("""
+            <html>
+                <body style="font-family: sans-serif; text-align: center; padding-top: 100px; background-color: #f4f6f9;">
+                    <div style="display: inline-block; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 400px;">
+                        <h2 style="color: #c62828; margin-top: 0;">❌ Missing Reset Token</h2>
+                        <p style="color: #666; font-size: 14px; line-height: 1.5;">To reset your password, please use the exact link sent to you or printed in your developer logs.</p>
+                        <a href="/login" style="display: inline-block; background: #1a237e; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 15px;">Return to Login</a>
+                    </div>
+                </body>
+            </html>
+        """)
+        
+    conn = db_router.connect()
+    cursor = conn.cursor()
+    
+    # Validate token
+    cursor.execute("""
+        SELECT email, is_used, expires_at 
+        FROM password_resets 
+        WHERE token = ?
+    """, (token,))
+    row = cursor.fetchone()
+    conn.close()
+    
+    if not row:
+        return HTMLResponse("""
+            <html>
+                <body style="font-family: sans-serif; text-align: center; padding-top: 100px; background-color: #f4f6f9;">
+                    <div style="display: inline-block; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 400px;">
+                        <h2 style="color: #c62828; margin-top: 0;">❌ Invalid Token</h2>
+                        <p style="color: #666; font-size: 14px; line-height: 1.5;">The password reset token is invalid, malformed, or does not exist.</p>
+                        <a href="/forgot-password" style="display: inline-block; background: #1a237e; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 15px;">Request New Link</a>
+                    </div>
+                </body>
+            </html>
+        """)
+        
+    email_val, is_used, expires_at_str = row
+    
+    if is_used == 'YES':
+        return HTMLResponse("""
+            <html>
+                <body style="font-family: sans-serif; text-align: center; padding-top: 100px; background-color: #f4f6f9;">
+                    <div style="display: inline-block; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 400px;">
+                        <h2 style="color: #c62828; margin-top: 0;">❌ Token Already Used</h2>
+                        <p style="color: #666; font-size: 14px; line-height: 1.5;">This password reset link has already been used to change your credentials and is deactivated.</p>
+                        <a href="/login" style="display: inline-block; background: #1a237e; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 15px;">Proceed to Login</a>
+                    </div>
+                </body>
+            </html>
+        """)
+        
+    # Check expiry
+    try:
+        expiry_dt = datetime.strptime(expires_at_str, "%Y-%m-%d %H:%M:%S")
+        if datetime.now() > expiry_dt:
+            return HTMLResponse("""
+                <html>
+                    <body style="font-family: sans-serif; text-align: center; padding-top: 100px; background-color: #f4f6f9;">
+                        <div style="display: inline-block; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 400px;">
+                            <h2 style="color: #c62828; margin-top: 0;">❌ Token Expired</h2>
+                            <p style="color: #666; font-size: 14px; line-height: 1.5;">This password reset request has expired. Reset links are only valid for 1 hour from generation.</p>
+                            <a href="/forgot-password" style="display: inline-block; background: #1a237e; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 15px;">Request New Link</a>
+                        </div>
+                    </body>
+                </html>
+            """)
+    except Exception:
+        pass # If expiry date parsing fails, bypass and allow reset
+
+    error_html = f'<div style="background-color: #ffebee; color: #c62828; padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; font-weight: bold; border-left: 4px solid #c62828;">❌ {error}</div>' if error else ''
+
+    return f"""
+    <html>
+        <head>
+            <title>Define New Password - LeadGroove \U0001f916</title>
+            <style>
+                body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding-top: 120px; background-color: #f4f6f9; color: #333; }}
+                .container {{ display: inline-block; background: white; padding: 40px; border-radius: 12px; box-shadow: 0px 8px 24px rgba(0,0,0,0.08); max-width: 400px; width: 100%; text-align: left; box-sizing: border-box; }}
+                h1 {{ color: #1a237e; margin-top: 0; margin-bottom: 8px; font-size: 24px; font-weight: 700; text-align: center; }}
+                p {{ color: #666; font-size: 14px; margin-top: 0; margin-bottom: 24px; text-align: center; }}
+                .form-group {{ margin-bottom: 18px; }}
+                label {{ display: block; font-weight: bold; font-size: 12px; margin-bottom: 6px; color: #1a237e; text-transform: uppercase; letter-spacing: 0.5px; }}
+                input[type="password"] {{ width: 100%; padding: 12px; border-radius: 6px; border: 1px solid #ced4da; font-size: 14px; box-sizing: border-box; transition: border-color 0.2s; }}
+                input[type="password"]:focus {{ border-color: #1a237e; outline: none; }}
+                .btn {{ width: 100%; background-color: #1a237e; color: white; padding: 12px; border: none; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; margin-top: 10px; transition: background 0.2s; }}
+                .btn:hover {{ background-color: #0d1b2a; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>Set New Password</h1>
+                <p>Define your secure, new password credentials for <strong>{email_val}</strong></p>
+                {error_html}
+                <form action="/reset-password" method="POST">
+                    <input type="hidden" name="token" value="{token}">
+                    <div class="form-group">
+                        <label for="password">New Password</label>
+                        <input type="password" id="password" name="password" required placeholder="••••••••">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 25px;">
+                        <label for="confirm_password">Confirm New Password</label>
+                        <input type="password" id="confirm_password" name="confirm_password" required placeholder="••••••••">
+                    </div>
+                    <button type="submit" class="btn">💾 Save & Apply Password</button>
+                </form>
+            </div>
+        </body>
+    </html>
+    """
+
+
+@app.post("/reset-password")
+async def post_reset_password(request: Request):
+    try:
+        form_data = await request.form()
+        token = form_data.get("token", "").strip()
+        password = form_data.get("password")
+        confirm_password = form_data.get("confirm_password")
+        
+        if not token or not password or not confirm_password:
+            return HTMLResponse(get_reset_password(request, token=token, error="All fields are required."))
+            
+        if password != confirm_password:
+            return HTMLResponse(get_reset_password(request, token=token, error="Passwords do not match."))
+            
+        if len(password) < 6:
+            return HTMLResponse(get_reset_password(request, token=token, error="Password must be at least 6 characters long."))
+            
+        conn = db_router.connect()
+        cursor = conn.cursor()
+        
+        # Double check token validity
+        cursor.execute("SELECT email, is_used, expires_at FROM password_resets WHERE token = ?", (token,))
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            return HTMLResponse(get_reset_password(request, token=token, error="Invalid token."))
+            
+        email, is_used, expires_at_str = row
+        if is_used == 'YES':
+            conn.close()
+            return HTMLResponse(get_reset_password(request, token=token, error="This reset link has already been used."))
+            
+        # Parse expiry date
+        try:
+            expiry_dt = datetime.strptime(expires_at_str, "%Y-%m-%d %H:%M:%S")
+            if datetime.now() > expiry_dt:
+                conn.close()
+                return HTMLResponse(get_reset_password(request, token=token, error="This reset link has expired."))
+        except Exception:
+            pass
+            
+        # Hash new password and update database
+        hashed = hash_password(password)
+        cursor.execute("UPDATE users SET hashed_password = ? WHERE email = ?", (hashed, email))
+        
+        # Mark token as used
+        cursor.execute("UPDATE password_resets SET is_used = 'YES' WHERE token = ?", (token,))
+        
+        conn.commit()
+        conn.close()
+        
+        # Display Success page
+        return HTMLResponse("""
+            <html>
+                <head>
+                    <title>Password Reset Success - LeadGroove \U0001f916</title>
+                    <style>
+                        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding-top: 120px; background-color: #f4f6f9; color: #333; }
+                        .container { display: inline-block; background: white; padding: 40px; border-radius: 12px; box-shadow: 0px 8px 24px rgba(0,0,0,0.08); max-width: 400px; width: 100%; box-sizing: border-box; }
+                        h1 { color: #2e7d32; margin-top: 0; margin-bottom: 12px; font-size: 24px; font-weight: 700; }
+                        p { color: #666; font-size: 14px; margin-top: 0; margin-bottom: 24px; line-height: 1.5; }
+                        .btn { display: block; width: 100%; background-color: #1a237e; color: white; padding: 12px; border: none; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; text-decoration: none; box-sizing: border-box; }
+                        .btn:hover { background-color: #0d1b2a; }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <h1>\U0001f389 Password Reset Complete!</h1>
+                        <p>Your password credentials have been successfully updated. You can now use your new password to access your dashboard.</p>
+                        <a href="/login" class="btn">\U0001f511 Proceed to Login</a>
+                    </div>
+                </body>
+            </html>
+        """)
+    except Exception as e:
+        return HTMLResponse(get_reset_password(request, token=token, error=f"Database update failed: {str(e)}"))
+
 
 @app.get("/admin/users", response_class=HTMLResponse)
 def get_admin_users(request: Request):
