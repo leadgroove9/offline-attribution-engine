@@ -2557,6 +2557,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                     </table>
                 </div>
             </div>
+            {upload_box_script_html}
         </body>
     </html>
     """
