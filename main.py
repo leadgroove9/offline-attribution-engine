@@ -3576,7 +3576,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             <!-- CRM webhook (Available if CRM active) -->
                             <div class="webhook-card" id="crm-webhook-card">
                                 <div class="webhook-title" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
-                                    <span>⚙️ CRM Deal/Lead Webhook</span>
+                                    <span id="settings-crm-webhook-title">⚙️ CRM Deal/Lead Webhook</span>
                                     
                                     <!-- Check Logs Hover Link -->
                                     <span class="tooltip-icon" style="font-size: 11px; font-weight: bold; margin-left: auto; cursor: help;">
@@ -3597,7 +3597,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             <!-- Billing webhook (Available if Accounting active) -->
                             <div class="webhook-card" id="billing-webhook-card">
                                 <div class="webhook-title" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
-                                    <span>💳 QuickBooks / Xero Billing Webhook</span>
+                                    <span id="settings-billing-webhook-title">💳 QuickBooks / Xero Billing Webhook</span>
                                     
                                     <!-- Check Logs Hover Link -->
                                     <span class="tooltip-icon" style="font-size: 11px; font-weight: bold; margin-left: auto; cursor: help;">
@@ -4220,7 +4220,18 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                 }}
 
                 function toggleSOTFields() {{
-                    const sot = document.getElementById('source_of_truth').value;
+                    const sotSelect = document.getElementById('source_of_truth');
+                    const selectedText = sotSelect.options[sotSelect.selectedIndex].text;
+                    const crmTitleSpan = document.getElementById('settings-crm-webhook-title');
+                    const billingTitleSpan = document.getElementById('settings-billing-webhook-title');
+                    if (crmTitleSpan) {{{{
+                        crmTitleSpan.innerText = "⚙️ " + selectedText + " Webhook";
+                    }}}}
+                    if (billingTitleSpan) {{{{
+                        billingTitleSpan.innerText = "💳 " + selectedText + " Webhook";
+                    }}}}
+                    
+                    const sot = sotSelect.value;
                     const leadGenRadio = document.querySelector('input[name="lead_gen_method"]:checked');
                     const leadGen = leadGenRadio ? leadGenRadio.value : 'both';
                     
