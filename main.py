@@ -2226,6 +2226,8 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
             function closeUploadInstructionsModal() {{{{
                 document.getElementById('upload-instructions-modal').style.display = 'none';
             }}}}
+
+            function closeAdjustmentModal() {{{{
                 document.getElementById('adjustment-modal').style.display = 'none';
             }}}}
 
