@@ -1903,6 +1903,32 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
         </div>
 
         <!-- Conversion Adjustment Modal -->
+        <!-- Upload Instructions Modal -->
+        <div id="upload-instructions-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center;">
+            <div style="background: white; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); max-width: 550px; width: 90%; text-align: left; overflow: hidden; display: flex; flex-direction: column;">
+                <!-- Header -->
+                <div id="ins_modal_header" style="background: #1a237e; color: white; padding: 20px; display: flex; justify-content: space-between; align-items: center;">
+                    <h3 id="ins_modal_title" style="margin: 0; font-size: 16px; color: white; display: flex; align-items: center; gap: 8px;">📋 Upload Instructions</h3>
+                    <span onclick="closeUploadInstructionsModal()" style="font-size: 24px; font-weight: bold; cursor: pointer; color: white; opacity: 0.8;">&times;</span>
+                </div>
+                <!-- Body -->
+                <div style="padding: 25px; font-size: 14px; color: #333; margin: 0; overflow-y: auto; max-height: 70vh;">
+                    <div style="margin-bottom: 15px; background: #e8eaf6; padding: 12px; border-radius: 6px; border-left: 4px solid #1a237e;">
+                        <span style="font-weight: bold; color: #1a237e; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 4px;">📂 TARGET UPLOAD LOCATION:</span>
+                        <strong id="ins_platform_path" style="display: block; font-size: 13px; color: #333; line-height: 1.4;"></strong>
+                    </div>
+                    
+                    <div style="margin-top: 15px;">
+                        <span style="font-weight: bold; color: #666; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 8px;">📝 STEP-BY-STEP WORKFLOW:</span>
+                        <ol id="ins_steps_list" style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;"></ol>
+                    </div>
+                </div>
+                <!-- Footer -->
+                <div style="background: #f1f3f4; padding: 15px; display: flex; justify-content: flex-end; border-top: 1px solid #eaeaea;">
+                    <button onclick="closeUploadInstructionsModal()" style="background: #1a237e; color: white; border: none; padding: 8px 18px; border-radius: 5px; font-weight: bold; cursor: pointer; transition: background 0.2s; font-size: 13px;">Got It, Close</button>
+                </div>
+            </div>
+        </div>
         <div id="adjustment-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center;">
             <div style="background: white; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); max-width: 480px; width: 90%; text-align: left; overflow: hidden;">
                 <!-- Header -->
@@ -2065,6 +2091,141 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
             }}}}
 
             function closeAdjustmentModal() {{{{
+                document.getElementById('adjustment-modal').style.display = 'none';
+            }}}}
+
+            function openUploadInstructions(platform) {{{{
+                const modal = document.getElementById('upload-instructions-modal');
+                const titleEl = document.getElementById('ins_modal_title');
+                const headerEl = document.getElementById('ins_modal_header');
+                const pathEl = document.getElementById('ins_platform_path');
+                const stepsEl = document.getElementById('ins_steps_list');
+                
+                let title = "";
+                let headerBg = "#1a237e";
+                let path = "";
+                let steps = [];
+                
+                if (platform === 'google') {{{{
+                    title = "🔍 Google Ads Upload Instructions";
+                    headerBg = "#4285F4";
+                    path = "Tools and Settings ➡️ Goals ➡️ Conversions ➡️ Uploads";
+                    steps = [
+                        "Click the <strong>Uploads</strong> tab from the left-hand navigation panel of the conversions screen.",
+                        "Click the blue <strong>plus (+)</strong> button to create a new upload session.",
+                        "Under <strong>Source</strong>, select <strong>Upload a file</strong> and choose the downloaded Google conversions CSV file.",
+                        "Select <strong>Apply</strong> or click <strong>Preview</strong> to verify GCLID click mappings and timestamps before applying."
+                    ];
+                }}}} else if (platform === 'facebook') {{{{
+                    title = "🔵 Meta / Facebook Offline Conversions Upload Guide";
+                    headerBg = "#1877F2";
+                    path = "Meta Events Manager ➡️ Data Sources";
+                    steps = [
+                        "Select the <strong>Offline Event Set</strong> matching your target active pixel campaigns.",
+                        "Click the <strong>Upload Events</strong> button inside the events set dashboard.",
+                        "Select and upload your downloaded Meta Offline Conversions CSV file.",
+                        "Verify and map key customer fields (like SHA-256 hashed email, phone, name) alongside the click ID (<code>fbclid</code>).",
+                        "Click <strong>Start Upload</strong> to transmit transaction attribution data to Meta."
+                    ];
+                }}}} else if (platform === 'linkedin') {{{{
+                    title = "🔗 LinkedIn Offline Conversions Upload Guide";
+                    headerBg = "#0A66C2";
+                    path = "LinkedIn Campaign Manager ➡️ Analyze ➡️ Conversion Tracking";
+                    steps = [
+                        "Click the <strong>Conversions</strong> tab inside the Campaign Manager analyzer.",
+                        "Click <strong>Create Conversion</strong> and define an <strong>Offline Upload (CSV)</strong> goal mapping (e.g., LeadGroove Lead/Sale).",
+                        "Click <strong>Upload Conversions</strong> in the upper right corner of the tracking summary panel.",
+                        "Choose the downloaded LinkedIn CSV file, associate your offline conversion goal, and click <strong>Upload</strong>."
+                    ];
+                }}}} else if (platform === 'microsoft') {{{{
+                    title = "🟢 Microsoft (Bing) Ads Offline Conversions Guide";
+                    headerBg = "#00A4EF";
+                    path = "Microsoft Advertising Dashboard ➡️ Tools ➡️ Conversion Goals";
+                    steps = [
+                        "Click the <strong>Offline Conversions</strong> tab under Conversion Goals management.",
+                        "Click the <strong>Upload</strong> button to launch the MS Ads import wizard.",
+                        "Select your downloaded Microsoft conversions CSV file.",
+                        "Ensure the TimeZone is aligned (defaults to UTC/+00:00), and click <strong>Apply</strong> to complete the process."
+                    ];
+                }}}} else if (platform === 'tiktok') {{{{
+                    title = "🎵 TikTok Ads Offline Event Upload Instructions";
+                    headerBg = "#010101";
+                    path = "TikTok Ads Manager ➡️ Tools ➡️ Events ➡️ Offline Events";
+                    steps = [
+                        "Select your configured active Offline Event Set.",
+                        "Click the <strong>Upload Offline Conversions (CSV)</strong> button.",
+                        "Choose the downloaded TikTok conversions CSV file.",
+                        "Verify that click ID (<code>ttclid</code>), conversion event name, value, and timestamp map cleanly, and click <strong>Submit</strong>."
+                    ];
+                }}}} else if (platform === 'twitter') {{{{
+                    title = "🐦 X (Twitter) Ads Offline Upload Guide";
+                    headerBg = "#15202B";
+                    path = "X Ads Manager ➡️ Tools ➡️ Events Manager";
+                    steps = [
+                        "Select your target offline attribution event set.",
+                        "Click **Upload Events (CSV)**.",
+                        "Select and upload the downloaded X Ads conversions CSV.",
+                        "Review column mappings (click ID, value, timestamp) and click <strong>Apply</strong> to queue conversion attribution."
+                    ];
+                }}}} else if (platform === 'snapchat') {{{{
+                    title = "👻 Snapchat Ads Offline Conversions Upload Instructions";
+                    headerBg = "#E9B800";
+                    path = "Snapchat Ads Manager ➡️ Assets ➡️ Events Manager";
+                    steps = [
+                        "Select your active Snapchat Pixel profile.",
+                        "Choose the **Upload Event Log** option inside event actions.",
+                        "Drop your downloaded Snapchat conversions CSV file.",
+                        "Verify event matching parameters (Click ID, Event Name) and click <strong>Process</strong> to trigger matching."
+                    ];
+                }}}} else if (platform === 'pinterest') {{{{
+                    title = "📌 Pinterest Ads Offline Event Upload Guide";
+                    headerBg = "#E60023";
+                    path = "Pinterest Ads Manager ➡️ Ads ➡️ Conversions ➡️ Offline Conversions";
+                    steps = [
+                        "Select your active Pinterest Tag offline dataset.",
+                        "Click the <strong>Upload Offline Conversions (CSV)</strong> button.",
+                        "Choose your downloaded Pinterest conversions CSV file.",
+                        "Confirm column metrics (PIN Click ID, Value, Currency) and select <strong>Apply</strong>."
+                    ];
+                }}}} else if (platform === 'chatgpt') {{{{
+                    title = "🧠 ChatGPT Ads Conversion Upload Instructions";
+                    headerBg = "#10a37f";
+                    path = "ChatGPT Ads Campaign Manager ➡️ Conversion Event Manager";
+                    steps = [
+                        "Click on the **Upload Offline CSV Match** button.",
+                        "Select your downloaded ChatGPT Ads conversions CSV file.",
+                        "Verify target mapping fields (ChatGPT Click ID, Event Name) and click <strong>Apply</strong>."
+                    ];
+                }}}} else if (platform === 'google-adjustments') {{{{
+                    title = "⚙️ Google Ads Offline Adjustments Guide";
+                    headerBg = "#37474F";
+                    path = "Goals ➡️ Conversions ➡️ Uploads ➡️ Adjustments";
+                    steps = [
+                        "Click the <strong>Adjustments</strong> tab at the top of your Google Ads Uploads menu.",
+                        "Click the blue <strong>plus (+)</strong> button.",
+                        "Select **Upload a file** and choose the downloaded Google Offline Adjustments CSV file.",
+                        "Click **Apply** or **Preview** to verify retracting or restating of matching click transactions."
+                    ];
+                }}}}
+                
+                titleEl.innerHTML = title;
+                headerEl.style.backgroundColor = headerBg;
+                pathEl.innerHTML = path;
+                
+                stepsEl.innerHTML = "";
+                steps.forEach(step => {{{{
+                    const li = document.createElement("li");
+                    li.style.marginBottom = "8px";
+                    li.innerHTML = step;
+                    stepsEl.appendChild(li);
+                }}}});
+                
+                modal.style.display = "flex";
+            }}}}
+
+            function closeUploadInstructionsModal() {{{{
+                document.getElementById('upload-instructions-modal').style.display = 'none';
+            }}}}
                 document.getElementById('adjustment-modal').style.display = 'none';
             }}}}
 
@@ -2237,6 +2398,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                                 <p>Export verified lead signals and transaction revenue for Smart Bidding optimization.</p>
                             </div>
                             {google_export_button}
+                            <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('google')" style="color: #4285F4; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;">📋 Instructions for uploading</a></div>
                         </div>
                         <!-- Facebook Ads -->
                         <div class="export-card">
@@ -2245,6 +2407,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                                 <p>Export offline events to optimize Facebook Conversions API and Custom Audiences.</p>
                             </div>
                             {facebook_export_button}
+                            <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('facebook')" style="color: #1877F2; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;">📋 Instructions for uploading</a></div>
                         </div>
                         <!-- LinkedIn Ads -->
                         <div class="export-card">
@@ -2253,6 +2416,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                                 <p>Export professional business conversions directly into LinkedIn Campaign Manager.</p>
                             </div>
                             {linkedin_export_button}
+                            <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('linkedin')" style="color: #0A66C2; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;">📋 Instructions for uploading</a></div>
                         </div>
                         <!-- Microsoft Ads -->
                         <div class="export-card">
@@ -2261,6 +2425,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                                 <p>Export click-matched offline sessions back into Bing/Microsoft campaign metrics.</p>
                             </div>
                             {microsoft_export_button}
+                            <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('microsoft')" style="color: #00A4EF; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;">📋 Instructions for uploading</a></div>
                         </div>
                         <!-- TikTok Ads -->
                         <div class="export-card">
@@ -2269,6 +2434,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                                 <p>Export offline conversion signals and purchase revenue directly into TikTok Ads Manager.</p>
                             </div>
                             {tiktok_export_button}
+                            <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('tiktok')" style="color: #010101; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;">📋 Instructions for uploading</a></div>
                         </div>
                         <!-- X Ads -->
                         <div class="export-card">
@@ -2277,6 +2443,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                                 <p>Export verified offline lead and sale transactions back into your X Ads campaigns.</p>
                             </div>
                             {twitter_export_button}
+                            <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('twitter')" style="color: #15202B; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;">📋 Instructions for uploading</a></div>
                         </div>
                         <!-- Snapchat Ads -->
                         <div class="export-card">
@@ -2285,6 +2452,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                                 <p style="margin-top: 5px;">Export offline event transactions directly into Snapchat Ads Pixel conversions manager.</p>
                             </div>
                             {snapchat_export_button}
+                            <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('snapchat')" style="color: #000; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;">📋 Instructions for uploading</a></div>
                         </div>
                         <!-- Pinterest Ads -->
                         <div class="export-card">
@@ -2293,6 +2461,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                                 <p>Export matched audience actions directly into your Pinterest Tag metrics.</p>
                             </div>
                             {pinterest_export_button}
+                            <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('pinterest')" style="color: #E60023; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;">📋 Instructions for uploading</a></div>
                         </div>
                         <!-- ChatGPT Ads -->
                         <div class="export-card">
@@ -2301,6 +2470,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                                 <p>Export verified offline lead and sale transactions back into your ChatGPT Ads metrics.</p>
                             </div>
                             {chatgpt_export_button}
+                            <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('chatgpt')" style="color: #10a37f; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;">📋 Instructions for uploading</a></div>
                         </div>
                         <!-- Google Ads Adjustments -->
                         <div class="export-card">
@@ -2309,6 +2479,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                                 <p>Export conversion adjustments (retractions and value restatements) to optimize bid accuracy.</p>
                             </div>
                             {google_adjustments_button}
+                            <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('google-adjustments')" style="color: #37474F; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;">📋 Instructions for uploading</a></div>
                         </div>
                     </div>
                 </div>
