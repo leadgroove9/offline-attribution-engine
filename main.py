@@ -1571,7 +1571,7 @@ def read_root(request: Request):
             <div class="container">
                 <h1>Welcome To Lead Grove's Offline Conversion Tracking Automation SAAS!</h1>
                 <p>Status: <span class="badge">Healthy, Multi-Tenant & AI-Enabled</span></p>
-                <p>Just point us to your offline lead/sales data, and it gets imported to your AD accounts automatically.</p>
+                <p>Just point us to your offline lead/sales data, and it gets imported to your AD accounts automatically!</p>
                 {user_header_html}
                 {auth_buttons_html}
                 
@@ -1579,7 +1579,7 @@ def read_root(request: Request):
                     <h3>Multi-Tenant Architecture Capabilities:</h3>
                     <ul>
                         <li>🏢 <strong>Multi-Channel Tracking</strong>: Seamless matching of Google (GCLID), Facebook (FBCLID), LinkedIn (LI_FAT_ID), and Microsoft (MSCLKID) Click IDs!</li>
-                        <li>🏢 <strong>4-Step Onboarding Wizard</strong>: Custom qualification mapping, billing order routing, and CRM parameters.</li>
+                        <li>🏢 <strong>5-Step Onboarding Wizard</strong>: Custom qualification mapping, billing order routing, and CRM parameters.</li>
                         <li>📥 <strong>Dynamic Webhook Endpoint</strong>: `/webhooks/callrail?client_id=X` automatically links tracking logs to the correct account.</li>
                         <li>🧠 <strong>Claude 4.5 Haiku Custom Audits</strong>: Real-time transcript parsing based on client's specific qualification definitions.</li>
                     </ul>
