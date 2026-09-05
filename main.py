@@ -1844,7 +1844,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
         
 
     # Define Global Instructions and Adjustments Modals (Rendered for ALL users)
-    global_modals_html = f"""
+    global_modals_html = """
         <!-- Upload Instructions Modal -->
         <div id="upload-instructions-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center;">
             <div style="background: white; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); max-width: 550px; width: 90%; text-align: left; overflow: hidden; display: flex; flex-direction: column;">
@@ -1928,23 +1928,23 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
         </div>
     """
 
-    global_modals_script_html = f"""
+    global_modals_script_html = """
         <script>
-            function openAdjustmentModal(sessionId, customerName, originalValue) {{{{
+            function openAdjustmentModal(sessionId, customerName, originalValue) {
                 document.getElementById('adj_session_id').value = sessionId;
                 document.getElementById('adj_customer_name').innerText = customerName;
-                document.getElementById('adj_original_value').innerText = `$$${{{{originalValue.toFixed(2)}}}}`;
+                document.getElementById('adj_original_value').innerText = `$$${originalValue.toFixed(2)}`;
                 document.getElementById('adj_new_value').value = '';
                 document.querySelectorAll('input[name="adj_strategy"]')[0].checked = true;
                 document.getElementById('adj_value_container').style.display = 'none';
                 document.getElementById('adjustment-modal').style.display = 'flex';
-            }}}}
+            }
 
-            function closeAdjustmentModal() {{{{
+            function closeAdjustmentModal() {
                 document.getElementById('adjustment-modal').style.display = 'none';
-            }}}}
+            }
 
-            function openUploadInstructions(platform) {{{{
+            function openUploadInstructions(platform) {
                 const modal = document.getElementById('upload-instructions-modal');
                 const titleEl = document.getElementById('ins_modal_title');
                 const headerEl = document.getElementById('ins_modal_header');
@@ -1956,7 +1956,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                 let path = "";
                 let steps = [];
                 
-                if (platform === 'google') {{{{
+                if (platform === 'google') {
                     title = "🔍 Google Ads Upload Instructions";
                     headerBg = "#4285F4";
                     path = "Tools and Settings ➡️ Goals ➡️ Conversions ➡️ Uploads";
@@ -1966,7 +1966,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                         "Under <strong>Source</strong>, select <strong>Upload a file</strong> and choose the downloaded Google conversions CSV file.",
                         "Select <strong>Apply</strong> or click <strong>Preview</strong> to verify GCLID click mappings and timestamps before applying."
                     ];
-                }}}} else if (platform === 'facebook') {{{{
+                } else if (platform === 'facebook') {
                     title = "🔵 Meta / Facebook Offline Conversions Upload Guide";
                     headerBg = "#1877F2";
                     path = "Meta Events Manager ➡️ Data Sources";
@@ -1977,7 +1977,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                         "Verify and map key customer fields (like SHA-256 hashed email, phone, name) alongside the click ID (<code>fbclid</code>).",
                         "Click <strong>Start Upload</strong> to transmit transaction attribution data to Meta."
                     ];
-                }}}} else if (platform === 'linkedin') {{{{
+                } else if (platform === 'linkedin') {
                     title = "🔗 LinkedIn Offline Conversions Upload Guide";
                     headerBg = "#0A66C2";
                     path = "LinkedIn Campaign Manager ➡️ Analyze ➡️ Conversion Tracking";
@@ -1987,7 +1987,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                         "Click <strong>Upload Conversions</strong> in the upper right corner of the tracking summary panel.",
                         "Choose the downloaded LinkedIn CSV file, associate your offline conversion goal, and click <strong>Upload</strong>."
                     ];
-                }}}} else if (platform === 'microsoft') {{{{
+                } else if (platform === 'microsoft') {
                     title = "🟢 Microsoft (Bing) Ads Offline Conversions Guide";
                     headerBg = "#00A4EF";
                     path = "Microsoft Advertising Dashboard ➡️ Tools ➡️ Conversion Goals";
@@ -1997,7 +1997,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                         "Select your downloaded Microsoft conversions CSV file.",
                         "Ensure the TimeZone is aligned (defaults to UTC/+00:00), and click <strong>Apply</strong> to complete the process."
                     ];
-                }}}} else if (platform === 'tiktok') {{{{
+                } else if (platform === 'tiktok') {
                     title = "🎵 TikTok Ads Offline Event Upload Instructions";
                     headerBg = "#010101";
                     path = "TikTok Ads Manager ➡️ Tools ➡️ Events ➡️ Offline Events";
@@ -2007,7 +2007,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                         "Choose the downloaded TikTok conversions CSV file.",
                         "Verify that click ID (<code>ttclid</code>), conversion event name, value, and timestamp map cleanly, and click <strong>Submit</strong>."
                     ];
-                }}}} else if (platform === 'twitter') {{{{
+                } else if (platform === 'twitter') {
                     title = "🐦 X (Twitter) Ads Offline Upload Guide";
                     headerBg = "#15202B";
                     path = "X Ads Manager ➡️ Tools ➡️ Events Manager";
@@ -2017,7 +2017,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                         "Select and upload the downloaded X Ads conversions CSV.",
                         "Review column mappings (click ID, value, timestamp) and click <strong>Apply</strong> to queue conversion attribution."
                     ];
-                }}}} else if (platform === 'snapchat') {{{{
+                } else if (platform === 'snapchat') {
                     title = "👻 Snapchat Ads Offline Conversions Upload Instructions";
                     headerBg = "#E9B800";
                     path = "Snapchat Ads Manager ➡️ Assets ➡️ Events Manager";
@@ -2027,7 +2027,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                         "Drop your downloaded Snapchat conversions CSV file.",
                         "Verify event matching parameters (Click ID, Event Name) and click <strong>Process</strong> to trigger matching."
                     ];
-                }}}} else if (platform === 'pinterest') {{{{
+                } else if (platform === 'pinterest') {
                     title = "📌 Pinterest Ads Offline Event Upload Guide";
                     headerBg = "#E60023";
                     path = "Pinterest Ads Manager ➡️ Ads ➡️ Conversions ➡️ Offline Conversions";
@@ -2037,7 +2037,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                         "Choose your downloaded Pinterest conversions CSV file.",
                         "Confirm column metrics (PIN Click ID, Value, Currency) and select <strong>Apply</strong>."
                     ];
-                }}}} else if (platform === 'chatgpt') {{{{
+                } else if (platform === 'chatgpt') {
                     title = "🧠 ChatGPT Ads Conversion Upload Instructions";
                     headerBg = "#10a37f";
                     path = "ChatGPT Ads Campaign Manager ➡️ Conversion Event Manager";
@@ -2046,7 +2046,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                         "Select your downloaded ChatGPT Ads conversions CSV file.",
                         "Verify target mapping fields (ChatGPT Click ID, Event Name) and click <strong>Apply</strong>."
                     ];
-                }}}} else if (platform === 'google-adjustments') {{{{
+                } else if (platform === 'google-adjustments') {
                     title = "⚙️ Google Ads Offline Adjustments Guide";
                     headerBg = "#37474F";
                     path = "Goals ➡️ Conversions ➡️ Uploads ➡️ Adjustments";
@@ -2056,73 +2056,73 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                         "Select **Upload a file** and choose the downloaded Google Offline Adjustments CSV file.",
                         "Click **Apply** or **Preview** to verify retracting or restating of matching click transactions."
                     ];
-                }}}}
+                }
                 
                 titleEl.innerHTML = title;
                 headerEl.style.backgroundColor = headerBg;
                 pathEl.innerHTML = path;
                 
                 stepsEl.innerHTML = "";
-                steps.forEach(step => {{{{ 
+                steps.forEach(step => { 
                     const li = document.createElement("li");
                     li.style.marginBottom = "8px";
                     li.innerHTML = step;
                     stepsEl.appendChild(li);
-                }}}});
+                });
                 
                 modal.style.display = "flex";
-            }}}}
+            }
 
-            function closeUploadInstructionsModal() {{{{ 
+            function closeUploadInstructionsModal() { 
                 document.getElementById('upload-instructions-modal').style.display = 'none';
-            }}}}
+            }
 
-            function toggleAdjValueField(show) {{{{ 
+            function toggleAdjValueField(show) { 
                 document.getElementById('adj_value_container').style.display = show ? 'block' : 'none';
-                if (show) {{{{ 
+                if (show) { 
                     document.getElementById('adj_new_value').required = true;
                     document.getElementById('adj_new_value').focus();
-                }}}} else {{{{ 
+                } else { 
                     document.getElementById('adj_new_value').required = false;
-                }}}}
-            }}}}
+                }
+            }
 
-            async function submitAdjustment(event) {{{{ 
+            async function submitAdjustment(event) { 
                 event.preventDefault();
                 const sessionId = document.getElementById('adj_session_id').value;
                 const strategy = document.querySelector('input[name="adj_strategy"]:checked').value;
                 const newValue = strategy === 'RESTATE' ? parseFloat(document.getElementById('adj_new_value').value) : 0.0;
                 
-                if (strategy === 'RESTATE' && (isNaN(newValue) || newValue < 0)) {{{{ 
+                if (strategy === 'RESTATE' && (isNaN(newValue) || newValue < 0)) { 
                     alert('Please enter a valid positive number for the restated value.');
                     return;
-                }}}}
+                }
                 
-                try {{{{ 
-                    const response = await fetch('/dashboard/adjust-sale', {{{{ 
+                try { 
+                    const response = await fetch('/dashboard/adjust-sale', { 
                         method: 'POST',
-                        headers: {{{{ 
+                        headers: { 
                             'Content-Type': 'application/json' 
-                        }}}},
-                        body: JSON.stringify({{{{ 
+                        },
+                        body: JSON.stringify({ 
                             session_id: parseInt(sessionId),
                             adjustment_type: strategy,
                             adjusted_value: newValue
-                        }}}})
-                    }}}});
+                        })
+                    });
                     
                     const data = await response.json();
-                    if (response.ok) {{{{ 
+                    if (response.ok) { 
                         alert('Success: Sale conversion adjustment saved cleanly! This correction will be uploaded to Google Ads next time you run adjustments sync.');
                         closeAdjustmentModal();
                         window.location.reload();
-                    }}}} else {{{{ 
+                    } else { 
                         throw new Error(data.detail || 'Failed to submit adjustment.');
-                    }}}}
-                }}}} catch (error) {{{{ 
+                    }
+                } catch (error) { 
                     alert('Error submitting adjustment: ' + error.message);
-                }}}}
-            }}}}
+                }
+            }
         </script>
     """
 
@@ -2186,53 +2186,53 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
             </div>
         </div>
         """
-        upload_box_script_html = f"""
+        upload_box_script_html = """
         <script>
             const dropZone = document.getElementById('drop-zone');
             const fileInput = document.getElementById('csv-file-input');
 
             // Add drag & drop event listeners
-            dropZone.addEventListener('dragover', (e) => {{{{
+            dropZone.addEventListener('dragover', (e) => {
                 e.preventDefault();
                 dropZone.style.background = '#e8eaf6';
                 dropZone.style.borderColor = '#3f51b5';
                 dropZone.style.transform = 'scale(1.01)';
-            }}}});
+            });
 
-            dropZone.addEventListener('dragleave', (e) => {{{{
+            dropZone.addEventListener('dragleave', (e) => {
                 e.preventDefault();
                 dropZone.style.background = '#f8f9fc';
                 dropZone.style.borderColor = '#1a237e';
                 dropZone.style.transform = 'scale(1)';
-            }}}});
+            });
 
-            dropZone.addEventListener('drop', (e) => {{{{
+            dropZone.addEventListener('drop', (e) => {
                 e.preventDefault();
                 dropZone.style.background = '#f8f9fc';
                 dropZone.style.borderColor = '#1a237e';
                 dropZone.style.transform = 'scale(1)';
                 
                 const files = e.dataTransfer.files;
-                if (files.length > 0) {{{{
+                if (files.length > 0) {
                     fileInput.files = files;
                     handleFileUpload(files[0]);
-                }}}}
-            }}}});
+                }
+            });
 
-            fileInput.addEventListener('change', (e) => {{{{
-                if (fileInput.files.length > 0) {{{{
+            fileInput.addEventListener('change', (e) => {
+                if (fileInput.files.length > 0) {
                     handleFileUpload(fileInput.files[0]);
-                }}}}
-            }}}});
+                }
+            });
 
-            async function handleFileUpload(file) {{{{
+            async function handleFileUpload(file) {
                 const clientIdSelect = document.getElementById('upload_client_id');
                 const clientId = clientIdSelect ? clientIdSelect.value : "{selected_client_id}";
                 
-                if (clientId === "0") {{{{
+                if (clientId === "0") {
                     alert("Please select a specific client account from the Target Client selector inside the upload box first!");
                     return;
-                }}}}
+                }
 
                 // Show visual loading
                 const content = document.getElementById('drop-zone-content');
@@ -2248,58 +2248,42 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                 formData.append('file', file);
                 formData.append('client_id', clientId);
 
-                try {{{{
-                    const response = await fetch('/dashboard/upload-sales', {{{{
+                try {
+                    const response = await fetch('/dashboard/upload-sales', {
                         method: 'POST',
                         body: formData
-                    }}}});
+                    });
 
                     const data = await response.json();
 
-                    if (response.ok) {{{{
+                    if (response.ok) {
                         // Show success modal
-                        document.getElementById('modal-message').innerText = `Spreadsheet successfully parsed for client ID #${{{{clientId}}}}!`;
+                        document.getElementById('modal-message').innerText = `Spreadsheet successfully parsed for client ID #${clientId}!`;
                         document.getElementById('stat-processed').innerText = data.stats.processed;
                         document.getElementById('stat-matches').innerText = data.stats.successful_matches;
                         document.getElementById('stat-organic').innerText = data.stats.organic_logged;
                         document.getElementById('stat-errors').innerText = data.stats.errors;
 
                         document.getElementById('upload-success-modal').style.display = 'flex';
-                    }}}} else {{{{
+                    } else {
                         throw new Error(data.detail || 'An error occurred during file parsing.');
-                    }}}}
-                }}}} catch (error) {{{{
+                    }
+                } catch (error) {
                     alert('Upload Error: ' + error.message);
-                }}}} finally {{{{
+                } finally {
                     // Reset Drop Zone content
                     content.innerHTML = originalHTML;
                     dropZone.style.pointerEvents = 'auto';
                     fileInput.value = ''; // Reset file input
-                }}}}
-            }}
+                }
+            }
 
-            function closeUploadModal() {{{{
+            function closeUploadModal() {
                 document.getElementById('upload-success-modal').style.display = 'none';
                 window.location.reload();
-            }}}}
-
-            function openAdjustmentModal(sessionId, customerName, originalValue) {{{{
-                document.getElementById('adj_session_id').value = sessionId;
-                document.getElementById('adj_customer_name').innerText = customerName;
-                document.getElementById('adj_original_value').innerText = `$$${{{{originalValue.toFixed(2)}}}}`;
-                document.getElementById('adj_new_value').value = '';
-                document.querySelectorAll('input[name="adj_strategy"]')[0].checked = true;
-                document.getElementById('adj_value_container').style.display = 'none';
-                document.getElementById('adjustment-modal').style.display = 'flex';
-            }}}}
-
-            function closeAdjustmentModal() {{{{
-                document.getElementById('adjustment-modal').style.display = 'none';
-            }}}}
-
-            
+            }
         </script>
-        """
+        """.replace("{selected_client_id}", str(selected_client_id))
     else:
         upload_box_html = ""
         upload_box_script_html = ""
