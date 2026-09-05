@@ -7380,9 +7380,9 @@ def create_client(request: Request, client: ClientCreate):
                 lead_gen_method, qualification_criteria, source_of_truth, email_provider, email_account,
                 crm_deal_tags, crm_won_deal_tags, crm_lead_tags, lead_count_rule, exclude_past_customers,
                 call_tracking_provider, ctm_account_id, ctm_profile_id, wc_account_id, wc_profile_id,
-                tiktok_ads_id, twitter_ads_id, pinterest_ads_id
+                tiktok_ads_id, twitter_ads_id, pinterest_ads_id, snapchat_ads_id, chatgpt_ads_id
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             client.name, 
             client.callrail_account_id or None,
@@ -7391,11 +7391,6 @@ def create_client(request: Request, client: ClientCreate):
             client.facebook_ads_id,
             client.linkedin_ads_id,
             client.microsoft_ads_id,
-            client.tiktok_ads_id or "",
-            client.twitter_ads_id or "",
-            client.pinterest_ads_id or "",
-            client.snapchat_ads_id or "",
-            client.chatgpt_ads_id or "",
             client.lead_gen_method,
             client.qualification_criteria,
             client.source_of_truth,
@@ -7413,7 +7408,9 @@ def create_client(request: Request, client: ClientCreate):
             client.wc_profile_id or "",
             client.tiktok_ads_id or "",
             client.twitter_ads_id or "",
-            client.pinterest_ads_id or ""
+            client.pinterest_ads_id or "",
+            client.snapchat_ads_id or "",
+            client.chatgpt_ads_id or ""
         ))
         
         client_id = cursor.lastrowid
