@@ -3565,8 +3565,8 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             
                             <!-- Call Tracking webhook (Dynamic based on provider) -->
                             <div class="webhook-card">
-                                <div class="webhook-title">{webhook_card_title}</div>
-                                <div class="webhook-desc">{webhook_card_desc}</div>
+                                <div class="webhook-title" id="settings-call-webhook-title">{webhook_card_title}</div>
+                                <div class="webhook-desc" id="settings-call-webhook-desc">{webhook_card_desc}</div>
                                 <div class="webhook-input-group">
                                     <input type="text" class="webhook-input" id="callrail-webhook" readonly value="" data-suffix="{webhook_suffix}">
                                     <button type="button" onclick="copyText('callrail-webhook', 'cr-copy-btn')" id="cr-copy-btn" class="btn-copy">📋 Copy</button>
@@ -3853,18 +3853,44 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     const ctmBox = document.getElementById('settings_call_tracking_ctm_box');
                     const wcBox = document.getElementById('settings_call_tracking_wc_box');
                     
+                    const titleEl = document.getElementById('settings-call-webhook-title');
+                    const descEl = document.getElementById('settings-call-webhook-desc');
+                    const inputEl = document.getElementById('callrail-webhook');
+                    const origin = window.location.origin || '';
+                    
                     if (provider === 'callrail') {{
                         crBox.style.display = 'flex';
                         ctmBox.style.display = 'none';
                         wcBox.style.display = 'none';
+                        if (titleEl) titleEl.innerHTML = "📞 CallRail CallCompleted Webhook";
+                        if (descEl) descEl.innerHTML = "Paste this dynamic endpoint into CallRail Integration Settings to sync automated call recordings and transcripts:";
+                        if (inputEl) {{
+                            const suffix = "/webhooks/callrail?client_id={active_client_id}";
+                            inputEl.setAttribute('data-suffix', suffix);
+                            inputEl.value = origin + suffix;
+                        }}
                     }} else if (provider === 'calltrackingmetrics') {{
                         crBox.style.display = 'none';
                         ctmBox.style.display = 'flex';
                         wcBox.style.display = 'none';
+                        if (titleEl) titleEl.innerHTML = "📞 CallTrackingMetrics Transcription Webhook";
+                        if (descEl) descEl.innerHTML = "Paste this dynamic endpoint into CallTrackingMetrics webhook setup to sync automated call recordings and transcripts:";
+                        if (inputEl) {{
+                            const suffix = "/webhooks/calltrackingmetrics?client_id={active_client_id}";
+                            inputEl.setAttribute('data-suffix', suffix);
+                            inputEl.value = origin + suffix;
+                        }}
                     }} else if (provider === 'whatconverts') {{
                         crBox.style.display = 'none';
                         ctmBox.style.display = 'none';
                         wcBox.style.display = 'flex';
+                        if (titleEl) titleEl.innerHTML = "📞 WhatConverts CallCompleted Webhook";
+                        if (descEl) descEl.innerHTML = "Paste this dynamic endpoint into WhatConverts webhook setup to sync automated call recordings and transcripts:";
+                        if (inputEl) {{
+                            const suffix = "/webhooks/whatconverts?client_id={active_client_id}";
+                            inputEl.setAttribute('data-suffix', suffix);
+                            inputEl.value = origin + suffix;
+                        }}
                     }}
                 }}
                 
