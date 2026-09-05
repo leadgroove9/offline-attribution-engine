@@ -957,6 +957,7 @@ def get_register(request: Request, error: Optional[str] = None, invite_token: Op
                 </div>
             </div>
             {upload_box_script_html}
+            {global_modals_script_html}
         </body>
     </html>
     """
@@ -1842,67 +1843,8 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
         admin_link_html = ' | <a href="/admin/users" style="color: #2e7d32; text-decoration: none; font-weight: bold; margin-left: 5px;">🛡️ Admin User Directory</a>'
         
 
-    # Configure upload box visibility
-    if user_role == "full":
-        # Check target clients options
-        if selected_client_id == 0:
-            upload_client_selector_html = """
-            <div style="margin-bottom: 25px; display: flex; align-items: center; justify-content: center; gap: 10px;">
-                <span style="font-weight: bold; color: #1a237e; font-size: 13px;">Target Client Account:</span>
-                <select id="upload_client_id" style="padding: 6px 12px; font-size: 13px; border-radius: 4px; border: 1px solid #9fa8da; font-weight: 600; outline: none; cursor: pointer; color: #1a237e; background: white;">
-            """
-            for c_id, c_name, _, _, _, _, _, _, _, _ in clients:
-                upload_client_selector_html += f'<option value="{c_id}">👤 {c_name}</option>'
-            upload_client_selector_html += """
-                </select>
-            </div>
-            """
-        else:
-            upload_client_selector_html = f'<input type="hidden" id="upload_client_id" value="{selected_client_id}">'
-
-        upload_box_html = f"""
-        <!-- Drag & Drop Ingestion Box -->
-        <div id="drop-zone" style="background: #f8f9fc; border: 2px dashed #1a237e; border-radius: 8px; padding: 25px; text-align: center; margin-bottom: 30px; cursor: pointer; transition: all 0.2s; position: relative;">
-            <div id="drop-zone-content">
-                <span style="font-size: 32px; display: block; margin-bottom: 10px;">📊</span>
-                <strong style="color: #1a237e; font-size: 15px; display: block;">Drag & drop your Customer Sales Spreadsheet (CSV or Excel)</strong>
-                <span style="color: #666; font-size: 13px; display: block; margin-top: 5px;">Or click here to browse and upload from your computer</span>
-                <small style="color: #888; font-size: 11px; display: block; margin-top: 10px; font-style: italic;">Supports exact phone/email matching & smart fuzzy name/company matching</small>
-            </div>
-            <input type="file" id="csv-file-input" accept=".csv, .xlsx, .xls" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;">
-        </div>
-        
-        {{upload_client_selector_html}}
-        
-        <!-- Ingestion Success Modal Overlay -->
-        <div id="upload-success-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center;">
-            <div style="background: white; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); max-width: 480px; width: 90%; text-align: center; overflow: hidden;">
-                <!-- Header -->
-                <div style="background: #1a237e; color: white; padding: 20px;">
-                    <span style="font-size: 40px;">🎉</span>
-                    <h3 style="margin: 10px 0 0 0; font-size: 18px;">Sales Spreadsheet Processed!</h3>
-                </div>
-                <!-- Body -->
-                <div style="padding: 25px; text-align: left; font-size: 14px; color: #333; line-height: 1.6;">
-                    <p id="modal-message" style="margin-top: 0; font-weight: 600; text-align: center; color: #1b5e20;"></p>
-                    <div style="background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 8px; padding: 15px; margin-top: 15px;">
-                        <strong style="display: block; margin-bottom: 8px; font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">📊 Ingestion Stats:</strong>
-                        <ul style="margin: 0; padding-left: 20px;">
-                            <li>Processed Rows: <strong id="stat-processed">0</strong></li>
-                            <li>Successful Matches: <strong id="stat-matches" style="color: #2e7d32;">0</strong></li>
-                            <li>New Organic Logged: <strong id="stat-organic" style="color: #1565c0;">0</strong></li>
-                            <li>Row Failures/Errors: <strong id="stat-errors" style="color: #c62828;">0</strong></li>
-                        </ul>
-                    </div>
-                </div>
-                <!-- Footer -->
-                <div style="background: #f1f3f4; padding: 15px; display: flex; justify-content: center;">
-                    <button onclick="closeUploadModal()" style="background: #1a237e; color: white; border: none; padding: 10px 24px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: background 0.2s;">Great, Refresh Dashboard!</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Conversion Adjustment Modal -->
+    # Define Global Instructions and Adjustments Modals (Rendered for ALL users)
+    global_modals_html = f"""
         <!-- Upload Instructions Modal -->
         <div id="upload-instructions-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center;">
             <div style="background: white; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); max-width: 550px; width: 90%; text-align: left; overflow: hidden; display: flex; flex-direction: column;">
@@ -1929,6 +1871,8 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                 </div>
             </div>
         </div>
+
+        <!-- Conversion Adjustment Modal -->
         <div id="adjustment-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center;">
             <div style="background: white; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); max-width: 480px; width: 90%; text-align: left; overflow: hidden;">
                 <!-- Header -->
@@ -1982,104 +1926,10 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                 </form>
             </div>
         </div>
-        """
-        upload_box_script_html = f"""
+    """
+
+    global_modals_script_html = f"""
         <script>
-            const dropZone = document.getElementById('drop-zone');
-            const fileInput = document.getElementById('csv-file-input');
-
-            // Add drag & drop event listeners
-            dropZone.addEventListener('dragover', (e) => {{{{
-                e.preventDefault();
-                dropZone.style.background = '#e8eaf6';
-                dropZone.style.borderColor = '#3f51b5';
-                dropZone.style.transform = 'scale(1.01)';
-            }}}});
-
-            dropZone.addEventListener('dragleave', (e) => {{{{
-                e.preventDefault();
-                dropZone.style.background = '#f8f9fc';
-                dropZone.style.borderColor = '#1a237e';
-                dropZone.style.transform = 'scale(1)';
-            }}}});
-
-            dropZone.addEventListener('drop', (e) => {{{{
-                e.preventDefault();
-                dropZone.style.background = '#f8f9fc';
-                dropZone.style.borderColor = '#1a237e';
-                dropZone.style.transform = 'scale(1)';
-                
-                const files = e.dataTransfer.files;
-                if (files.length > 0) {{{{
-                    fileInput.files = files;
-                    handleFileUpload(files[0]);
-                }}}}
-            }}}});
-
-            fileInput.addEventListener('change', (e) => {{{{
-                if (fileInput.files.length > 0) {{{{
-                    handleFileUpload(fileInput.files[0]);
-                }}}}
-            }}}});
-
-            async function handleFileUpload(file) {{{{
-                const clientIdSelect = document.getElementById('upload_client_id');
-                const clientId = clientIdSelect ? clientIdSelect.value : "{selected_client_id}";
-                
-                if (clientId === "0") {{{{
-                    alert("Please select a specific client account from the Target Client selector inside the upload box first!");
-                    return;
-                }}}}
-
-                // Show visual loading
-                const content = document.getElementById('drop-zone-content');
-                const originalHTML = content.innerHTML;
-                content.innerHTML = `
-                    <span style="font-size: 32px; display: block; margin-bottom: 10px; animation: spin 2s linear infinite; width: 40px; margin: 0 auto 10px auto;">⏳</span>
-                    <strong style="color: #1a237e; font-size: 15px; display: block;">Processing spreadsheet, performing fuzzy matching audits...</strong>
-                    <span style="color: #666; font-size: 13px; display: block; margin-top: 5px;">Do not close your browser or navigate away.</span>
-                `;
-                dropZone.style.pointerEvents = 'none';
-
-                const formData = new FormData();
-                formData.append('file', file);
-                formData.append('client_id', clientId);
-
-                try {{{{
-                    const response = await fetch('/dashboard/upload-sales', {{{{
-                        method: 'POST',
-                        body: formData
-                    }}}});
-
-                    const data = await response.json();
-
-                    if (response.ok) {{{{
-                        // Show success modal
-                        document.getElementById('modal-message').innerText = `Spreadsheet successfully parsed for client ID #${{{{clientId}}}}!`;
-                        document.getElementById('stat-processed').innerText = data.stats.processed;
-                        document.getElementById('stat-matches').innerText = data.stats.successful_matches;
-                        document.getElementById('stat-organic').innerText = data.stats.organic_logged;
-                        document.getElementById('stat-errors').innerText = data.stats.errors;
-
-                        document.getElementById('upload-success-modal').style.display = 'flex';
-                    }}}} else {{{{
-                        throw new Error(data.detail || 'An error occurred during file parsing.');
-                    }}}}
-                }}}} catch (error) {{{{
-                    alert('Upload Error: ' + error.message);
-                }}}} finally {{{{
-                    // Reset Drop Zone content
-                    content.innerHTML = originalHTML;
-                    dropZone.style.pointerEvents = 'auto';
-                    fileInput.value = ''; // Reset file input
-                }}}}
-            }}
-
-            function closeUploadModal() {{{{
-                document.getElementById('upload-success-modal').style.display = 'none';
-                window.location.reload();
-            }}}}
-
             function openAdjustmentModal(sessionId, customerName, originalValue) {{{{
                 document.getElementById('adj_session_id').value = sessionId;
                 document.getElementById('adj_customer_name').innerText = customerName;
@@ -2213,7 +2063,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                 pathEl.innerHTML = path;
                 
                 stepsEl.innerHTML = "";
-                steps.forEach(step => {{{{
+                steps.forEach(step => {{{{ 
                     const li = document.createElement("li");
                     li.style.marginBottom = "8px";
                     li.innerHTML = step;
@@ -2223,42 +2073,38 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                 modal.style.display = "flex";
             }}}}
 
-            function closeUploadInstructionsModal() {{{{
+            function closeUploadInstructionsModal() {{{{ 
                 document.getElementById('upload-instructions-modal').style.display = 'none';
             }}}}
 
-            function closeAdjustmentModal() {{{{
-                document.getElementById('adjustment-modal').style.display = 'none';
-            }}}}
-
-            function toggleAdjValueField(show) {{{{
+            function toggleAdjValueField(show) {{{{ 
                 document.getElementById('adj_value_container').style.display = show ? 'block' : 'none';
-                if (show) {{{{
+                if (show) {{{{ 
                     document.getElementById('adj_new_value').required = true;
                     document.getElementById('adj_new_value').focus();
-                }}}} else {{{{
+                }}}} else {{{{ 
                     document.getElementById('adj_new_value').required = false;
                 }}}}
             }}}}
 
-            async function submitAdjustment(event) {{{{
+            async function submitAdjustment(event) {{{{ 
                 event.preventDefault();
                 const sessionId = document.getElementById('adj_session_id').value;
                 const strategy = document.querySelector('input[name="adj_strategy"]:checked').value;
                 const newValue = strategy === 'RESTATE' ? parseFloat(document.getElementById('adj_new_value').value) : 0.0;
                 
-                if (strategy === 'RESTATE' && (isNaN(newValue) || newValue < 0)) {{{{
+                if (strategy === 'RESTATE' && (isNaN(newValue) || newValue < 0)) {{{{ 
                     alert('Please enter a valid positive number for the restated value.');
                     return;
                 }}}}
                 
-                try {{{{
-                    const response = await fetch('/dashboard/adjust-sale', {{{{
+                try {{{{ 
+                    const response = await fetch('/dashboard/adjust-sale', {{{{ 
                         method: 'POST',
-                        headers: {{{{
-                            'Content-Type': 'application/json'
+                        headers: {{{{ 
+                            'Content-Type': 'application/json' 
                         }}}},
-                        body: JSON.stringify({{{{
+                        body: JSON.stringify({{{{ 
                             session_id: parseInt(sessionId),
                             adjustment_type: strategy,
                             adjusted_value: newValue
@@ -2266,17 +2112,192 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                     }}}});
                     
                     const data = await response.json();
-                    if (response.ok) {{{{
+                    if (response.ok) {{{{ 
                         alert('Success: Sale conversion adjustment saved cleanly! This correction will be uploaded to Google Ads next time you run adjustments sync.');
                         closeAdjustmentModal();
                         window.location.reload();
-                    }}}} else {{{{
+                    }}}} else {{{{ 
                         throw new Error(data.detail || 'Failed to submit adjustment.');
                     }}}}
-                }}}} catch (error) {{{{
+                }}}} catch (error) {{{{ 
                     alert('Error submitting adjustment: ' + error.message);
                 }}}}
+            }}}}
+        </script>
+    """
+
+    # Configure upload box visibility
+    if user_role == "full":
+        # Check target clients options
+        if selected_client_id == 0:
+            upload_client_selector_html = """
+            <div style="margin-bottom: 25px; display: flex; align-items: center; justify-content: center; gap: 10px;">
+                <span style="font-weight: bold; color: #1a237e; font-size: 13px;">Target Client Account:</span>
+                <select id="upload_client_id" style="padding: 6px 12px; font-size: 13px; border-radius: 4px; border: 1px solid #9fa8da; font-weight: 600; outline: none; cursor: pointer; color: #1a237e; background: white;">
+            """
+            for c_id, c_name, _, _, _, _, _, _, _, _ in clients:
+                upload_client_selector_html += f'<option value="{c_id}">👤 {c_name}</option>'
+            upload_client_selector_html += """
+                </select>
+            </div>
+            """
+        else:
+            upload_client_selector_html = f'<input type="hidden" id="upload_client_id" value="{selected_client_id}">'
+
+        upload_box_html = f"""
+        <!-- Drag & Drop Ingestion Box -->
+        <div id="drop-zone" style="background: #f8f9fc; border: 2px dashed #1a237e; border-radius: 8px; padding: 25px; text-align: center; margin-bottom: 30px; cursor: pointer; transition: all 0.2s; position: relative;">
+            <div id="drop-zone-content">
+                <span style="font-size: 32px; display: block; margin-bottom: 10px;">📊</span>
+                <strong style="color: #1a237e; font-size: 15px; display: block;">Drag & drop your Customer Sales Spreadsheet (CSV or Excel)</strong>
+                <span style="color: #666; font-size: 13px; display: block; margin-top: 5px;">Or click here to browse and upload from your computer</span>
+                <small style="color: #888; font-size: 11px; display: block; margin-top: 10px; font-style: italic;">Supports exact phone/email matching & smart fuzzy name/company matching</small>
+            </div>
+            <input type="file" id="csv-file-input" accept=".csv, .xlsx, .xls" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;">
+        </div>
+        
+        {{upload_client_selector_html}}
+        
+        <!-- Ingestion Success Modal Overlay -->
+        <div id="upload-success-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center;">
+            <div style="background: white; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); max-width: 480px; width: 90%; text-align: center; overflow: hidden;">
+                <!-- Header -->
+                <div style="background: #1a237e; color: white; padding: 20px;">
+                    <span style="font-size: 40px;">🎉</span>
+                    <h3 style="margin: 10px 0 0 0; font-size: 18px;">Sales Spreadsheet Processed!</h3>
+                </div>
+                <!-- Body -->
+                <div style="padding: 25px; text-align: left; font-size: 14px; color: #333; line-height: 1.6;">
+                    <p id="modal-message" style="margin-top: 0; font-weight: 600; text-align: center; color: #1b5e20;"></p>
+                    <div style="background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 8px; padding: 15px; margin-top: 15px;">
+                        <strong style="display: block; margin-bottom: 8px; font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">📊 Ingestion Stats:</strong>
+                        <ul style="margin: 0; padding-left: 20px;">
+                            <li>Processed Rows: <strong id="stat-processed">0</strong></li>
+                            <li>Successful Matches: <strong id="stat-matches" style="color: #2e7d32;">0</strong></li>
+                            <li>New Organic Logged: <strong id="stat-organic" style="color: #1565c0;">0</strong></li>
+                            <li>Row Failures/Errors: <strong id="stat-errors" style="color: #c62828;">0</strong></li>
+                        </ul>
+                    </div>
+                </div>
+                <!-- Footer -->
+                <div style="background: #f1f3f4; padding: 15px; display: flex; justify-content: center;">
+                    <button onclick="closeUploadModal()" style="background: #1a237e; color: white; border: none; padding: 10px 24px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: background 0.2s;">Great, Refresh Dashboard!</button>
+                </div>
+            </div>
+        </div>
+        """
+        upload_box_script_html = f"""
+        <script>
+            const dropZone = document.getElementById('drop-zone');
+            const fileInput = document.getElementById('csv-file-input');
+
+            // Add drag & drop event listeners
+            dropZone.addEventListener('dragover', (e) => {{{{
+                e.preventDefault();
+                dropZone.style.background = '#e8eaf6';
+                dropZone.style.borderColor = '#3f51b5';
+                dropZone.style.transform = 'scale(1.01)';
+            }}}});
+
+            dropZone.addEventListener('dragleave', (e) => {{{{
+                e.preventDefault();
+                dropZone.style.background = '#f8f9fc';
+                dropZone.style.borderColor = '#1a237e';
+                dropZone.style.transform = 'scale(1)';
+            }}}});
+
+            dropZone.addEventListener('drop', (e) => {{{{
+                e.preventDefault();
+                dropZone.style.background = '#f8f9fc';
+                dropZone.style.borderColor = '#1a237e';
+                dropZone.style.transform = 'scale(1)';
+                
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {{{{
+                    fileInput.files = files;
+                    handleFileUpload(files[0]);
+                }}}}
+            }}}});
+
+            fileInput.addEventListener('change', (e) => {{{{
+                if (fileInput.files.length > 0) {{{{
+                    handleFileUpload(fileInput.files[0]);
+                }}}}
+            }}}});
+
+            async function handleFileUpload(file) {{{{
+                const clientIdSelect = document.getElementById('upload_client_id');
+                const clientId = clientIdSelect ? clientIdSelect.value : "{selected_client_id}";
+                
+                if (clientId === "0") {{{{
+                    alert("Please select a specific client account from the Target Client selector inside the upload box first!");
+                    return;
+                }}}}
+
+                // Show visual loading
+                const content = document.getElementById('drop-zone-content');
+                const originalHTML = content.innerHTML;
+                content.innerHTML = `
+                    <span style="font-size: 32px; display: block; margin-bottom: 10px; animation: spin 2s linear infinite; width: 40px; margin: 0 auto 10px auto;">⏳</span>
+                    <strong style="color: #1a237e; font-size: 15px; display: block;">Processing spreadsheet, performing fuzzy matching audits...</strong>
+                    <span style="color: #666; font-size: 13px; display: block; margin-top: 5px;">Do not close your browser or navigate away.</span>
+                `;
+                dropZone.style.pointerEvents = 'none';
+
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('client_id', clientId);
+
+                try {{{{
+                    const response = await fetch('/dashboard/upload-sales', {{{{
+                        method: 'POST',
+                        body: formData
+                    }}}});
+
+                    const data = await response.json();
+
+                    if (response.ok) {{{{
+                        // Show success modal
+                        document.getElementById('modal-message').innerText = `Spreadsheet successfully parsed for client ID #${{{{clientId}}}}!`;
+                        document.getElementById('stat-processed').innerText = data.stats.processed;
+                        document.getElementById('stat-matches').innerText = data.stats.successful_matches;
+                        document.getElementById('stat-organic').innerText = data.stats.organic_logged;
+                        document.getElementById('stat-errors').innerText = data.stats.errors;
+
+                        document.getElementById('upload-success-modal').style.display = 'flex';
+                    }}}} else {{{{
+                        throw new Error(data.detail || 'An error occurred during file parsing.');
+                    }}}}
+                }}}} catch (error) {{{{
+                    alert('Upload Error: ' + error.message);
+                }}}} finally {{{{
+                    // Reset Drop Zone content
+                    content.innerHTML = originalHTML;
+                    dropZone.style.pointerEvents = 'auto';
+                    fileInput.value = ''; // Reset file input
+                }}}}
             }}
+
+            function closeUploadModal() {{{{
+                document.getElementById('upload-success-modal').style.display = 'none';
+                window.location.reload();
+            }}}}
+
+            function openAdjustmentModal(sessionId, customerName, originalValue) {{{{
+                document.getElementById('adj_session_id').value = sessionId;
+                document.getElementById('adj_customer_name').innerText = customerName;
+                document.getElementById('adj_original_value').innerText = `$$${{{{originalValue.toFixed(2)}}}}`;
+                document.getElementById('adj_new_value').value = '';
+                document.querySelectorAll('input[name="adj_strategy"]')[0].checked = true;
+                document.getElementById('adj_value_container').style.display = 'none';
+                document.getElementById('adjustment-modal').style.display = 'flex';
+            }}}}
+
+            function closeAdjustmentModal() {{{{
+                document.getElementById('adjustment-modal').style.display = 'none';
+            }}}}
+
+            
         </script>
         """
     else:
@@ -2530,6 +2551,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                 </div>
 
                 {upload_box_html}
+                {global_modals_html}
 
                 <!-- Table -->
                 <h3 style="margin: 0 0 15px 0; color: #1a237e;">Lead Activity Log</h3>
@@ -2558,6 +2580,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                 </div>
             </div>
             {upload_box_script_html}
+            {global_modals_script_html}
         </body>
     </html>
     """
