@@ -3424,7 +3424,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                         <li>On the `afterSubmit` hook, write a script that triggers an outbound HTTP POST to our web receiver:
                                             <code style="display: block; background: #fff; border: 1px solid #b0bec5; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #37474f;">https://your-agency-app.onrender.com/webhooks/billing?client_id=conversions-{active_client_id}</code>
                                         </li>
-                                        <li>Format your JSON payload to include: `{"customer_name": invoice.entity, "email": invoice.email, "invoice_number": invoice.id, "amount": invoice.total}`.</li>
+                                        <li>Format your JSON payload to include: `{{"customer_name": invoice.entity, "email": invoice.email, "invoice_number": invoice.id, "amount": invoice.total}}`.</li>
                                     </ol>
                                 </div>
                             </div>
@@ -3923,7 +3923,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #4285F4; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #4285F4; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                    🔍 Google Ads Goal Setup (ID: ${googleAds})
+                                    🔍 Google Ads Goal Setup (ID: ${{googleAds}})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>Google Ads account</strong>.</li>
@@ -3939,7 +3939,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #10a37f; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #10a37f; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                    🧠 ChatGPT Ads Goal Setup (ID: ${chatgptAds})
+                                    🧠 ChatGPT Ads Goal Setup (ID: ${{chatgptAds}})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>ChatGPT Ads Campaign Manager</strong>.</li>
@@ -3956,7 +3956,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #1877F2; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #1877F2; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                    🔵 Meta / Facebook Ads Goal Setup (Pixel: ${facebookAds})
+                                    🔵 Meta / Facebook Ads Goal Setup (Pixel: ${{facebookAds}})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>Meta Events Manager</strong>.</li>
@@ -3971,7 +3971,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #10a37f; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #10a37f; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                    🧠 ChatGPT Ads Goal Setup (ID: ${chatgptAds})
+                                    🧠 ChatGPT Ads Goal Setup (ID: ${{chatgptAds}})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>ChatGPT Ads Campaign Manager</strong>.</li>
@@ -3988,7 +3988,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #0A66C2; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #0A66C2; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                    🔗 LinkedIn Ads Goal Setup (Account: ${linkedinAds})
+                                    🔗 LinkedIn Ads Goal Setup (Account: ${{linkedinAds}})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into <strong>LinkedIn Campaign Manager</strong>.</li>
@@ -4007,7 +4007,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #10a37f; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #10a37f; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                    🧠 ChatGPT Ads Goal Setup (ID: ${chatgptAds})
+                                    🧠 ChatGPT Ads Goal Setup (ID: ${{chatgptAds}})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>ChatGPT Ads Campaign Manager</strong>.</li>
@@ -4024,7 +4024,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #00A4EF; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #00A4EF; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                    🟢 Microsoft (Bing) Ads Goal Setup (ID: ${microsoftAds})
+                                    🟢 Microsoft (Bing) Ads Goal Setup (ID: ${{microsoftAds}})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>Microsoft Advertising Dashboard</strong>.</li>
@@ -4040,7 +4040,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #10a37f; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #10a37f; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                    🧠 ChatGPT Ads Goal Setup (ID: ${chatgptAds})
+                                    🧠 ChatGPT Ads Goal Setup (ID: ${{chatgptAds}})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>ChatGPT Ads Campaign Manager</strong>.</li>
@@ -4057,7 +4057,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #010101; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #010101; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                    🎵 TikTok Ads Goal Setup (Pixel: ${tiktokAds})
+                                    🎵 TikTok Ads Goal Setup (Pixel: ${{tiktokAds}})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>TikTok Ads Manager</strong>.</li>
@@ -4076,7 +4076,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #10a37f; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #10a37f; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                    🧠 ChatGPT Ads Goal Setup (ID: ${chatgptAds})
+                                    🧠 ChatGPT Ads Goal Setup (ID: ${{chatgptAds}})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>ChatGPT Ads Campaign Manager</strong>.</li>
@@ -4093,7 +4093,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #15202B; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #15202B; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                    🐦 X (Twitter) Ads Goal Setup (Pixel: ${twitterAds})
+                                    🐦 X (Twitter) Ads Goal Setup (Pixel: ${{twitterAds}})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>X Ads Manager</strong>.</li>
@@ -4112,7 +4112,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #10a37f; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #10a37f; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                    🧠 ChatGPT Ads Goal Setup (ID: ${chatgptAds})
+                                    🧠 ChatGPT Ads Goal Setup (ID: ${{chatgptAds}})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>ChatGPT Ads Campaign Manager</strong>.</li>
@@ -4129,7 +4129,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #FFFC00; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #000; background: #FFFC00; display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 14px;">
-                                    👻 Snapchat Ads Goal Setup (ID: ${snapchatAds})
+                                    👻 Snapchat Ads Goal Setup (ID: ${{snapchatAds}})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>Snapchat Ads Manager</strong>.</li>
@@ -4145,7 +4145,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #E60023; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #E60023; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                    📌 Pinterest Ads Goal Setup (Tag: ${pinterestAds})
+                                    📌 Pinterest Ads Goal Setup (Tag: ${{pinterestAds}})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>Pinterest Ads Manager</strong>.</li>
@@ -4164,7 +4164,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #10a37f; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #10a37f; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                    🧠 ChatGPT Ads Goal Setup (ID: ${chatgptAds})
+                                    🧠 ChatGPT Ads Goal Setup (ID: ${{chatgptAds}})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>ChatGPT Ads Campaign Manager</strong>.</li>
@@ -5878,7 +5878,7 @@ def add_client_page(request: Request):
                                     <li>On the `afterSubmit` hook, write a script that triggers an outbound HTTP POST to our web receiver:
                                         <code style="display: block; background: #fff; border: 1px solid #b0bec5; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #37474f;">https://your-agency-app.onrender.com/webhooks/billing?client_id=conversions-[id]</code>
                                     </li>
-                                    <li>Format your JSON payload to include: `{"customer_name": invoice.entity, "email": invoice.email, "invoice_number": invoice.id, "amount": invoice.total}`.</li>
+                                    <li>Format your JSON payload to include: `{{"customer_name": invoice.entity, "email": invoice.email, "invoice_number": invoice.id, "amount": invoice.total}}`.</li>
                                 </ol>
                             </div>
                         </div>
