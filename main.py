@@ -3767,13 +3767,22 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             <!-- SECTION 5: Active Webhooks read-only deck -->
                             <div class="section-title" style="margin-top: 30px;">🔑 Live Webhooks & Integration URLs</div>
                             
-                            <!-- Automated Google Sheets & Google Ads Scheduled Fetch Feed Card -->
+                            <!-- Automated Google Sheets & Google Ads Scheduled Fetch Feed Cards -->
                             <div class="webhook-card" id="sheets-feed-webhook-card" style="border-left: 4px solid #34A853;">
-                                <div class="webhook-title" style="color: #1e7e34;">📊 Automated Google Sheets & Google Ads Scheduled Fetch Feed</div>
-                                <div class="webhook-desc">Use this live CSV feed URL inside Google Sheets via <code>=IMPORTDATA("...")</code> or directly inside Google Ads under <strong>Goals ➡️ Conversions ➡️ Uploads ➡️ Schedules</strong> for automated 24/7 offline conversion syncing! Also compatible with Zapier spreadsheet triggers.</div>
+                                <div class="webhook-title" style="color: #1e7e34;">📊 Automated Google Sheets & Google Ads Feed (Standard Conversions)</div>
+                                <div class="webhook-desc">Use this live CSV feed URL inside Google Sheets via <code>=IMPORTDATA("...")</code> or directly inside Google Ads under <strong>Goals ➡️ Conversions ➡️ Uploads ➡️ Schedules</strong> for automated 24/7 offline conversion syncing!</div>
                                 <div class="webhook-input-group">
                                     <input type="text" class="webhook-input" id="sheets-feed-webhook" readonly value="" data-suffix="/feeds/google-conversions.csv?client_id={active_client_id}">
-                                    <button type="button" onclick="copyText('sheets-feed-webhook', 'sheets-feed-copy-btn')" id="sheets-feed-copy-btn" class="btn-copy" style="background-color: #34A853;">📋 Copy Feed URL</button>
+                                    <button type="button" onclick="copyText('sheets-feed-webhook', 'sheets-feed-copy-btn')" id="sheets-feed-copy-btn" class="btn-copy" style="background-color: #34A853;">📋 Copy Conversions Feed URL</button>
+                                </div>
+                            </div>
+                            
+                            <div class="webhook-card" id="sheets-adj-feed-webhook-card" style="border-left: 4px solid #37474F;">
+                                <div class="webhook-title" style="color: #37474F;">⚙️ Automated Google Sheets & Google Ads Feed (Conversion Adjustments & Retractions)</div>
+                                <div class="webhook-desc">Use this live CSV feed URL in Google Sheets via <code>=IMPORTDATA("...")</code> or directly in Google Ads under <strong>Goals ➡️ Conversions ➡️ Uploads ➡️ Schedules (Adjustments tab)</strong> for automated 24/7 retractions and value restatements!</div>
+                                <div class="webhook-input-group">
+                                    <input type="text" class="webhook-input" id="sheets-adj-feed-webhook" readonly value="" data-suffix="/feeds/google-adjustments.csv?client_id={active_client_id}">
+                                    <button type="button" onclick="copyText('sheets-adj-feed-webhook', 'sheets-adj-feed-copy-btn')" id="sheets-adj-feed-copy-btn" class="btn-copy" style="background-color: #37474F;">📋 Copy Adjustments Feed URL</button>
                                 </div>
                             </div>
                             
@@ -4172,7 +4181,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                     <li style="margin-bottom: 8px;"><strong>Goal 1 (Qualification):</strong> Set Goal Name to <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>. Under Category, choose <strong>Qualified Lead</strong>. Set Value to use a default value of <code>$1.00</code>.</li>
                                     <li style="margin-bottom: 8px;"><strong>Goal 2 (Offline Sale):</strong> Create a second conversion import action. Set Goal Name to <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>. Under Category, choose <strong>Purchase</strong> or <strong>Converted Lead</strong>. Set Value to <strong>Use different values for each conversion</strong> (defaulting to <code>$0.00</code>).</li>
                                     <li style="margin-bottom: 8px; background: #fff8e1; border-left: 3px solid #ffa000; padding: 8px 10px; border-radius: 4px; color: #5d4037;">💡 <strong>Recommended Conversion Settings:</strong> Under <strong>Count</strong>, select <strong>Every</strong> conversion (so multiple sales/leads from the same user are tracked). Always select the <strong>longest allowable conversion window</strong> (e.g., 90-day click-through window) each time to maximize historical match depth.</li>
-                                    <li style="margin-bottom: 8px; background: #e8f5e9; border-left: 3px solid #2e7d32; padding: 8px 10px; border-radius: 4px; color: #1b5e20;">🚀 <strong>Hands-Free Automated Sync (Optional):</strong> Want Google Ads to pull conversions automatically without manual CSV uploads? Go to <strong>Goals ➡️ Conversions ➡️ Uploads ➡️ Schedules</strong>, click <strong>+</strong>, select <strong>HTTPS</strong> as Source, and paste your live LeadGrove feed URL: <code style="background: #fff; padding: 2px 5px; border-radius: 3px; border: 1px solid #a5d6a7;">https://your-agency-app.onrender.com/feeds/google-conversions.csv?client_id=[id]</code>!</li>
+                                    <li style="margin-bottom: 8px; background: #e8f5e9; border-left: 3px solid #2e7d32; padding: 8px 10px; border-radius: 4px; color: #1b5e20;">🚀 <strong>Hands-Free Automated Sync (Optional):</strong> Want Google Ads to pull conversions automatically without manual CSV uploads? Go to <strong>Goals ➡️ Conversions ➡️ Uploads ➡️ Schedules</strong>, click <strong>+</strong>, select <strong>HTTPS</strong> as Source, and paste your live LeadGrove feed URL: <code style="background: #fff; padding: 2px 5px; border-radius: 3px; border: 1px solid #a5d6a7;">https://your-agency-app.onrender.com/feeds/google-conversions.csv?client_id=[id]</code>! (For automated retractions & restatements, set up a second schedule under the Adjustments tab using: <code style="background: #fff; padding: 2px 5px; border-radius: 3px; border: 1px solid #b0bec5;">https://your-agency-app.onrender.com/feeds/google-adjustments.csv?client_id=[id]</code>).</li>
                                 </ol>
                             </div>
                         `);
@@ -6847,7 +6856,7 @@ def add_client_page(request: Request):
                                     <li style="margin-bottom: 8px;"><strong>Goal 1 (Qualification):</strong> Set Goal Name to <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>. Under Category, choose <strong>Qualified Lead</strong>. Set Value to use a default value of <code>$1.00</code>.</li>
                                     <li style="margin-bottom: 8px;"><strong>Goal 2 (Offline Sale):</strong> Create a second conversion import action. Set Goal Name to <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>. Under Category, choose <strong>Purchase</strong> or <strong>Converted Lead</strong>. Set Value to <strong>Use different values for each conversion</strong> (defaulting to <code>$0.00</code>).</li>
                                     <li style="margin-bottom: 8px; background: #fff8e1; border-left: 3px solid #ffa000; padding: 8px 10px; border-radius: 4px; color: #5d4037;">💡 <strong>Recommended Conversion Settings:</strong> Under <strong>Count</strong>, select <strong>Every</strong> conversion (so multiple sales/leads from the same user are tracked). Always select the <strong>longest allowable conversion window</strong> (e.g., 90-day click-through window) each time to maximize historical match depth.</li>
-                                    <li style="margin-bottom: 8px; background: #e8f5e9; border-left: 3px solid #2e7d32; padding: 8px 10px; border-radius: 4px; color: #1b5e20;">🚀 <strong>Hands-Free Automated Sync (Optional):</strong> Want Google Ads to pull conversions automatically without manual CSV uploads? Go to <strong>Goals ➡️ Conversions ➡️ Uploads ➡️ Schedules</strong>, click <strong>+</strong>, select <strong>HTTPS</strong> as Source, and paste your live LeadGrove feed URL: <code style="background: #fff; padding: 2px 5px; border-radius: 3px; border: 1px solid #a5d6a7;">https://your-agency-app.onrender.com/feeds/google-conversions.csv?client_id=[id]</code>!</li>
+                                    <li style="margin-bottom: 8px; background: #e8f5e9; border-left: 3px solid #2e7d32; padding: 8px 10px; border-radius: 4px; color: #1b5e20;">🚀 <strong>Hands-Free Automated Sync (Optional):</strong> Want Google Ads to pull conversions automatically without manual CSV uploads? Go to <strong>Goals ➡️ Conversions ➡️ Uploads ➡️ Schedules</strong>, click <strong>+</strong>, select <strong>HTTPS</strong> as Source, and paste your live LeadGrove feed URL: <code style="background: #fff; padding: 2px 5px; border-radius: 3px; border: 1px solid #a5d6a7;">https://your-agency-app.onrender.com/feeds/google-conversions.csv?client_id=[id]</code>! (For automated retractions & restatements, set up a second schedule under the Adjustments tab using: <code style="background: #fff; padding: 2px 5px; border-radius: 3px; border: 1px solid #b0bec5;">https://your-agency-app.onrender.com/feeds/google-adjustments.csv?client_id=[id]</code>).</li>
                                 </ol>
                             </div>
                         `);
@@ -7830,6 +7839,69 @@ def export_microsoft_adjustments(request: Request, client_id: int):
         'Content-Type': 'text/csv'
     }
     return StreamingResponse(output, headers=headers)
+
+@app.get("/feeds/google-adjustments.csv")
+@app.get("/feeds/adjustments.csv")
+def feed_google_adjustments(request: Request, client_id: int = 1, feed_key: Optional[str] = None):
+    """
+    Live Automated CSV Feed for Google Sheets =IMPORTDATA() and Google Ads Scheduled Fetch (Adjustments/Retractions).
+    Returns real-time, Google Ads-compliant conversion adjustments CSV data for a specific client account.
+    """
+    try:
+        conn = db_router.connect()
+        cursor = conn.cursor()
+        
+        # Verify client exists
+        cursor.execute("SELECT name, google_ads_customer_id FROM clients WHERE id = ?", (client_id,))
+        client_row = cursor.fetchone()
+        if not client_row:
+            raise HTTPException(status_code=400, detail="Invalid client ID")
+        
+        client_name = client_row[0]
+        google_ads_id = client_row[1] or ""
+        
+        # Pull adjusted records belonging to this client that have a GCLID
+        cursor.execute("""
+            SELECT gclid, adjustment_type, adjusted_value, adjusted_at, created_at
+            FROM sessions
+            WHERE client_id = ? AND gclid IS NOT NULL AND gclid != '' AND adjusted = 'YES'
+            ORDER BY adjusted_at DESC
+        """, (client_id,))
+        rows = cursor.fetchall()
+        conn.close()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+    # Generate CSV in memory
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # 1. Google Ads template parameter header
+    ads_parameter = f"Parameters:TimeZone=+0000;customerId={google_ads_id}" if google_ads_id else "Parameters:TimeZone=+0000"
+    writer.writerow([ads_parameter])
+    
+    # 2. Google Ads Adjustments headers
+    writer.writerow(["Google Click ID", "Conversion Name", "Conversion Time", "Adjustment Type", "Adjustment Time", "Adjusted Value", "Adjusted Value Currency"])
+    
+    for r in rows:
+        gclid, adj_type, adj_value, adj_at, orig_created_at = r
+        orig_conv_time = f"{orig_created_at} +0000" if orig_created_at else ""
+        adj_time = f"{adj_at} +0000" if adj_at else ""
+        
+        conv_name = "LeadGroove Offline Sale"
+        val_str = f"{adj_value:.2f}" if adj_type == 'RESTATE' else ""
+        curr_str = "USD" if adj_type == 'RESTATE' else ""
+        
+        writer.writerow([gclid, conv_name, orig_conv_time, adj_type, adj_time, val_str, curr_str])
+        
+    output.seek(0)
+    safe_filename = re.sub(r'\s+', '-', client_name.strip().lower())
+    headers = {
+        'Content-Disposition': f'inline; filename="google_adjustments_feed_{safe_filename}.csv"',
+        'Content-Type': 'text/csv'
+    }
+    return StreamingResponse(output, headers=headers)
+
 
 
 @app.get("/dashboard/export/google-adjustments")
