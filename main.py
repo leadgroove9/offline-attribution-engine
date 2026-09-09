@@ -1786,12 +1786,14 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
         table_rows_html = f'<tr><td colspan="{"12" if selected_client_id == 0 else "11"}" style="text-align: center; color: #888; padding: 40px;">No lead sessions recorded for this client. Set up their CallRail webhook to populate this space!</td></tr>'
 
     # Calculate adjustments count
-    exportable_adjustments = sum(1 for r in rows if len(r) > 21 and r[21] == 'YES')
+    exportable_adjustments = sum(1 for r in rows if r[5] and len(r) > 23 and r[23] == 'YES')
+    exportable_microsoft_adjustments = sum(1 for r in rows if r[15] and len(r) > 23 and r[23] == 'YES')
 
     # Build multi-channel action buttons dynamically
     if selected_client_id == 0:
         google_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Google Ads offline conversion CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
         google_adjustments_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Google Ads offline conversion adjustments CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
+        microsoft_adjustments_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Microsoft Ads offline conversion adjustments CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
         google_audience_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Google Customer Match list!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
         facebook_audience_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Meta Custom Audience list!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
         linkedin_audience_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their LinkedIn List Match list!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
@@ -1806,6 +1808,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
     else:
         google_export_button = f'<a href="/dashboard/export/google?client_id={selected_client_id}" class="btn-export" style="background-color: #4285F4; text-align: center; text-decoration: none; width: 100%;">📥 Download Google CSV ({exportable_google})</a>'
         google_adjustments_button = f'<a href="/dashboard/export/google-adjustments?client_id={selected_client_id}" class="btn-export" style="background-color: #37474F; text-align: center; text-decoration: none; width: 100%;">📥 Download Google Adjustments CSV ({exportable_adjustments})</a>'
+        microsoft_adjustments_button = f'<a href="/dashboard/export/microsoft-adjustments?client_id={selected_client_id}" class="btn-export" style="background-color: #00838F; text-align: center; text-decoration: none; width: 100%;">📥 Download Bing Adjustments CSV ({exportable_microsoft_adjustments})</a>'
         google_audience_button = f"""
         <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px; width: 100%;">
             <a href="/dashboard/export/audience/google?client_id={selected_client_id}&segment=all" class="btn-export" style="background-color: #4285F4; text-align: center; text-decoration: none; font-size: 12px; font-weight: bold; border-radius: 5px; padding: 10px 12px;">📥 All Profiles (Leads & Buyers)</a>
@@ -2055,6 +2058,17 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                         "Click the blue <strong>plus (+)</strong> button.",
                         "Select **Upload a file** and choose the downloaded Google Offline Adjustments CSV file.",
                         "Click **Apply** or **Preview** to verify retracting or restating of matching click transactions."
+                    ];
+                } else if (platform === 'microsoft-adjustments') {
+                    title = "⚙️ Microsoft (Bing) Ads Offline Adjustments Guide";
+                    headerBg = "#00838F";
+                    path = "Microsoft Advertising Dashboard ➡️ Tools ➡️ Conversion Goals";
+                    steps = [
+                        "Click the <strong>Offline Conversions</strong> tab under Conversion Goals management inside Microsoft Advertising.",
+                        "Click the <strong>Upload</strong> button and select <strong>Offline Conversion Adjustments</strong>.",
+                        "Select your downloaded Microsoft Offline Adjustments CSV file.",
+                        "Ensure column headers match <code>Microsoft Click ID</code>, <code>Conversion Name</code>, <code>Conversion Time</code>, <code>Adjustment Type</code> (RETRACT or RESTATE), <code>Adjustment Time</code>, <code>Adjusted Value</code>, and <code>Microsoft Account ID</code>.",
+                        "Click <strong>Apply</strong> to commit your conversion retractions or value updates."
                     ];
                 }
                 
@@ -2487,6 +2501,15 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                             </div>
                             {google_adjustments_button}
                             <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('google-adjustments')" style="color: #37474F; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;">📋 Instructions for uploading</a></div>
+                        </div>
+                        <!-- Microsoft Ads Adjustments -->
+                        <div class="export-card">
+                            <div>
+                                <h4 style="color: #00838F;">Microsoft Ads Adjustments (Offline)</h4>
+                                <p>Export Bing/Microsoft conversion adjustments (retractions & value restatements) for ROAS accuracy.</p>
+                            </div>
+                            {microsoft_adjustments_button}
+                            <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('microsoft-adjustments')" style="color: #00838F; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;">📋 Instructions for uploading</a></div>
                         </div>
                     </div>
                 </div>
@@ -7743,6 +7766,70 @@ def adjust_offline_sale(request: Request, adjustment: SaleAdjustment):
         raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+
+@app.get("/dashboard/export/microsoft-adjustments")
+def export_microsoft_adjustments(request: Request, client_id: int):
+    email = is_authenticated(request)
+    if not email:
+        return RedirectResponse(url="/login", status_code=303)
+    """
+    Exports adjusted conversions for Microsoft Advertising into a compliant 
+    Microsoft Ads Offline Conversion Adjustments CSV format.
+    """
+    try:
+        conn = db_router.connect()
+        cursor = conn.cursor()
+        
+        # Verify client exists
+        cursor.execute("SELECT name, microsoft_ads_id FROM clients WHERE id = ?", (client_id,))
+        client_row = cursor.fetchone()
+        if not client_row:
+            raise HTTPException(status_code=400, detail="Invalid client ID")
+        
+        client_name = client_row[0]
+        microsoft_id = client_row[1] or ""
+        
+        # Pull adjusted records belonging to this client that have a MSCLKID
+        cursor.execute("""
+            SELECT msclkid, adjustment_type, adjusted_value, adjusted_at, created_at
+            FROM sessions
+            WHERE client_id = ? AND msclkid IS NOT NULL AND msclkid != '' AND adjusted = 'YES'
+            ORDER BY adjusted_at DESC
+        """, (client_id,))
+        rows = cursor.fetchall()
+        conn.close()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+    # Generate CSV in memory
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Microsoft Ads Adjustments headers
+    writer.writerow(["Microsoft Click ID", "Conversion Name", "Conversion Time", "Adjustment Type", "Adjustment Time", "Adjusted Value", "Adjusted Value Currency", "Microsoft Account ID"])
+    
+    for r in rows:
+        msclkid, adj_type, adj_value, adj_at, orig_created_at = r
+        orig_conv_time = f"{orig_created_at} +0000" if orig_created_at else ""
+        adj_time = f"{adj_at} +0000" if adj_at else ""
+        
+        # Original conversion name matches "LeadGroove Offline Sale"
+        conv_name = "LeadGroove Offline Sale"
+        
+        val_str = f"{adj_value:.2f}" if adj_type == 'RESTATE' else ""
+        curr_str = "USD" if adj_type == 'RESTATE' else ""
+        
+        writer.writerow([msclkid, conv_name, orig_conv_time, adj_type, adj_time, val_str, curr_str, microsoft_id])
+            
+    output.seek(0)
+    safe_filename = re.sub(r'\s+', '-', client_name.strip().lower())
+    
+    headers = {
+        'Content-Disposition': f'attachment; filename="microsoft_ads_adjustments_{safe_filename}.csv"',
+        'Content-Type': 'text/csv'
+    }
+    return StreamingResponse(output, headers=headers)
 
 
 @app.get("/dashboard/export/google-adjustments")
