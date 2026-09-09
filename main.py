@@ -2156,7 +2156,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
             <input type="file" id="csv-file-input" accept=".csv, .xlsx, .xls" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;">
         </div>
         
-        {{upload_client_selector_html}}
+        {upload_client_selector_html}
         
         <!-- Ingestion Success Modal Overlay -->
         <div id="upload-success-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center;">
