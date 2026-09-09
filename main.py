@@ -852,7 +852,7 @@ class ClientCreate(BaseModel):
     ctm_profile_id: Optional[str] = ""
     wc_account_id: Optional[str] = ""
     wc_profile_id: Optional[str] = "" 
-    google_ads_customer_id: str
+    google_ads_customer_id: Optional[str] = ""
     facebook_ads_id: Optional[str] = ""
     tiktok_ads_id: Optional[str] = ""
     twitter_ads_id: Optional[str] = ""
@@ -2605,7 +2605,7 @@ class ClientUpdate(BaseModel):
     ctm_profile_id: Optional[str] = ""
     wc_account_id: Optional[str] = ""
     wc_profile_id: Optional[str] = "" 
-    google_ads_customer_id: str
+    google_ads_customer_id: Optional[str] = ""
     facebook_ads_id: Optional[str] = ""
     tiktok_ads_id: Optional[str] = ""
     twitter_ads_id: Optional[str] = ""
@@ -3215,7 +3215,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             <div class="form-row">
                                 <div class="form-group">
                                     <label for="google_ads_customer_id">Google Ads Customer ID</label>
-                                    <input type="text" id="google_ads_customer_id" value="{client_data.get("google_ads_customer_id", "")}" required>
+                                    <input type="text" id="google_ads_customer_id" value="{client_data.get("google_ads_customer_id", "")}">
                                 </div>
                                 <div class="form-group">
                                     <label for="facebook_ads_id">Facebook Ads Pixel ID</label>
@@ -5751,7 +5751,7 @@ def add_client_page(request: Request):
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="google_ads_customer_id">Google Ads Customer ID</label>
-                                <input type="text" id="google_ads_customer_id" required placeholder="e.g. 123-456-7890">
+                                <input type="text" id="google_ads_customer_id" placeholder="e.g. 123-456-7890">
                             </div>
                             <div class="form-group">
                                 <label for="facebook_ads_id">Facebook Ads Pixel/Account ID</label>
@@ -6573,10 +6573,24 @@ def add_client_page(request: Request):
                         if (currentStep === 1) {
                             const name = document.getElementById('name').value.trim();
                             const g_ads = document.getElementById('google_ads_customer_id').value.trim();
+                            const fb_ads = document.getElementById('facebook_ads_id').value.trim();
+                            const li_ads = document.getElementById('linkedin_ads_id').value.trim();
+                            const ms_ads = document.getElementById('microsoft_ads_id').value.trim();
+                            const tt_ads = document.getElementById('tiktok_ads_id').value.trim();
+                            const tw_ads = document.getElementById('twitter_ads_id').value.trim();
+                            const pin_ads = document.getElementById('pinterest_ads_id').value.trim();
+                            const sc_ads = document.getElementById('snapchat_ads_id').value.trim();
+                            const gpt_ads = document.getElementById('chatgpt_ads_id').value.trim();
                             const provider = document.getElementById('call_tracking_provider').value;
                             
-                            if (!name || !g_ads) {
-                                showErrorAlert('Please fill out Client Business Name and Google Ads Customer ID.');
+                            if (!name) {
+                                showErrorAlert('Please fill out Client Business Name.');
+                                return;
+                            }
+                            
+                            const hasAdPlatform = g_ads || fb_ads || li_ads || ms_ads || tt_ads || tw_ads || pin_ads || sc_ads || gpt_ads;
+                            if (!hasAdPlatform) {
+                                showErrorAlert('Please enter at least one Ad Platform ID (e.g. Google Ads, Facebook, LinkedIn, Microsoft, TikTok, X, Pinterest, Snapchat, or ChatGPT Ads).');
                                 return;
                             }
                             
@@ -7555,6 +7569,19 @@ def create_client(request: Request, client: ClientCreate):
     if user_role != "full" or user_client_id is not None:
         raise HTTPException(status_code=403, detail="Unauthorized: Client onboarding is restricted to Agency Administrators.")
     """Endpoint to handle questionnaire form submission."""
+    has_ad_platform = any([
+        client.google_ads_customer_id,
+        client.facebook_ads_id,
+        client.linkedin_ads_id,
+        client.microsoft_ads_id,
+        client.tiktok_ads_id,
+        client.twitter_ads_id,
+        client.pinterest_ads_id,
+        client.snapchat_ads_id,
+        client.chatgpt_ads_id,
+    ])
+    if not has_ad_platform:
+        raise HTTPException(status_code=400, detail="At least one Ad Platform ID must be provided (e.g. Google Ads, Facebook, LinkedIn, Microsoft, TikTok, X, Pinterest, Snapchat, or ChatGPT Ads).")
     try:
         conn = db_router.connect()
         cursor = conn.cursor()
