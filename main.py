@@ -293,22 +293,29 @@ class PostgreSQLConnectionWrapper:
 
 
 class DatabaseRouter:
+    _pg_failed = False
+
     @staticmethod
     def connect():
-        if DATABASE_URL:
-            # Render PostgreSQL active connection routing
+        if DATABASE_URL and not DatabaseRouter._pg_failed:
             import psycopg2
-            # Render sometimes provides connection string starting with 'postgres://' 
-            # which python's psycopg2 expects as 'postgresql://'
             url_clean = DATABASE_URL
             if url_clean.startswith("postgres://"):
                 url_clean = url_clean.replace("postgres://", "postgresql://", 1)
             
-            # Open PostgreSQL Connection and return our adapter wrapper
-            conn = psycopg2.connect(url_clean, connect_timeout=5)
-            return PostgreSQLConnectionWrapper(conn)
+            try:
+                # Ensure sslmode='require' is present for Render PostgreSQL
+                if "sslmode=" not in url_clean:
+                    conn = psycopg2.connect(url_clean, sslmode="require", connect_timeout=3)
+                else:
+                    conn = psycopg2.connect(url_clean, connect_timeout=3)
+                return PostgreSQLConnectionWrapper(conn)
+            except Exception as e:
+                print(f"⚠️ PostgreSQL connection error ({e}). Switching to local SQLite fallback.")
+                DatabaseRouter._pg_failed = True
+                import sqlite3
+                return sqlite3.connect("offline_attribution.db")
         else:
-            # Local development SQLite connection routing
             import sqlite3
             return sqlite3.connect("offline_attribution.db")
 
@@ -584,30 +591,29 @@ def init_db():
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, mock_clients)
         print("Seeded 3 mock agency clients successfully!")
+        
+    # Seed default admin user if users table is empty
+    cursor.execute("SELECT COUNT(*) FROM users")
+    if cursor.fetchone()[0] == 0:
+        default_admin_email = "admin@leadgrove.net"
+        default_admin_pass = hash_password("admin123")
+        cursor.execute("""
+            INSERT INTO users (email, hashed_password, role)
+            VALUES (?, ?, 'full')
+        """, (default_admin_email, default_admin_pass))
+        print(f"Seeded default admin user '{default_admin_email}' successfully!")
     
     conn.commit()
     conn.close()
 
-# Run database initialization on FastAPI startup to prevent import blocking
-import threading
-
-_db_initialized = False
-
-def run_db_init_safe():
-    global _db_initialized
-    if _db_initialized:
-        return
-    try:
-        init_db()
-        _db_initialized = True
-        print("✅ Background database initialization completed successfully.")
-    except Exception as e:
-        print(f"⚠️ Warning: Background database init error: {e}")
-
+# Run database initialization on FastAPI startup
 @app.on_event("startup")
 def startup_db_init():
-    # Launch database initialization in a background thread so Uvicorn opens port $PORT instantly!
-    threading.Thread(target=run_db_init_safe, daemon=True).start()
+    try:
+        init_db()
+        print("✅ Database initialization completed successfully on startup.")
+    except Exception as e:
+        print(f"⚠️ Warning: Non-fatal startup database init error: {e}")
 
 
 # ---------------------------------------------------------
@@ -2184,7 +2190,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                 <span style="font-weight: bold; color: #1a237e; font-size: 13px;">Target Client Account:</span>
                 <select id="upload_client_id" style="padding: 6px 12px; font-size: 13px; border-radius: 4px; border: 1px solid #9fa8da; font-weight: 600; outline: none; cursor: pointer; color: #1a237e; background: white;">
             """
-            for c_id, c_name, _, _, _, _, _, _, _, _ in clients:
+            for c_id, c_name, *rest in clients:
                 upload_client_selector_html += f'<option value="{c_id}">👤 {c_name}</option>'
             upload_client_selector_html += """
                 </select>
