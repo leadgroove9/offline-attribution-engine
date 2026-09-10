@@ -3594,7 +3594,29 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                     </ol>
                                 </div>
                             </div>
-                            <!-- CONDITIONAL: Housecall Pro Setup Instructions -->
+                            
+                        <!-- CONDITIONAL: GoHighLevel Setup Instructions -->
+                        <div id="sot-gohighlevel-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
+                            <div style="background-color: #e8eaf6; border-left: 4px solid #3f51b5; padding: 15px; border-radius: 4px; color: #1a237e; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                💡 <strong>GoHighLevel (GHL) Workflow Webhook Setup Guide:</strong><br>
+                                <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #1a237e;">
+                                    <li>Log into your <strong>GoHighLevel (GHL) Sub-Account / Agency Portal</strong>.</li>
+                                    <li>In the left navigation bar, go to <strong>Automation ➡️ Workflows</strong> and click <strong>+ Create Workflow</strong> (or edit an existing Lead/Sales Pipeline Workflow).</li>
+                                    <li><strong>Add Workflow Trigger</strong>: Select <strong>Opportunity Status Changed</strong> (e.g. Pipeline Stage updated to <em>Won</em>, <em>Qualified</em>, or <em>Closed</em>), <strong>Contact Tag Added</strong>, or <strong>Form Submitted</strong>.</li>
+                                    <li><strong>Add Action</strong>: Click the <strong>+ (Plus)</strong> icon in the flow canvas, search for <strong>Webhook</strong>, and select it.</li>
+                                    <li>In the Webhook Action settings:
+                                        <ul style="list-style-type: disc; padding-left: 15px; margin: 4px 0;">
+                                            <li><strong>Method</strong>: Select <strong>POST</strong></li>
+                                            <li><strong>URL</strong>: Paste your dynamic endpoint:
+                                                <code style="display: block; background: #fff; border: 1px solid #c5cae9; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #1a237e;">https://your-agency-app.onrender.com/webhooks/crm?client_id=conversions-{active_client_id}</code>
+                                            </li>
+                                        </ul>
+                                    </li>
+                                    <li>Click <strong>Save Action</strong>, toggle the Workflow status from <em>Draft</em> to <strong>Publish</strong> in the top right, and click <strong>Save</strong>! Whenever an opportunity updates or a form submits in GHL, lead status and sales value will push to LeadGrove automatically in real time!</li>
+                                </ol>
+                            </div>
+                        </div>
+                        <!-- CONDITIONAL: Housecall Pro Setup Instructions -->
                             <div id="sot-housecallpro-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                                 <div style="background-color: #fff3e0; border-left: 4px solid #e65100; padding: 15px; border-radius: 4px; color: #e65100; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
                                     💡 <strong>Housecall Pro Webhooks Quick Setup Guide:</strong><br>
@@ -4085,26 +4107,6 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             </div>
                         </div>
 
-                        <!-- CONDITIONAL: GoHighLevel Setup Instructions -->
-                        <div id="sot-gohighlevel-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
-                            <div style="background-color: #e8eaf6; border-left: 4px solid #3f51b5; padding: 15px; border-radius: 4px; color: #1a237e; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                💡 <strong>GoHighLevel (GHL) Workflow Webhook Setup Guide:</strong><br>
-                                <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #1a237e;">
-                                    <li>Log into your <strong>GoHighLevel (GHL) Sub-Account / Agency Portal</strong>.</li>
-                                    <li>In the left navigation bar, go to <strong>Automation ➡️ Workflows</strong> and click <strong>+ Create Workflow</strong> (or edit an existing Lead/Sales Pipeline Workflow).</li>
-                                    <li><strong>Add Workflow Trigger</strong>: Select <strong>Opportunity Status Changed</strong> (e.g. Pipeline Stage updated to <em>Won</em>, <em>Qualified</em>, or <em>Closed</em>), <strong>Contact Tag Added</strong>, or <strong>Form Submitted</strong>.</li>
-                                    <li><strong>Add Action</strong>: Click the <strong>+ (Plus)</strong> icon in the flow canvas, search for <strong>Webhook</strong>, and select it.</li>
-                                    <li>In the Webhook Action settings:
-                                        <ul style="list-style-type: disc; padding-left: 15px; margin: 4px 0;">
-                                            <li><strong>Method</strong>: Select <strong>POST</strong></li>
-                                            <li><strong>URL</strong>: Paste your dynamic endpoint:
-                                                <code style="display: block; background: #fff; border: 1px solid #c5cae9; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #1a237e;">https://your-agency-app.onrender.com/webhooks/crm?client_id=conversions-{active_client_id}</code>
-                                            </li>
-                                        </ul>
-                                    </li>
-                                    <li>Click <strong>Save Action</strong>, toggle the Workflow status from <em>Draft</em> to <strong>Publish</strong> in the top right, and click <strong>Save</strong>! Whenever an opportunity updates or a form submits in GHL, lead status and sales value will push to LeadGrove automatically in real time!</li>
-                                </ol>
-                            </div>
                         </div>
                     </div>
 
@@ -4809,16 +4811,115 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     }}
                 }}
 
-                                function toggleSOTFields() {{
+                                
+                function toggleSOTFields() {{
                     const sotSelect = document.getElementById('source_of_truth');
                     if (!sotSelect) return;
                     
-                    const selectedText = sotSelect.options[sotSelect.selectedIndex] ? sotSelect.options[sotSelect.selectedIndex].text : '';
+                    const selectedOption = sotSelect.options[sotSelect.selectedIndex];
+                    const selectedText = selectedOption ? selectedOption.text : '';
+                    const sot = sotSelect.value;
+                    
                     const crmTitleSpan = document.getElementById('settings-crm-webhook-title');
                     const billingTitleSpan = document.getElementById('settings-billing-webhook-title');
                     if (crmTitleSpan) {{
                         crmTitleSpan.innerText = "⚙️ " + selectedText + " Webhook";
                     }}
+                    if (billingTitleSpan) {{
+                        billingTitleSpan.innerText = "💳 " + selectedText + " Webhook";
+                    }}
+                    
+                    const dealBox = document.getElementById('sot-deal-tags-box');
+                    const leadBox = document.getElementById('sot-lead-tags-box');
+                    const emailBox = document.getElementById('sot-email-box');
+                    
+                    const hsBox = document.getElementById('sot-hubspot-instructions-box');
+                    const salesforceBox = document.getElementById('sot-salesforce-instructions-box');
+                    const zohoBox = document.getElementById('sot-zoho-instructions-box');
+                    const servicetitanBox = document.getElementById('sot-servicetitan-instructions-box');
+                    const housecallproBox = document.getElementById('sot-housecallpro-instructions-box');
+                    const ghlBox = document.getElementById('sot-gohighlevel-instructions-box');
+                    
+                    const quickbooksBox = document.getElementById('sot-quickbooks-instructions-box');
+                    const xeroBox = document.getElementById('sot-xero-instructions-box');
+                    const zohoBooksBox = document.getElementById('sot-zoho_books-instructions-box');
+                    const netsuiteBox = document.getElementById('sot-netsuite-instructions-box');
+                    const sageBox = document.getElementById('sot-sage-instructions-box');
+                    const freshbooksBox = document.getElementById('sot-freshbooks-instructions-box');
+                    const googleSheetsBox = document.getElementById('sot-google_sheets-instructions-box');
+                    const zapierBox = document.getElementById('sot-zapier-instructions-box');
+                    
+                    const crmCard = document.getElementById('crm-webhook-card');
+                    const billingCard = document.getElementById('billing-webhook-card');
+                    const emailCard = document.getElementById('email-webhook-card');
+                    
+                    // 1. Reset / Hide all SOT fields and instruction boxes
+                    if (dealBox) dealBox.style.display = 'none';
+                    if (leadBox) leadBox.style.display = 'none';
+                    if (emailBox) emailBox.style.display = 'none';
+                    
+                    if (hsBox) hsBox.style.display = 'none';
+                    if (salesforceBox) salesforceBox.style.display = 'none';
+                    if (zohoBox) zohoBox.style.display = 'none';
+                    if (servicetitanBox) servicetitanBox.style.display = 'none';
+                    if (housecallproBox) housecallproBox.style.display = 'none';
+                    if (ghlBox) ghlBox.style.display = 'none';
+                    
+                    if (quickbooksBox) quickbooksBox.style.display = 'none';
+                    if (xeroBox) xeroBox.style.display = 'none';
+                    if (zohoBooksBox) zohoBooksBox.style.display = 'none';
+                    if (netsuiteBox) netsuiteBox.style.display = 'none';
+                    if (sageBox) sageBox.style.display = 'none';
+                    if (freshbooksBox) freshbooksBox.style.display = 'none';
+                    if (googleSheetsBox) googleSheetsBox.style.display = 'none';
+                    if (zapierBox) zapierBox.style.display = 'none';
+                    
+                    // 2. Reset / Hide all SOT webhook cards in Section 5
+                    if (crmCard) crmCard.style.display = 'none';
+                    if (billingCard) billingCard.style.display = 'none';
+                    if (emailCard) emailCard.style.display = 'none';
+                    
+                    // 3. Show ONLY the active SOT webhook card and instructions
+                    const crmPlatforms = ['hubspot', 'salesforce', 'zoho', 'servicetitan', 'housecallpro', 'gohighlevel'];
+                    const billingPlatforms = ['quickbooks', 'xero', 'zoho_books', 'netsuite', 'sage', 'freshbooks', 'google_sheets', 'zapier'];
+                    
+                    if (crmPlatforms.includes(sot)) {{
+                        if (crmCard) crmCard.style.display = 'block';
+                        
+                        if (['hubspot', 'salesforce', 'zoho', 'gohighlevel'].includes(sot)) {{
+                            if (dealBox) dealBox.style.display = 'block';
+                        }}
+                        if (['servicetitan', 'housecallpro', 'gohighlevel'].includes(sot)) {{
+                            if (leadBox) leadBox.style.display = 'block';
+                        }}
+                        
+                        if (sot === 'hubspot' && hsBox) hsBox.style.display = 'block';
+                        else if (sot === 'salesforce' && salesforceBox) salesforceBox.style.display = 'block';
+                        else if (sot === 'zoho' && zohoBox) zohoBox.style.display = 'block';
+                        else if (sot === 'servicetitan' && servicetitanBox) servicetitanBox.style.display = 'block';
+                        else if (sot === 'housecallpro' && housecallproBox) housecallproBox.style.display = 'block';
+                        else if (sot === 'gohighlevel' && ghlBox) ghlBox.style.display = 'block';
+                        
+                    }} else if (billingPlatforms.includes(sot)) {{
+                        if (billingCard) billingCard.style.display = 'block';
+                        
+                        if (sot === 'quickbooks' && quickbooksBox) quickbooksBox.style.display = 'block';
+                        else if (sot === 'xero' && xeroBox) xeroBox.style.display = 'block';
+                        else if (sot === 'zoho_books' && zohoBooksBox) zohoBooksBox.style.display = 'block';
+                        else if (sot === 'netsuite' && netsuiteBox) netsuiteBox.style.display = 'block';
+                        else if (sot === 'sage' && sageBox) sageBox.style.display = 'block';
+                        else if (sot === 'freshbooks' && freshbooksBox) freshbooksBox.style.display = 'block';
+                        else if (sot === 'google_sheets' && googleSheetsBox) googleSheetsBox.style.display = 'block';
+                        else if (sot === 'zapier' && zapierBox) zapierBox.style.display = 'block';
+                        
+                    }} else if (sot === 'email') {{
+                        if (emailBox) emailBox.style.display = 'block';
+                        if (emailCard) emailCard.style.display = 'block';
+                    }} else if (sot === 'ai_rating') {{
+                        // Direct AI call auditing active - no external webhook needed
+                    }}
+                }}
+
                     if (billingTitleSpan) {{
                         billingTitleSpan.innerText = "💳 " + selectedText + " Webhook";
                     }}
