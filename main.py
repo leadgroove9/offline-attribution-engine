@@ -2923,7 +2923,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
     
     # Configure read-only form elements mapping
     if is_readonly:
-        save_btn_html = "<div style=\"background-color: #fff3cd; color: #856404; padding: 15px; border-radius: 6px; font-weight: bold; font-size: 13px; border: 1px solid #ffeeba; display: flex; align-items: center; gap: 8px;\">🔒 Read-Only: You have view-only access to this client's configurations.</div>"
+        save_btn_html = "<div style=\"background-color: #fff3cd; color: #856404; padding: 15px; border-radius: 6px; font-weight: bold; font-size: 13px; border: 1px solid #ffeeba; display: flex; align-items: center; gap: 8px;\">🔒 Read-Only: You have view-only access to the configuration section.</div>"
         fieldset_disabled_attr = "disabled"
         invite_form_display = "none"
     else:
