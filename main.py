@@ -3835,6 +3835,86 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                 </div>
                             </div>
 
+                            <!-- SECTION C: Zapier Multi-Network Conversions API Export (TikTok, X, Pinterest, Snapchat, LinkedIn & ChatGPT Ads) -->
+                            <div class="webhook-card" id="zapier-capi-export-card" style="border-left: 4px solid #FF4F00;">
+                                <div class="webhook-title" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; color: #E65100;">
+                                    <span>⚡ Section C: Zapier Multi-Network Conversions API Export (TikTok, X, Pinterest, Snapchat, LinkedIn & ChatGPT Ads)</span>
+                                    
+                                    <!-- Interactive Speech Bubble Tooltip for Zapier CAPI Export Setup -->
+                                    <span class="tooltip-icon" style="font-size: 16px; cursor: help; color: #FF4F00; margin-left: auto;">
+                                        💬
+                                        <span class="tooltip-text" style="width: 420px; max-width: 88vw; background-color: #ffffff; color: #333333; border: 2px solid #FF4F00; border-radius: 8px; padding: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); font-size: 12px; line-height: 1.5; bottom: 125%; right: 0; left: auto; margin-left: 0;">
+                                            <div style="font-size: 13px; font-weight: bold; color: #E65100; margin-bottom: 8px; border-bottom: 1px solid #ffe0b2; padding-bottom: 5px; display: flex; align-items: center; gap: 6px;">
+                                                ⚡ Zapier Multi-Network CAPI Export Guide
+                                            </div>
+                                            
+                                            <p style="margin: 0 0 8px 0; color: #555; font-size: 11px;">Send LeadGrove conversion events to TikTok, X, Pinterest, Snapchat, LinkedIn, and ChatGPT Ads via your own Zapier account!</p>
+
+                                            <strong style="color: #E65100;">1. Setting Up the Zapier Trigger:</strong>
+                                            <ol style="margin: 4px 0 10px 0; padding-left: 18px; color: #444; font-size: 11px; line-height: 1.4;">
+                                                <li>In Zapier, click <strong>Create Zap</strong>.</li>
+                                                <li><strong>Trigger Options:</strong> Choose <strong>Google Sheets (New or Updated Row)</strong> linked to your Section A feed Sheet, OR choose <strong>Webhooks by Zapier (Catch Hook)</strong> using the LeadGrove endpoint below.</li>
+                                            </ol>
+
+                                            <strong style="color: #E65100;">2. Ad Platform CAPI Action & Click ID Mapping:</strong>
+                                            <p style="margin: 4px 0 6px 0; color: #444; font-size: 11px;">Add an Action step in Zapier for your target ad network and map LeadGrove's click ID columns:</p>
+
+                                            <!-- Visual Graphic CAPI Mapping Table -->
+                                            <div style="background: #fff8e1; border: 1px solid #ffe0b2; border-radius: 6px; padding: 6px; margin: 6px 0 10px 0;">
+                                                <table style="width: 100%; border-collapse: collapse; font-size: 9px; text-align: left; border: 1px solid #ffe0b2; background: white;">
+                                                    <thead>
+                                                        <tr style="background: #fff3e0; color: #e65100; font-weight: bold;">
+                                                            <th style="border: 1px solid #ffe0b2; padding: 3px;">Ad Platform</th>
+                                                            <th style="border: 1px solid #ffe0b2; padding: 3px;">Click ID Field</th>
+                                                            <th style="border: 1px solid #ffe0b2; padding: 3px;">Zapier CAPI Action</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <tr>
+                                                            <td style="border: 1px solid #eee; padding: 3px; font-weight: bold;">🎵 TikTok Ads</td>
+                                                            <td style="border: 1px solid #eee; padding: 3px; font-family: monospace; color: #c62828;">ttclid</td>
+                                                            <td style="border: 1px solid #eee; padding: 3px;">TikTok Offline Events</td>
+                                                        </tr>
+                                                        <tr style="background: #fafafa;">
+                                                            <td style="border: 1px solid #eee; padding: 3px; font-weight: bold;">🔗 LinkedIn Ads</td>
+                                                            <td style="border: 1px solid #eee; padding: 3px; font-family: monospace; color: #1565c0;">li_fat_id</td>
+                                                            <td style="border: 1px solid #eee; padding: 3px;">LinkedIn Conversions</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td style="border: 1px solid #eee; padding: 3px; font-weight: bold;">📌 Pinterest Ads</td>
+                                                            <td style="border: 1px solid #eee; padding: 3px; font-family: monospace; color: #b71c1c;">pin_clid</td>
+                                                            <td style="border: 1px solid #eee; padding: 3px;">Pinterest Conversions</td>
+                                                        </tr>
+                                                        <tr style="background: #fafafa;">
+                                                            <td style="border: 1px solid #eee; padding: 3px; font-weight: bold;">👻 Snapchat Ads</td>
+                                                            <td style="border: 1px solid #eee; padding: 3px; font-family: monospace; color: #f57f17;">scclid</td>
+                                                            <td style="border: 1px solid #eee; padding: 3px;">Snapchat CAPI Event</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td style="border: 1px solid #eee; padding: 3px; font-weight: bold;">🐦 X (Twitter) Ads</td>
+                                                            <td style="border: 1px solid #eee; padding: 3px; font-family: monospace; color: #333;">twclid</td>
+                                                            <td style="border: 1px solid #eee; padding: 3px;">X Ads Conversion Event</td>
+                                                        </tr>
+                                                        <tr style="background: #fafafa;">
+                                                            <td style="border: 1px solid #eee; padding: 3px; font-weight: bold;">🧠 ChatGPT Ads</td>
+                                                            <td style="border: 1px solid #eee; padding: 3px; font-family: monospace; color: #00796b;">gptclid</td>
+                                                            <td style="border: 1px solid #eee; padding: 3px;">Webhooks POST Custom</td>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+
+                                            <p style="margin: 0; font-size: 10px; color: #666; font-style: italic;">💡 LeadGrove automatically includes hashed customer emails and phone numbers for high CAPI match rates!</p>
+                                        </span>
+                                    </span>
+                                </div>
+                                <div class="webhook-desc">Export LeadGrove conversion data to your personal Zapier account via Webhooks or Google Sheets triggers, and automatically forward conversion signals to <strong>TikTok Ads, LinkedIn, Pinterest, Snapchat, X (Twitter), and ChatGPT Ads</strong> via their Conversion APIs!</div>
+                                <div class="webhook-input-group">
+                                    <input type="text" class="webhook-input" id="zapier-export-webhook" readonly value="" data-suffix="/webhooks/crm?client_id={active_client_id}">
+                                    <button type="button" onclick="copyText('zapier-export-webhook', 'zapier-export-copy-btn')" id="zapier-export-copy-btn" class="btn-copy" style="background-color: #FF4F00;">📋 Copy Zapier Export Webhook URL</button>
+                                </div>
+                            </div>
+
                             <!-- SECTION B: Direct HTTP Scheduled Imports (Google Ads, Microsoft Ads & Meta Ads) -->
                             <div class="webhook-card" id="direct-http-feed-webhook-card" style="border-left: 4px solid #1a237e;">
                                 <div class="webhook-title" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; color: #1a237e;">
