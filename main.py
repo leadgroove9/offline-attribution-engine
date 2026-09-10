@@ -4107,7 +4107,6 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             </div>
                         </div>
 
-                        </div>
                     </div>
 
                     <!-- App Password Modal Overlay -->
@@ -4917,93 +4916,6 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         if (emailCard) emailCard.style.display = 'block';
                     }} else if (sot === 'ai_rating') {{
                         // Direct AI call auditing active - no external webhook needed
-                    }}
-                }}
-
-                    if (billingTitleSpan) {{
-                        billingTitleSpan.innerText = "💳 " + selectedText + " Webhook";
-                    }}
-                    
-                    const sot = sotSelect.value;
-                    
-                    const dealBox = document.getElementById('sot-deal-tags-box');
-                    const leadBox = document.getElementById('sot-lead-tags-box');
-                    const emailBox = document.getElementById('sot-email-box');
-                    
-                    const hsBox = document.getElementById('sot-hubspot-instructions-box');
-                    const salesforceBox = document.getElementById('sot-salesforce-instructions-box');
-                    const zohoBox = document.getElementById('sot-zoho-instructions-box');
-                    const servicetitanBox = document.getElementById('sot-servicetitan-instructions-box');
-                    const housecallproBox = document.getElementById('sot-housecallpro-instructions-box');
-                    const ghlBox = document.getElementById('sot-gohighlevel-instructions-box');
-                    
-                    const quickbooksBox = document.getElementById('sot-quickbooks-instructions-box');
-                    const xeroBox = document.getElementById('sot-xero-instructions-box');
-                    const zohoBooksBox = document.getElementById('sot-zoho_books-instructions-box');
-                    const netsuiteBox = document.getElementById('sot-netsuite-instructions-box');
-                    const sageBox = document.getElementById('sot-sage-instructions-box');
-                    const freshbooksBox = document.getElementById('sot-freshbooks-instructions-box');
-                    const googleSheetsBox = document.getElementById('sot-google_sheets-instructions-box');
-                    const zapierBox = document.getElementById('sot-zapier-instructions-box');
-                    
-                    const crmCard = document.getElementById('crm-webhook-card');
-                    const billingCard = document.getElementById('billing-webhook-card');
-                    const emailCard = document.getElementById('email-webhook-card');
-                    
-                    // Hide all by default
-                    if (dealBox) dealBox.style.display = 'none';
-                    if (leadBox) leadBox.style.display = 'none';
-                    if (emailBox) emailBox.style.display = 'none';
-                    
-                    if (hsBox) hsBox.style.display = 'none';
-                    if (salesforceBox) salesforceBox.style.display = 'none';
-                    if (zohoBox) zohoBox.style.display = 'none';
-                    if (servicetitanBox) servicetitanBox.style.display = 'none';
-                    if (housecallproBox) housecallproBox.style.display = 'none';
-                    if (ghlBox) ghlBox.style.display = 'none';
-                    
-                    if (quickbooksBox) quickbooksBox.style.display = 'none';
-                    if (xeroBox) xeroBox.style.display = 'none';
-                    if (zohoBooksBox) zohoBooksBox.style.display = 'none';
-                    if (netsuiteBox) netsuiteBox.style.display = 'none';
-                    if (sageBox) sageBox.style.display = 'none';
-                    if (freshbooksBox) freshbooksBox.style.display = 'none';
-                    if (googleSheetsBox) googleSheetsBox.style.display = 'none';
-                    if (zapierBox) zapierBox.style.display = 'none';
-                    
-                    if (crmCard) crmCard.style.display = 'none';
-                    if (billingCard) billingCard.style.display = 'none';
-                    if (emailCard) emailCard.style.display = 'none';
-                    
-                    if (['hubspot', 'salesforce', 'zoho', 'servicetitan', 'housecallpro', 'gohighlevel'].includes(sot)) {{
-                        if (crmCard) crmCard.style.display = 'block';
-                        if (['hubspot', 'salesforce', 'zoho', 'gohighlevel'].includes(sot)) {{
-                            if (dealBox) dealBox.style.display = 'block';
-                        }}
-                        if (['servicetitan', 'housecallpro', 'gohighlevel'].includes(sot)) {{
-                            if (leadBox) leadBox.style.display = 'block';
-                        }}
-                        if (sot === 'hubspot' && hsBox) hsBox.style.display = 'block';
-                        else if (sot === 'salesforce' && salesforceBox) salesforceBox.style.display = 'block';
-                        else if (sot === 'zoho' && zohoBox) zohoBox.style.display = 'block';
-                        else if (sot === 'servicetitan' && servicetitanBox) servicetitanBox.style.display = 'block';
-                        else if (sot === 'housecallpro' && housecallproBox) housecallproBox.style.display = 'block';
-                        else if (sot === 'gohighlevel' && ghlBox) ghlBox.style.display = 'block';
-                    }} else if (['quickbooks', 'xero', 'zoho_books', 'netsuite', 'sage', 'freshbooks', 'google_sheets', 'zapier'].includes(sot)) {{
-                        if (billingCard) billingCard.style.display = 'block';
-                        if (sot === 'quickbooks' && quickbooksBox) quickbooksBox.style.display = 'block';
-                        else if (sot === 'xero' && xeroBox) xeroBox.style.display = 'block';
-                        else if (sot === 'zoho_books' && zohoBooksBox) zohoBooksBox.style.display = 'block';
-                        else if (sot === 'netsuite' && netsuiteBox) netsuiteBox.style.display = 'block';
-                        else if (sot === 'sage' && sageBox) sageBox.style.display = 'block';
-                        else if (sot === 'freshbooks' && freshbooksBox) freshbooksBox.style.display = 'block';
-                        else if (sot === 'google_sheets' && googleSheetsBox) googleSheetsBox.style.display = 'block';
-                        else if (sot === 'zapier' && zapierBox) zapierBox.style.display = 'block';
-                    }} else if (sot === 'email') {{
-                        if (emailBox) emailBox.style.display = 'block';
-                        if (emailCard) emailCard.style.display = 'block';
-                    }} else if (sot === 'ai_rating') {{
-                        // Direct AI call auditing active
                     }}
                 }}
 
