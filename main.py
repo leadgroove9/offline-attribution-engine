@@ -589,12 +589,25 @@ def init_db():
     conn.close()
 
 # Run database initialization on FastAPI startup to prevent import blocking
-@app.on_event("startup")
-def startup_db_init():
+import threading
+
+_db_initialized = False
+
+def run_db_init_safe():
+    global _db_initialized
+    if _db_initialized:
+        return
     try:
         init_db()
+        _db_initialized = True
+        print("✅ Background database initialization completed successfully.")
     except Exception as e:
-        print(f"⚠️ Warning: Non-fatal startup database init error: {e}")
+        print(f"⚠️ Warning: Background database init error: {e}")
+
+@app.on_event("startup")
+def startup_db_init():
+    # Launch database initialization in a background thread so Uvicorn opens port $PORT instantly!
+    threading.Thread(target=run_db_init_safe, daemon=True).start()
 
 
 # ---------------------------------------------------------
