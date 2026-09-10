@@ -956,8 +956,6 @@ def get_register(request: Request, error: Optional[str] = None, invite_token: Op
                     Already have an account? <a href="/login">Log In</a>
                 </div>
             </div>
-            {upload_box_script_html}
-            {global_modals_script_html}
         </body>
     </html>
     """
@@ -2586,8 +2584,6 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                     </table>
                 </div>
             </div>
-            {upload_box_script_html}
-            {global_modals_script_html}
         </body>
     </html>
     """
