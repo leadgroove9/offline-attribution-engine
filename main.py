@@ -3495,306 +3495,255 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                 </div>
                             </div>
                             
-                            <!-- CONDITIONAL: HubSpot Setup Instructions -->
-                            <div id="sot-hubspot-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px;">
-                                <div style="background-color: #fff8e1; border-left: 4px solid #ffb300; padding: 15px; border-radius: 4px; color: #5d4037; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                    💡 <strong>HubSpot Private App Quick Setup Guide:</strong><br>
-                                    <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #4e342e;">
-                                        <li>Log into HubSpot as a <strong>Super Admin</strong>.</li>
-                                        <li>Go to <strong>Settings (Gear Icon) &gt; Integrations &gt; Private Apps</strong>.</li>
-                                        <li>Click <strong>Create Private App</strong> and configure basic info.</li>
-                                        <li>Under <strong>Scopes</strong>, search <code>CRM</code> and check <code>Read</code> permissions for:
-                                            <ul style="list-style-type: disc; padding-left: 15px; margin: 4px 0;">
-                                                <li><code>crm.objects.deals.read</code> (to track closed sales &amp; revenue)</li>
-                                                <li><code>crm.objects.contacts.read</code> (to sync leads)</li>
-                                            </ul>
-                                        </li>
-                                        <li>Click <strong>Create App</strong>. If you want real-time syncing, click the <strong>Webhooks</strong> tab of your new app, click <strong>Edit Webhooks</strong>, paste your dynamic target URL (provided above on this screen), and subscribe to <code>propertyChange</code> or <code>creation</code> for <strong>Deals</strong>!</li>
-                                    </ol>
-                                    <small style="display: block; font-style: italic; color: #6d4c41; line-height: 1.4; border-top: 1px solid #ffe082; padding-top: 8px;">
-                                        ⚠️ <strong>Tip:</strong> If you don't see the "Webhooks" tab inside Private App settings, go to your HubSpot profile (top-right) &gt; <strong>Product Updates &gt; Betas</strong>, click <strong>Join Beta</strong> for <em>"Private App Webhooks"</em>, and refresh!
-                                    </small>
+                                                    <div id="sot-hubspot-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
+                            <div style="background-color: #fff8e1; border-left: 4px solid #ffb300; padding: 15px; border-radius: 4px; color: #5d4037; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                💡 <strong>HubSpot Private App Quick Setup Guide:</strong><br>
+                                <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #4e342e;">
+                                    <li>Log into HubSpot as a <strong>Super Admin</strong>.</li>
+                                    <li>Go to <strong>Settings (Gear Icon) &gt; Integrations &gt; Private Apps</strong>.</li>
+                                    <li>Click <strong>Create Private App</strong> and configure basic info.</li>
+                                    <li>Under <strong>Scopes</strong>, search <code>CRM</code> and check <code>Read</code> permissions for:
+                                        <ul style="list-style-type: disc; padding-left: 15px; margin: 4px 0;">
+                                            <li><code>crm.objects.deals.read</code> (to track closed sales &amp; revenue)</li>
+                                            <li><code>crm.objects.contacts.read</code> (to sync leads)</li>
+                                        </ul>
+                                    </li>
+                                    <li>Click <strong>Create App</strong>. Click the <strong>Webhooks</strong> tab, click <strong>Edit Webhooks</strong>, paste your dynamic target URL below, and subscribe to <code>propertyChange</code> or <code>creation</code> for <strong>Deals</strong>!</li>
+                                </ol>
+                                <div style="margin-top: 12px; background: white; padding: 12px; border-radius: 6px; border: 1px solid #ffb300;">
+                                    <label style="font-size: 11px; font-weight: bold; color: #5d4037; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
+                                    <div class="webhook-input-group">
+                                        <input type="text" class="webhook-input" id="sot-hubspot-instructions-box-input" readonly value="" data-suffix="/webhooks/crm?client_id={active_client_id}">
+                                        <button type="button" onclick="copyText('sot-hubspot-instructions-box-input', 'sot-hubspot-instructions-box-btn')" id="sot-hubspot-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
+                                    </div>
                                 </div>
                             </div>
-                            
-
-                        <!-- CONDITIONAL INPUT: Salesforce Setup Instructions -->
+                        </div>
                         <div id="sot-salesforce-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #e3f2fd; border-left: 4px solid #1e88e5; padding: 15px; border-radius: 4px; color: #0d47a1; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
                                 💡 <strong>Salesforce Outbound Flow Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #1565c0;">
-                                    <li>In Salesforce Setup, go to <strong>Named Credentials &gt; External Credentials</strong> tab, click <strong>New</strong>. Label <code>LeadGroove External Credential</code>, Name <code>LeadGroove_External_Credential</code>, Protocol <strong>Custom</strong>. Save, scroll to <em>Principals</em>, click <strong>New</strong> and define a principal named <code>LeadGroove_Principal</code>.</li>
-                                    <li>Create a <strong>Permission Set</strong> in Setup named <code>LeadGroove Webhook Access</code>. In it, click <strong>External Credential Principal Access</strong>, enable your new credential and principal, and assign this permission set to any integrating users.</li>
-                                    <li>Back in <strong>Named Credentials</strong>, click <strong>New</strong> under the main tab. Label <code>LeadGroove API</code>, Name <code>LeadGroove_API</code>, URL <code style="background: rgba(0,0,0,0.05); padding: 2px 4px; border-radius: 3px;">https://your-agency-app.onrender.com</code> (or active origin). Under <em>External Credential</em>, select the credential you created in Step 1, and save.</li>
-                                    <li>Create a <strong>Record-Triggered Flow</strong> on the <strong>Opportunity</strong> object (when updated) with conditions <code>StageName Equals Closed Won</code> (Only when updated to meet conditions), optimized for <strong>Actions and Related Records</strong>.</li>
-                                    <li>On the flow canvas, click <strong>+ Add Action &gt; Create HTTP Callout</strong>, select your Named Credential, and define a <strong>POST</strong> method with path <code style="color: #2e7d32; font-family: monospace;">/webhooks/crm?client_id=conversions-{{active_client_id}}</code>. Provide this sample JSON structure for automatic Salesforce parameter mapping:
-                                        <pre style="background: rgba(255,255,255,0.7); padding: 8px; border-radius: 4px; margin-top: 5px; font-family: monospace; font-size: 10px; overflow-x: auto; border: 1px solid #bbdefb; color: #0d47a1;">{{
-  "customer_name": "John Doe",
-  "customer_email": "john@example.com",
-  "customer_phone": "5551234567",
-  "deal_stage": "Closed Won",
-  "deal_value": 1500.00
-}}</pre>
-                                    </li>
-                                </ol>
+                                <li>In Salesforce Setup, go to <strong>Named Credentials &gt; External Credentials</strong> tab, click <strong>New</strong>. Label <code>LeadGroove External Credential</code>, Name <code>LeadGroove_External_Credential</code>, Protocol <strong>Custom</strong>. Save, scroll to <em>Principals</em>, click <strong>New</strong> and define a principal named <code>LeadGroove_Principal</code>.</li>
+                                <li>Create a <strong>Permission Set</strong> in Setup named <code>LeadGroove Webhook Access</code>. In it, click <strong>External Credential Principal Access</strong>, enable your new credential and principal, and assign this permission set to any integrating users.</li>
+                                <li>Back in <strong>Named Credentials</strong>, click <strong>New</strong> under the main tab. Label <code>LeadGroove API</code>, Name <code>LeadGroove_API</code>, URL set to your active origin. Under <em>External Credential</em>, select the credential you created in Step 1, and save.</li>
+                                <li>Create a <strong>Record-Triggered Flow</strong> on the <strong>Opportunity</strong> object (when updated) with conditions <code>StageName Equals Closed Won</code> (Only when updated to meet conditions), optimized for <strong>Actions and Related Records</strong>.</li>
+                                <li>On the flow canvas, click <strong>+ Add Action &gt; Create HTTP Callout</strong>, select your Named Credential, and define a <strong>POST</strong> method targeting your webhook URL below.</li>
+                            </ol>
+                                <div style="margin-top: 12px; background: white; padding: 12px; border-radius: 6px; border: 1px solid #1e88e5;">
+                                    <label style="font-size: 11px; font-weight: bold; color: #0d47a1; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
+                                    <div class="webhook-input-group">
+                                        <input type="text" class="webhook-input" id="sot-salesforce-instructions-box-input" readonly value="" data-suffix="/webhooks/crm?client_id={active_client_id}">
+                                        <button type="button" onclick="copyText('sot-salesforce-instructions-box-input', 'sot-salesforce-instructions-box-btn')" id="sot-salesforce-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <!-- CONDITIONAL INPUT: Zoho Setup Instructions -->
                         <div id="sot-zoho-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #e8f5e9; border-left: 4px solid #2e7d32; padding: 15px; border-radius: 4px; color: #1b5e20; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
                                 💡 <strong>Zoho CRM Outbound Webhook Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #2e7d32;">
-                                    <li>Click the <strong>Setup (Gear Icon)</strong> in the top-right corner of your Zoho CRM dashboard.</li>
-                                    <li>Under <strong>Automation</strong>, click on <strong>Actions</strong>, then select the <strong>Webhooks</strong> tab at the top.</li>
-                                    <li>Click <strong>Configure Webhook</strong> and configure these fields:
-                                        <ul style="list-style-type: disc; padding-left: 15px; margin: 4px 0;">
-                                            <li><strong>Name</strong>: <code>LeadGroove Conversion Sync</code></li>
-                                            <li><strong>URL to notify</strong>: <code style="background: rgba(0,0,0,0.05); padding: 2px 4px; border-radius: 3px;">https://your-agency-app.onrender.com/webhooks/crm?client_id=conversions-{{active_client_id}}</code></li>
-                                            <li><strong>Method</strong>: Select <strong>POST</strong></li>
-                                            <li><strong>Module</strong>: Select <strong>Deals</strong> (or your tracking module)</li>
-                                        </ul>
-                                    </li>
-                                    <li>In the <strong>Body</strong> parameters section:
-                                        <ul style="list-style-type: disc; padding-left: 15px; margin: 4px 0;">
-                                            <li>Choose <strong>Raw</strong> format and select <strong>JSON</strong> from the dropdown.</li>
-                                            <li>Type <code>#</code> to dynamically insert CRM fields into this JSON structure:
-                                                <pre style="background: rgba(255,255,255,0.7); padding: 8px; border-radius: 4px; margin-top: 5px; font-family: monospace; font-size: 10px; overflow-x: auto; border: 1px solid #c8e6c9; color: #1b5e20;">{{
-  "customer_name": "${{Deals.Deal Name}}",
-  "customer_email": "${{Deals.Email}}",
-  "customer_phone": "${{Deals.Phone}}",
-  "deal_stage": "${{Deals.Stage}}",
-  "deal_value": ${{Deals.Amount}}
-}}</pre>
-                                            </li>
-                                        </ul>
-                                    </li>
-                                    <li>Click <strong>Save</strong>. Next, go to <strong>Workflow Rules</strong> (under Setup &gt; Automation) and create a rule triggered on Deal Update when the <strong>Stage is Closed Won</strong>, then associate this Webhook as an <strong>Instant Action</strong>!</li>
-                                </ol>
-                            </div>
-                        </div>
-
-                            
-                            <!-- CONDITIONAL: ServiceTitan Setup Instructions -->
-                            <div id="sot-servicetitan-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
-                                <div style="background-color: #f3f4f6; border-left: 4px solid #4b5563; padding: 15px; border-radius: 4px; color: #1f2937; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                    💡 <strong>ServiceTitan Webhooks V2 Quick Setup Guide:</strong><br>
-                                    <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #374151;">
-                                        <li>Navigate to the **ServiceTitan Developer Portal** at <a href="https://developer.servicetitan.io" target="_blank" style="color: #1a237e; font-weight: bold; text-decoration: none;">developer.servicetitan.io</a> and sign in with your production credentials.</li>
-                                        <li>Click **Create and Manage Applications** ➡️ **Create New App**. Name it <code>LeadGroove Webhook Sync</code> and set your tenant/business units.</li>
-                                        <li>Under **API Scopes**, select:
-                                            <ul style="list-style-type: disc; padding-left: 15px; margin: 4px 0;">
-                                                <li><code>crm.objects.leads.read</code> or <code>jpm.objects.jobs.read</code> (to capture lead states and bookings)</li>
-                                            </ul>
-                                        </li>
-                                        <li>Click **Save** to generate your **Client ID**, **Client Secret**, **App ID**, and **App Key**.</li>
-                                        <li>Log into your main production portal at <a href="https://go.servicetitan.com" target="_blank" style="color: #1a237e; font-weight: bold; text-decoration: none;">go.servicetitan.com</a>, go to **Settings ➡️ Integrations ➡️ API Application Access**, find your app, click **Edit**, and set your dynamic Webhook Endpoint Target URL:
-                                            <code style="display: block; background: #fff; border: 1px solid #d1d5db; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #1f2937;">https://your-agency-app.onrender.com/webhooks/crm?client_id=conversions-{active_client_id}</code>
-                                        </li>
-                                        <li>Register your endpoint triggers for <code>job.created</code> and <code>job.updated</code> (under Job Planning & Management v2 endpoints) to fire instantly when dispatch sheets are updated!</li>
-                                    </ol>
+                                <li>Click the <strong>Setup (Gear Icon)</strong> in the top-right corner of your Zoho CRM dashboard.</li>
+                                <li>Under <strong>Automation</strong>, click on <strong>Actions</strong>, then select the <strong>Webhooks</strong> tab at the top.</li>
+                                <li>Click <strong>Configure Webhook</strong>, set Name to <code>LeadGroove Conversion Sync</code>, Method to <strong>POST</strong>, Module to <strong>Deals</strong>, and paste your target URL below into <strong>URL to notify</strong>.</li>
+                                <li>In the <strong>Body</strong> section, select <strong>Raw (JSON)</strong> format, and type <code>#</code> to insert CRM fields into your payload structure. Click <strong>Save</strong>!</li>
+                            </ol>
+                                <div style="margin-top: 12px; background: white; padding: 12px; border-radius: 6px; border: 1px solid #2e7d32;">
+                                    <label style="font-size: 11px; font-weight: bold; color: #1b5e20; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
+                                    <div class="webhook-input-group">
+                                        <input type="text" class="webhook-input" id="sot-zoho-instructions-box-input" readonly value="" data-suffix="/webhooks/crm?client_id={active_client_id}">
+                                        <button type="button" onclick="copyText('sot-zoho-instructions-box-input', 'sot-zoho-instructions-box-btn')" id="sot-zoho-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
+                                    </div>
                                 </div>
                             </div>
-                            
-                        <!-- CONDITIONAL: GoHighLevel Setup Instructions -->
+                        </div>
+                        <div id="sot-servicetitan-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
+                            <div style="background-color: #f3f4f6; border-left: 4px solid #4b5563; padding: 15px; border-radius: 4px; color: #1f2937; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                💡 <strong>ServiceTitan Webhooks V2 Quick Setup Guide:</strong><br>
+                                <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #374151;">
+                                    <li>Navigate to the <strong>ServiceTitan Developer Portal</strong> at <a href="https://developer.servicetitan.io" target="_blank" style="color: #1a237e; font-weight: bold; text-decoration: none;">developer.servicetitan.io</a>.</li>
+                                    <li>Click <strong>Create and Manage Applications ➡️ Create New App</strong>. Name it <code>LeadGroove Webhook Sync</code> and set scopes <code>crm.objects.leads.read</code> / <code>jpm.objects.jobs.read</code>.</li>
+                                    <li>Log into your portal at <a href="https://go.servicetitan.com" target="_blank" style="color: #1a237e; font-weight: bold; text-decoration: none;">go.servicetitan.com</a>, go to <strong>Settings ➡️ Integrations ➡️ API Application Access</strong>, edit your app, and set your target Webhook URL below!</li>
+                                </ol>
+                                <div style="margin-top: 12px; background: white; padding: 12px; border-radius: 6px; border: 1px solid #4b5563;">
+                                    <label style="font-size: 11px; font-weight: bold; color: #1f2937; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
+                                    <div class="webhook-input-group">
+                                        <input type="text" class="webhook-input" id="sot-servicetitan-instructions-box-input" readonly value="" data-suffix="/webhooks/crm?client_id={active_client_id}">
+                                        <button type="button" onclick="copyText('sot-servicetitan-instructions-box-input', 'sot-servicetitan-instructions-box-btn')" id="sot-servicetitan-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                         <div id="sot-gohighlevel-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #e8eaf6; border-left: 4px solid #3f51b5; padding: 15px; border-radius: 4px; color: #1a237e; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
                                 💡 <strong>GoHighLevel (GHL) Workflow Webhook Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #1a237e;">
-                                    <li>Log into your <strong>GoHighLevel (GHL) Sub-Account / Agency Portal</strong>.</li>
-                                    <li>In the left navigation bar, go to <strong>Automation ➡️ Workflows</strong> and click <strong>+ Create Workflow</strong> (or edit an existing Lead/Sales Pipeline Workflow).</li>
-                                    <li><strong>Add Workflow Trigger</strong>: Select <strong>Opportunity Status Changed</strong> (e.g. Pipeline Stage updated to <em>Won</em>, <em>Qualified</em>, or <em>Closed</em>), <strong>Contact Tag Added</strong>, or <strong>Form Submitted</strong>.</li>
-                                    <li><strong>Add Action</strong>: Click the <strong>+ (Plus)</strong> icon in the flow canvas, search for <strong>Webhook</strong>, and select it.</li>
-                                    <li>In the Webhook Action settings:
-                                        <ul style="list-style-type: disc; padding-left: 15px; margin: 4px 0;">
-                                            <li><strong>Method</strong>: Select <strong>POST</strong></li>
-                                            <li><strong>URL</strong>: Paste your dynamic endpoint:
-                                                <code style="display: block; background: #fff; border: 1px solid #c5cae9; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #1a237e;">https://your-agency-app.onrender.com/webhooks/crm?client_id=conversions-{active_client_id}</code>
-                                            </li>
-                                        </ul>
-                                    </li>
-                                    <li>Click <strong>Save Action</strong>, toggle the Workflow status from <em>Draft</em> to <strong>Publish</strong> in the top right, and click <strong>Save</strong>! Whenever an opportunity updates or a form submits in GHL, lead status and sales value will push to LeadGrove automatically in real time!</li>
-                                </ol>
+                                <li>Log into your <strong>GoHighLevel Sub-Account / Agency Portal</strong>.</li>
+                                <li>Go to <strong>Automation ➡️ Workflows</strong> and click <strong>+ Create Workflow</strong>.</li>
+                                <li>Set Trigger to <strong>Opportunity Status Changed</strong> (e.g. Stage updated to <em>Won</em> or <em>Qualified</em>), <strong>Contact Tag Added</strong>, or <strong>Form Submitted</strong>.</li>
+                                <li>Add Action ➡️ Select <strong>Webhook</strong>, set Method to <strong>POST</strong>, and paste your target URL below.</li>
+                                <li>Toggle Workflow to <strong>Publish</strong> and save! Whenever an opportunity updates or form submits, data pushes to LeadGrove in real time.</li>
+                            </ol>
+                                <div style="margin-top: 12px; background: white; padding: 12px; border-radius: 6px; border: 1px solid #3f51b5;">
+                                    <label style="font-size: 11px; font-weight: bold; color: #1a237e; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
+                                    <div class="webhook-input-group">
+                                        <input type="text" class="webhook-input" id="sot-gohighlevel-instructions-box-input" readonly value="" data-suffix="/webhooks/crm?client_id={active_client_id}">
+                                        <button type="button" onclick="copyText('sot-gohighlevel-instructions-box-input', 'sot-gohighlevel-instructions-box-btn')" id="sot-gohighlevel-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <!-- CONDITIONAL: Housecall Pro Setup Instructions -->
-                            <div id="sot-housecallpro-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
-                                <div style="background-color: #fff3e0; border-left: 4px solid #e65100; padding: 15px; border-radius: 4px; color: #e65100; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                    💡 <strong>Housecall Pro Webhooks Quick Setup Guide:</strong><br>
-                                    <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #e65100;">
-                                        <li>Sign in to your Housecall Pro admin account. (Only <strong>Admin</strong> users can access and generate webhook API settings).</li>
-                                        <li>Navigate to <strong>My Apps</strong> from the top navigation bar, then click <strong>All Apps</strong>.</li>
-                                        <li>Select the <strong>All Apps</strong> tab, search for the <strong>Webhooks</strong> app, and click to open it.</li>
-                                        <li>Click the toggle button in the top-right corner of the page to <strong>Enable Webhooks</strong>.</li>
-                                        <li>In the <strong>Target URL</strong> field, paste your client's custom live endpoint:
-                                            <code style="display: block; background: #fff; border: 1px solid #ffcc80; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #d84315;">https://your-agency-app.onrender.com/webhooks/crm?client_id=conversions-{active_client_id}</code>
-                                        </li>
-                                        <li>Select your preferred event triggers to notify our platform. We recommend subscribing to **<code>job.completed</code>**, <code>job.created</code>, and <code>job.paid</code> to track actual conversion events.</li>
-                                        <li>Click <strong>Save</strong> to activate the webhook instantly!</li>
-                                    </ol>
-                                    <small style="display: block; font-style: italic; color: #bf360c; line-height: 1.4; border-top: 1px solid #ffe0b2; padding-top: 8px;">
-                                        ⚠️ <strong>Note:</strong> Webhook access in Housecall Pro requires their **MAX plan** subscription level. If you don't see the Webhooks app under All Apps, contact Housecall Pro support to verify your plan access.
-                                    </small>
+                        <div id="sot-housecallpro-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
+                            <div style="background-color: #fff3e0; border-left: 4px solid #e65100; padding: 15px; border-radius: 4px; color: #e65100; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                💡 <strong>Housecall Pro Webhooks Quick Setup Guide:</strong><br>
+                                <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #e65100;">
+                                    <li>Sign in as an <strong>Admin</strong> user in Housecall Pro.</li>
+                                    <li>Go to <strong>My Apps ➡️ All Apps</strong>, search for <strong>Webhooks</strong>, and click to open.</li>
+                                    <li>Toggle <strong>Enable Webhooks</strong> on, and paste your target URL below into <strong>Target URL</strong>.</li>
+                                    <li>Subscribe to <code>job.completed</code>, <code>job.created</code>, and <code>job.paid</code>. Save to activate!</li>
+                                </ol>
+                                <div style="margin-top: 12px; background: white; padding: 12px; border-radius: 6px; border: 1px solid #e65100;">
+                                    <label style="font-size: 11px; font-weight: bold; color: #e65100; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
+                                    <div class="webhook-input-group">
+                                        <input type="text" class="webhook-input" id="sot-housecallpro-instructions-box-input" readonly value="" data-suffix="/webhooks/crm?client_id={active_client_id}">
+                                        <button type="button" onclick="copyText('sot-housecallpro-instructions-box-input', 'sot-housecallpro-instructions-box-btn')" id="sot-housecallpro-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
+                                    </div>
                                 </div>
                             </div>
+                        </div>
+                        <div id="sot-quickbooks-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
+                            <div style="background-color: #e3f2fd; border-left: 4px solid #0288d1; padding: 15px; border-radius: 4px; color: #01579b; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                💡 <strong>QuickBooks Online Webhooks Setup Guide:</strong><br>
+                                <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #0277bd;">
+                                    <li>Log into the <strong>Intuit Developer Portal</strong> at <a href="https://developer.intuit.com" target="_blank" style="color: #1a237e; font-weight: bold; text-decoration: none;">developer.intuit.com</a>.</li>
+                                    <li>Go to <strong>Production Settings ➡️ Webhooks</strong> in your App sidebar.</li>
+                                    <li>In the <strong>Endpoint URL</strong> field, paste your dynamic target URL below.</li>
+                                    <li>Check event boxes under <strong>Invoices</strong> or <strong>Payments</strong> and click Save!</li>
+                                </ol>
+                                <div style="margin-top: 12px; background: white; padding: 12px; border-radius: 6px; border: 1px solid #0288d1;">
+                                    <label style="font-size: 11px; font-weight: bold; color: #01579b; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
+                                    <div class="webhook-input-group">
+                                        <input type="text" class="webhook-input" id="sot-quickbooks-instructions-box-input" readonly value="" data-suffix="/webhooks/billing?client_id={active_client_id}">
+                                        <button type="button" onclick="copyText('sot-quickbooks-instructions-box-input', 'sot-quickbooks-instructions-box-btn')" id="sot-quickbooks-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="sot-xero-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
+                            <div style="background-color: #e0f7fa; border-left: 4px solid #00b0ff; padding: 15px; border-radius: 4px; color: #006064; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                💡 <strong>Xero Webhooks Setup Guide:</strong><br>
+                                <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #00838f;">
+                                    <li>Log into <strong>Xero Developer Portal</strong> under My Apps, select your App, and open the <strong>Webhooks</strong> tab.</li>
+                                    <li>Paste your live endpoint below into the <strong>Send notifications to</strong> field.</li>
+                                    <li>Subscribe to <strong>Invoices</strong> (CREATE, UPDATE) and click Save!</li>
+                                </ol>
+                                <div style="margin-top: 12px; background: white; padding: 12px; border-radius: 6px; border: 1px solid #00b0ff;">
+                                    <label style="font-size: 11px; font-weight: bold; color: #006064; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
+                                    <div class="webhook-input-group">
+                                        <input type="text" class="webhook-input" id="sot-xero-instructions-box-input" readonly value="" data-suffix="/webhooks/billing?client_id={active_client_id}">
+                                        <button type="button" onclick="copyText('sot-xero-instructions-box-input', 'sot-xero-instructions-box-btn')" id="sot-xero-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="sot-zoho_books-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
+                            <div style="background-color: #e8f5e9; border-left: 4px solid #2e7d32; padding: 15px; border-radius: 4px; color: #1b5e20; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                💡 <strong>Zoho Books Webhooks Setup Guide:</strong><br>
+                                <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #1b5e20;">
+                                    <li>Go to <strong>Settings ➡️ Developer Space ➡️ Webhooks</strong> in Zoho Books and click <strong>+ New Webhook</strong>.</li>
+                                    <li>Paste your custom endpoint below into <strong>URL to Notify</strong>, set Module to <strong>Invoices</strong>, and select event <strong>Invoice Paid</strong>!</li>
+                                </ol>
+                                <div style="margin-top: 12px; background: white; padding: 12px; border-radius: 6px; border: 1px solid #2e7d32;">
+                                    <label style="font-size: 11px; font-weight: bold; color: #1b5e20; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
+                                    <div class="webhook-input-group">
+                                        <input type="text" class="webhook-input" id="sot-zoho_books-instructions-box-input" readonly value="" data-suffix="/webhooks/billing?client_id={active_client_id}">
+                                        <button type="button" onclick="copyText('sot-zoho_books-instructions-box-input', 'sot-zoho_books-instructions-box-btn')" id="sot-zoho_books-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="sot-netsuite-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
+                            <div style="background-color: #eceff1; border-left: 4px solid #455a64; padding: 15px; border-radius: 4px; color: #263238; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                💡 <strong>NetSuite SuiteScript Integration Guide:</strong><br>
+                                <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #37474f;">
+                                    <li>Deploy a <strong>SuiteScript 2.x User Event Script</strong> on `Invoice` or `CustomerPayment` records.</li>
+                                    <li>On `afterSubmit`, trigger an outbound HTTP POST to your web receiver endpoint below.</li>
+                                </ol>
+                                <div style="margin-top: 12px; background: white; padding: 12px; border-radius: 6px; border: 1px solid #455a64;">
+                                    <label style="font-size: 11px; font-weight: bold; color: #263238; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
+                                    <div class="webhook-input-group">
+                                        <input type="text" class="webhook-input" id="sot-netsuite-instructions-box-input" readonly value="" data-suffix="/webhooks/billing?client_id={active_client_id}">
+                                        <button type="button" onclick="copyText('sot-netsuite-instructions-box-input', 'sot-netsuite-instructions-box-btn')" id="sot-netsuite-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="sot-sage-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
+                            <div style="background-color: #fff3e0; border-left: 4px solid #e65100; padding: 15px; border-radius: 4px; color: #e65100; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                💡 <strong>Sage Accounting Webhooks Setup Guide:</strong><br>
+                                <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #e65100;">
+                                    <li>In Sage Developer Portal, configure webhooks and paste your dynamic endpoint URL below.</li>
+                                    <li>Subscribe to <code>sales_invoice.paid</code> and <code>payment_received</code>!</li>
+                                </ol>
+                                <div style="margin-top: 12px; background: white; padding: 12px; border-radius: 6px; border: 1px solid #e65100;">
+                                    <label style="font-size: 11px; font-weight: bold; color: #e65100; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
+                                    <div class="webhook-input-group">
+                                        <input type="text" class="webhook-input" id="sot-sage-instructions-box-input" readonly value="" data-suffix="/webhooks/billing?client_id={active_client_id}">
+                                        <button type="button" onclick="copyText('sot-sage-instructions-box-input', 'sot-sage-instructions-box-btn')" id="sot-sage-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="sot-freshbooks-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
+                            <div style="background-color: #f3e5f5; border-left: 4px solid #4a148c; padding: 15px; border-radius: 4px; color: #4a148c; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                💡 <strong>FreshBooks Billing Webhooks Guide:</strong><br>
+                                <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #4a148c;">
+                                    <li>Subscribe to webhook notifications in FreshBooks Developer Center and paste your endpoint below.</li>
+                                    <li>Set trigger event to <code>invoice.payment.create</code>.</li>
+                                </ol>
+                                <div style="margin-top: 12px; background: white; padding: 12px; border-radius: 6px; border: 1px solid #4a148c;">
+                                    <label style="font-size: 11px; font-weight: bold; color: #4a148c; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
+                                    <div class="webhook-input-group">
+                                        <input type="text" class="webhook-input" id="sot-freshbooks-instructions-box-input" readonly value="" data-suffix="/webhooks/billing?client_id={active_client_id}">
+                                        <button type="button" onclick="copyText('sot-freshbooks-instructions-box-input', 'sot-freshbooks-instructions-box-btn')" id="sot-freshbooks-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="sot-google_sheets-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
+                            <div style="background-color: #efebe9; border-left: 4px solid #4e342e; padding: 15px; border-radius: 4px; color: #4e342e; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                💡 <strong>Google Sheets (Live Sync via Apps Script) Guide:</strong><br>
+                                <ol style="padding-left: 20px; font-size: 12px; color: #4e342e;">
+                                    <li>Open your Google Sheet, click <strong>Extensions ➡️ Apps Script</strong>.</li>
+                                    <li>Copy-paste the Apps Script snippet below and save!</li>
+                                </ol>
+                                <div style="margin-top: 12px; background: white; padding: 12px; border-radius: 6px; border: 1px solid #4e342e;">
+                                    <label style="font-size: 11px; font-weight: bold; color: #4e342e; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
+                                    <div class="webhook-input-group">
+                                        <input type="text" class="webhook-input" id="sot-google_sheets-instructions-box-input" readonly value="" data-suffix="/webhooks/billing?client_id={active_client_id}">
+                                        <button type="button" onclick="copyText('sot-google_sheets-instructions-box-input', 'sot-google_sheets-instructions-box-btn')" id="sot-google_sheets-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="sot-zapier-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
+                            <div style="background-color: #fffde7; border-left: 4px solid #fbc02d; padding: 15px; border-radius: 4px; color: #f57f17; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                💡 <strong>Webhooks by Zapier Custom Setup Guide:</strong><br>
+                                <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #e65100;">
+                                    <li>In your Zapier account, create a new Zap.</li>
+                                    <li><strong>Trigger:</strong> Select your platform (Stripe, PayPal, Shopify, custom CRM).</li>
+                                    <li><strong>Action:</strong> Select <strong>Webhooks by Zapier (Custom Request or POST)</strong> and paste your endpoint below.</li>
+                                </ol>
+                                <div style="margin-top: 12px; background: white; padding: 12px; border-radius: 6px; border: 1px solid #fbc02d;">
+                                    <label style="font-size: 11px; font-weight: bold; color: #f57f17; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
+                                    <div class="webhook-input-group">
+                                        <input type="text" class="webhook-input" id="sot-zapier-instructions-box-input" readonly value="" data-suffix="/webhooks/billing?client_id={active_client_id}">
+                                        <button type="button" onclick="copyText('sot-zapier-instructions-box-input', 'sot-zapier-instructions-box-btn')" id="sot-zapier-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
-\n                            
-                            <!-- CONDITIONAL: QuickBooks Setup Instructions -->
-                            <div id="sot-quickbooks-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px;">
-                                <div style="background-color: #e3f2fd; border-left: 4px solid #0288d1; padding: 15px; border-radius: 4px; color: #01579b; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                    💡 <strong>QuickBooks Online Webhooks Quick Setup Guide:</strong><br>
-                                    <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #0277bd;">
-                                        <li>Log into the <strong>Intuit Developer Portal</strong> at <a href="https://developer.intuit.com" target="_blank" style="color: #1a237e; font-weight: bold; text-decoration: none;">developer.intuit.com</a>.</li>
-                                        <li>Go to your **Dashboard**, select your App, and navigate to **Production Settings ➡️ Webhooks** in the left sidebar menu.</li>
-                                        <li>In the **Endpoint URL** field, paste your dynamic target URL (provided above on this screen):
-                                            <code style="display: block; background: #fff; border: 1px solid #b3e5fc; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #01579b;">https://your-agency-app.onrender.com/webhooks/billing?client_id=conversions-{active_client_id}</code>
-                                        </li>
-                                        <li>Check the boxes for the event notifications you want to receive under **Invoices** or **Payments** (e.g., invoice creation and payment status updates).</li>
-                                        <li>Click **Save** to generate your **Verifier Token** (copy this key to verify QuickBooks signatures on your server!).</li>
-                                    </ol>
-                                    <small style="display: block; font-style: italic; color: #0288d1; line-height: 1.4; border-top: 1px solid #b3e5fc; padding-top: 8px;">
-                                        ⚠️ <strong>Important Note:</strong> QuickBooks Online aggregates webhook events and delivers them in **5-minute intervals**, so test events might take up to 5 minutes to appear in your logs!
-                                    </small>
-                                </div>
-                            </div>
-    
-                            <!-- CONDITIONAL: Xero Setup Instructions -->
-                            <div id="sot-xero-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px;">
-                                <div style="background-color: #e0f7fa; border-left: 4px solid #00b0ff; padding: 15px; border-radius: 4px; color: #006064; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                    💡 <strong>Xero Webhooks Quick Setup Guide:</strong><br>
-                                    <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #00838f;">
-                                        <li>Log into the <strong>Xero Developer Portal</strong> at <a href="https://developer.xero.com" target="_blank" style="color: #1a237e; font-weight: bold; text-decoration: none;">developer.xero.com</a> under **My Apps**.</li>
-                                        <li>Select your App and click on the **Webhooks** tab in the left-hand navigation panel.</li>
-                                        <li>In the **Send notifications to** (Delivery URL) field, paste your custom live endpoint (provided above on this screen):
-                                            <code style="display: block; background: #fff; border: 1px solid #80deea; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #006064;">https://your-agency-app.onrender.com/webhooks/billing?client_id=conversions-{active_client_id}</code>
-                                        </li>
-                                        <li>Select your preferred event categories. We highly recommend subscribing to **Invoices** (CREATE, UPDATE) and **Contacts** (CREATE, UPDATE).</li>
-                                        <li>Click **Save**. This will generate your **Webhook Key** (also known as the signing key) which you can copy to authenticate payloads.</li>
-                                        <li>Click the **Send intent to receive** button to initiate Xero's connection validation handshake and verify your setup is active!</li>
-                                    </ol>
-                                    <small style="display: block; font-style: italic; color: #00838f; line-height: 1.4; border-top: 1px solid #80deea; padding-top: 8px;">
-                                        🔒 <strong>Intent-to-Receive Handshake:</strong> To complete the setup, our platform automatically responds to Xero's secure validation checks. Ensure your SSL certificate is trusted (non-self-signed) and running on port 443.
-                                    </small>
-                                </div>
-                            </div>
-    
-                            <!-- CONDITIONAL: Zoho Books Setup Instructions -->
-                            <div id="sot-zoho_books-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px;">
-                                <div style="background-color: #e8f5e9; border-left: 4px solid #2e7d32; padding: 15px; border-radius: 4px; color: #1b5e20; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                    💡 <strong>Zoho Books Webhooks Quick Setup Guide:</strong><br>
-                                    <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #1b5e20;">
-                                        <li>Log into your <strong>Zoho Books Account</strong>.</li>
-                                        <li>Go to <strong>Settings (Gear Icon) ➡️ Developer Space ➡️ Webhooks</strong>.</li>
-                                        <li>Click <strong>+ New Webhook</strong>.</li>
-                                        <li>Set Name to <code>LeadGroove Sales Sync</code> and set Module to <strong>Invoices</strong> or <strong>Customer Payments</strong>.</li>
-                                        <li>In the <strong>URL to Notify</strong> field, paste your custom live endpoint (provided above on this screen):
-                                            <code style="display: block; background: #fff; border: 1px solid #a5d6a7; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #1b5e20;">https://your-agency-app.onrender.com/webhooks/billing?client_id=conversions-{active_client_id}</code>
-                                        </li>
-                                        <li>Select trigger events: **Invoice Paid** or **Payment Recorded**. Save your Webhook!</li>
-                                    </ol>
-                                </div>
-                            </div>
-
-                            <!-- CONDITIONAL: NetSuite Setup Instructions -->
-                            <div id="sot-netsuite-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px;">
-                                <div style="background-color: #eceff1; border-left: 4px solid #455a64; padding: 15px; border-radius: 4px; color: #263238; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                    💡 <strong>NetSuite SuiteScript Quick Integration Guide:</strong><br>
-                                    <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #37474f;">
-                                        <li>Deploy a minimal **SuiteScript 2.x User Event Script** on your `Invoice` or `CustomerPayment` records.</li>
-                                        <li>On the `afterSubmit` hook, write a script that triggers an outbound HTTP POST to our web receiver:
-                                            <code style="display: block; background: #fff; border: 1px solid #b0bec5; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #37474f;">https://your-agency-app.onrender.com/webhooks/billing?client_id=conversions-{active_client_id}</code>
-                                        </li>
-                                        <li>Format your JSON payload to include: `{{"customer_name": invoice.entity, "email": invoice.email, "invoice_number": invoice.id, "amount": invoice.total}}`.</li>
-                                    </ol>
-                                </div>
-                            </div>
-
-                            <!-- CONDITIONAL: Sage Setup Instructions -->
-                            <div id="sot-sage-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px;">
-                                <div style="background-color: #fff3e0; border-left: 4px solid #e65100; padding: 15px; border-radius: 4px; color: #e65100; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                    💡 <strong>Sage Accounting Webhooks Setup Guide:</strong><br>
-                                    <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #e65100;">
-                                        <li>Log into your <strong>Sage Developer Account</strong>.</li>
-                                        <li>Configure webhooks under your Active Integration profile.</li>
-                                        <li>Set the destination endpoint URL to your dynamic LeadGrove billing webhook:
-                                            <code style="display: block; background: #fff; border: 1px solid #ffcc80; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #d84315;">https://your-agency-app.onrender.com/webhooks/billing?client_id=conversions-{active_client_id}</code>
-                                        </li>
-                                        <li>Subscribe to **sales_invoice.paid** and **payment_received** webhook events to track real-time conversions.</li>
-                                    </ol>
-                                </div>
-                            </div>
-
-                            <!-- CONDITIONAL: FreshBooks Setup Instructions -->
-                            <div id="sot-freshbooks-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px;">
-                                <div style="background-color: #f3e5f5; border-left: 4px solid #4a148c; padding: 15px; border-radius: 4px; color: #4a148c; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                    💡 <strong>FreshBooks Billing Webhooks Guide:</strong><br>
-                                    <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #4a148c;">
-                                        <li>Register your application inside the <strong>FreshBooks Developer Center</strong>.</li>
-                                        <li>Subscribe to webhook notifications for your production account.</li>
-                                        <li>Set the webhook URL endpoint directly to:
-                                            <code style="display: block; background: #fff; border: 1px solid #e1bee7; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #4a148c;">https://your-agency-app.onrender.com/webhooks/billing?client_id=conversions-{active_client_id}</code>
-                                        </li>
-                                        <li>Choose trigger event: <code>invoice.payment.create</code> to synchronize billing revenue.</li>
-                                    </ol>
-                                </div>
-                            </div>
-
-                            <!-- CONDITIONAL: Google Sheets Setup Instructions -->
-                            <div id="sot-google_sheets-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px;">
-                                <div style="background-color: #efebe9; border-left: 4px solid #4e342e; padding: 15px; border-radius: 4px; color: #4e342e; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                    💡 <strong>Google Sheets (Live Sync via Apps Script) Guide:</strong><br>
-                                    <p style="margin: 5px 0; font-size: 12px;">Sync your spreadsheet rows instantly with this pre-built script:</p>
-                                    <ol style="padding-left: 20px; font-size: 12px; color: #4e342e;">
-                                        <li>Open your Google Sheet, click on <strong>Extensions ➡️ Apps Script</strong>.</li>
-                                        <li>Wipe any default code and copy-paste the snippet below:
-                                            <pre style="background: white; border: 1px solid #d7ccc8; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 10px; overflow-x: auto; color: #3e2723; max-height: 160px;">function onEdit(e) {{
-  var sheet = e.source.getActiveSheet();
-  var range = e.range;
-  if (range.getColumn() == 5 && range.getValue() == "Paid") {{
-    var row = range.getRow();
-    var payload = {{
-      customer_name: sheet.getRange(row, 1).getValue(),
-      email: sheet.getRange(row, 2).getValue(),
-      invoice_number: sheet.getRange(row, 3).getValue(),
-      amount: parseFloat(sheet.getRange(row, 4).getValue())
-    }};
-    UrlFetchApp.fetch("https://your-agency-app.onrender.com/webhooks/billing?client_id=conversions-{active_client_id}", {{
-      method: "POST",
-      contentType: "application/json",
-      payload: JSON.stringify(payload)
-    }});
-  }}
-}}</pre>
-                                        </li>
-                                        <li>Replace the placeholders inside quotes with your actual row indexes, and hit Save! When a row's column 5 updates to "Paid", it sends the conversion instantly!</li>
-                                    </ol>
-                                </div>
-                            </div>
-
-                            <!-- CONDITIONAL: Zapier Setup Instructions -->
-                            <div id="sot-zapier-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px;">
-                                <div style="background-color: #fffde7; border-left: 4px solid #fbc02d; padding: 15px; border-radius: 4px; color: #f57f17; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                    💡 <strong>Webhooks by Zapier Custom Setup Guide:</strong><br>
-                                    <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #e65100;">
-                                        <li>In your Zapier account, create a new Zap.</li>
-                                        <li>**Trigger:** Select any platform of choice (e.g. Stripe, PayPal, Shopify).</li>
-                                        <li>**Action:** Search for **"Webhooks by Zapier"** and select **Custom Request** or **POST**.</li>
-                                        <li>**URL Endpoint:** Paste your dynamic tracking endpoint:
-                                            <code style="display: block; background: #fff; border: 1px solid #fff59d; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #e65100;">https://your-agency-app.onrender.com/webhooks/billing?client_id=conversions-{active_client_id}</code>
-                                            <small style="color: #666;">(Use `/webhooks/crm` if setting up lead qualification steps rather than sales)</small>
-                                        </li>
-                                        <li>**Payload Mapping:** Map your trigger's payload attributes into our standard database keys:
-                                            <ul style="list-style-type: disc; padding-left: 15px; margin-top: 4px;">
-                                                <li><code>customer_name</code>: Name of the contact</li>
-                                                <li><code>email</code>: Email of the customer</li>
-                                                <li><code>phone</code>: Customer phone number</li>
-                                                <li><code>amount</code>: The numeric value of the sale</li>
-                                            </ul>
-                                        </li>
-                                    </ol>
-                                </div>
-                            </div>
-    
-                            <!-- CONDITIONAL: CRM Lead status tags -->
+<!-- CONDITIONAL: CRM Lead status tags -->
                             <div id="sot-lead-tags-box" class="conditional-box">
                                 <label for="crm_lead_tags">Which statuses under <strong>Leads</strong> signify qualification?</label>
                                 <input type="text" id="crm_lead_tags" value="{client_data.get("crm_lead_tags", "") or ""}" placeholder="e.g. job-booked, estimate-given">
@@ -6345,8 +6294,7 @@ def add_client_page(request: Request):
                             </div>
                         </div>
                         
-                        <!-- CONDITIONAL INPUT: HubSpot Setup Instructions -->
-                        <div id="sot-hubspot-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: block;">
+                                                <div id="sot-hubspot-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #fff8e1; border-left: 4px solid #ffb300; padding: 15px; border-radius: 4px; color: #5d4037; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
                                 💡 <strong>HubSpot Private App Quick Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #4e342e;">
@@ -6359,293 +6307,242 @@ def add_client_page(request: Request):
                                             <li><code>crm.objects.contacts.read</code> (to sync leads)</li>
                                         </ul>
                                     </li>
-                                    <li>Click <strong>Create App</strong>. If you want real-time syncing, click the <strong>Webhooks</strong> tab of your new app, click <strong>Edit Webhooks</strong>, paste your dynamic target URL (provided on the next screen once saved), and subscribe to <code>propertyChange</code> or <code>creation</code> for <strong>Deals</strong>!</li>
+                                    <li>Click <strong>Create App</strong>. Click the <strong>Webhooks</strong> tab, click <strong>Edit Webhooks</strong>, paste your dynamic target URL below, and subscribe to <code>propertyChange</code> or <code>creation</code> for <strong>Deals</strong>!</li>
                                 </ol>
-                                <small style="display: block; font-style: italic; color: #6d4c41; line-height: 1.4; border-top: 1px solid #ffe082; padding-top: 8px;">
-                                    ⚠️ <strong>Tip:</strong> If you don't see the "Webhooks" tab inside Private App settings, go to your HubSpot profile (top-right) &gt; <strong>Product Updates &gt; Betas</strong>, click <strong>Join Beta</strong> for <em>"Private App Webhooks"</em>, and refresh!
-                                </small>
+                                <div style="margin-top: 12px; background: white; padding: 12px; border-radius: 6px; border: 1px solid #ffb300;">
+                                    <label style="font-size: 11px; font-weight: bold; color: #5d4037; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
+                                    <div class="webhook-input-group">
+                                        <input type="text" class="webhook-input" id="wiz-sot-hubspot-instructions-box-input" readonly value="" data-suffix="/webhooks/crm?client_id={next_id}">
+                                        <button type="button" onclick="copyText('wiz-sot-hubspot-instructions-box-input', 'wiz-sot-hubspot-instructions-box-btn')" id="wiz-sot-hubspot-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        
-
-                        <!-- CONDITIONAL INPUT: Salesforce Setup Instructions -->
                         <div id="sot-salesforce-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #e3f2fd; border-left: 4px solid #1e88e5; padding: 15px; border-radius: 4px; color: #0d47a1; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
                                 💡 <strong>Salesforce Outbound Flow Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #1565c0;">
-                                    <li>In Salesforce Setup, go to <strong>Named Credentials &gt; External Credentials</strong> tab, click <strong>New</strong>. Label <code>LeadGroove External Credential</code>, Name <code>LeadGroove_External_Credential</code>, Protocol <strong>Custom</strong>. Save, scroll to <em>Principals</em>, click <strong>New</strong> and define a principal named <code>LeadGroove_Principal</code>.</li>
-                                    <li>Create a <strong>Permission Set</strong> in Setup named <code>LeadGroove Webhook Access</code>. In it, click <strong>External Credential Principal Access</strong>, enable your new credential and principal, and assign this permission set to any integrating users.</li>
-                                    <li>Back in <strong>Named Credentials</strong>, click <strong>New</strong> under the main tab. Label <code>LeadGroove API</code>, Name <code>LeadGroove_API</code>, URL <code style="background: rgba(0,0,0,0.05); padding: 2px 4px; border-radius: 3px;">https://your-agency-app.onrender.com</code> (or active origin). Under <em>External Credential</em>, select the credential you created in Step 1, and save.</li>
-                                    <li>Create a <strong>Record-Triggered Flow</strong> on the <strong>Opportunity</strong> object (when updated) with conditions <code>StageName Equals Closed Won</code> (Only when updated to meet conditions), optimized for <strong>Actions and Related Records</strong>.</li>
-                                    <li>On the flow canvas, click <strong>+ Add Action &gt; Create HTTP Callout</strong>, select your Named Credential, and define a <strong>POST</strong> method with path <code style="color: #2e7d32; font-family: monospace;">/webhooks/crm?client_id=conversions-[id]</code>. Provide this sample JSON structure for automatic Salesforce parameter mapping:
-                                        <pre style="background: rgba(255,255,255,0.7); padding: 8px; border-radius: 4px; margin-top: 5px; font-family: monospace; font-size: 10px; overflow-x: auto; border: 1px solid #bbdefb; color: #0d47a1;">{
-  "customer_name": "John Doe",
-  "customer_email": "john@example.com",
-  "customer_phone": "5551234567",
-  "deal_stage": "Closed Won",
-  "deal_value": 1500.00
-}</pre>
-                                    </li>
-                                </ol>
+                                <li>In Salesforce Setup, go to <strong>Named Credentials &gt; External Credentials</strong> tab, click <strong>New</strong>. Label <code>LeadGroove External Credential</code>, Name <code>LeadGroove_External_Credential</code>, Protocol <strong>Custom</strong>. Save, scroll to <em>Principals</em>, click <strong>New</strong> and define a principal named <code>LeadGroove_Principal</code>.</li>
+                                <li>Create a <strong>Permission Set</strong> in Setup named <code>LeadGroove Webhook Access</code>. In it, click <strong>External Credential Principal Access</strong>, enable your new credential and principal, and assign this permission set to any integrating users.</li>
+                                <li>Back in <strong>Named Credentials</strong>, click <strong>New</strong> under the main tab. Label <code>LeadGroove API</code>, Name <code>LeadGroove_API</code>, URL set to your active origin. Under <em>External Credential</em>, select the credential you created in Step 1, and save.</li>
+                                <li>Create a <strong>Record-Triggered Flow</strong> on the <strong>Opportunity</strong> object (when updated) with conditions <code>StageName Equals Closed Won</code> (Only when updated to meet conditions), optimized for <strong>Actions and Related Records</strong>.</li>
+                                <li>On the flow canvas, click <strong>+ Add Action &gt; Create HTTP Callout</strong>, select your Named Credential, and define a <strong>POST</strong> method targeting your webhook URL below.</li>
+                            </ol>
+                                <div style="margin-top: 12px; background: white; padding: 12px; border-radius: 6px; border: 1px solid #1e88e5;">
+                                    <label style="font-size: 11px; font-weight: bold; color: #0d47a1; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
+                                    <div class="webhook-input-group">
+                                        <input type="text" class="webhook-input" id="wiz-sot-salesforce-instructions-box-input" readonly value="" data-suffix="/webhooks/crm?client_id={next_id}">
+                                        <button type="button" onclick="copyText('wiz-sot-salesforce-instructions-box-input', 'wiz-sot-salesforce-instructions-box-btn')" id="wiz-sot-salesforce-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-
-                        <!-- CONDITIONAL INPUT: Zoho Setup Instructions -->
                         <div id="sot-zoho-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #e8f5e9; border-left: 4px solid #2e7d32; padding: 15px; border-radius: 4px; color: #1b5e20; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
                                 💡 <strong>Zoho CRM Outbound Webhook Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #2e7d32;">
-                                    <li>Click the <strong>Setup (Gear Icon)</strong> in the top-right corner of your Zoho CRM dashboard.</li>
-                                    <li>Under <strong>Automation</strong>, click on <strong>Actions</strong>, then select the <strong>Webhooks</strong> tab at the top.</li>
-                                    <li>Click <strong>Configure Webhook</strong> and configure these fields:
-                                        <ul style="list-style-type: disc; padding-left: 15px; margin: 4px 0;">
-                                            <li><strong>Name</strong>: <code>LeadGroove Conversion Sync</code></li>
-                                            <li><strong>URL to notify</strong>: <code style="background: rgba(0,0,0,0.05); padding: 2px 4px; border-radius: 3px;">https://your-agency-app.onrender.com/webhooks/crm?client_id=conversions-[id]</code></li>
-                                            <li><strong>Method</strong>: Select <strong>POST</strong></li>
-                                            <li><strong>Module</strong>: Select <strong>Deals</strong> (or your tracking module)</li>
-                                        </ul>
-                                    </li>
-                                    <li>In the <strong>Body</strong> parameters section:
-                                        <ul style="list-style-type: disc; padding-left: 15px; margin: 4px 0;">
-                                            <li>Choose <strong>Raw</strong> format and select <strong>JSON</strong> from the dropdown.</li>
-                                            <li>Type <code>#</code> to dynamically insert CRM fields into this JSON structure:
-                                                <pre style="background: rgba(255,255,255,0.7); padding: 8px; border-radius: 4px; margin-top: 5px; font-family: monospace; font-size: 10px; overflow-x: auto; border: 1px solid #c8e6c9; color: #1b5e20;">{
-  "customer_name": "${Deals.Deal Name}",
-  "customer_email": "${Deals.Email}",
-  "customer_phone": "${Deals.Phone}",
-  "deal_stage": "${Deals.Stage}",
-  "deal_value": ${Deals.Amount}
-}</pre>
-                                            </li>
-                                        </ul>
-                                    </li>
-                                    <li>Click <strong>Save</strong>. Next, go to <strong>Workflow Rules</strong> (under Setup &gt; Automation) and create a rule triggered on Deal Update when the <strong>Stage is Closed Won</strong>, then associate this Webhook as an <strong>Instant Action</strong>!</li>
-                                </ol>
+                                <li>Click the <strong>Setup (Gear Icon)</strong> in the top-right corner of your Zoho CRM dashboard.</li>
+                                <li>Under <strong>Automation</strong>, click on <strong>Actions</strong>, then select the <strong>Webhooks</strong> tab at the top.</li>
+                                <li>Click <strong>Configure Webhook</strong>, set Name to <code>LeadGroove Conversion Sync</code>, Method to <strong>POST</strong>, Module to <strong>Deals</strong>, and paste your target URL below into <strong>URL to notify</strong>.</li>
+                                <li>In the <strong>Body</strong> section, select <strong>Raw (JSON)</strong> format, and type <code>#</code> to insert CRM fields into your payload structure. Click <strong>Save</strong>!</li>
+                            </ol>
+                                <div style="margin-top: 12px; background: white; padding: 12px; border-radius: 6px; border: 1px solid #2e7d32;">
+                                    <label style="font-size: 11px; font-weight: bold; color: #1b5e20; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
+                                    <div class="webhook-input-group">
+                                        <input type="text" class="webhook-input" id="wiz-sot-zoho-instructions-box-input" readonly value="" data-suffix="/webhooks/crm?client_id={next_id}">
+                                        <button type="button" onclick="copyText('wiz-sot-zoho-instructions-box-input', 'wiz-sot-zoho-instructions-box-btn')" id="wiz-sot-zoho-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-
-                        
-                        <!-- CONDITIONAL INPUT: ServiceTitan Setup Instructions -->
                         <div id="sot-servicetitan-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #f3f4f6; border-left: 4px solid #4b5563; padding: 15px; border-radius: 4px; color: #1f2937; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
                                 💡 <strong>ServiceTitan Webhooks V2 Quick Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #374151;">
-                                    <li>Navigate to the **ServiceTitan Developer Portal** at <a href="https://developer.servicetitan.io" target="_blank" style="color: #1a237e; font-weight: bold; text-decoration: none;">developer.servicetitan.io</a> and sign in with your production credentials.</li>
-                                    <li>Click **Create and Manage Applications** ➡️ **Create New App**. Name it <code>LeadGroove Webhook Sync</code> and set your tenant/business units.</li>
-                                    <li>Under **API Scopes**, select:
-                                        <ul style="list-style-type: disc; padding-left: 15px; margin: 4px 0;">
-                                            <li><code>crm.objects.leads.read</code> or <code>jpm.objects.jobs.read</code> (to capture lead states and bookings)</li>
-                                        </ul>
-                                    </li>
-                                    <li>Click **Save** to generate your **Client ID**, **Client Secret**, **App ID**, and **App Key**.</li>
-                                    <li>Log into your main production portal at <a href="https://go.servicetitan.com" target="_blank" style="color: #1a237e; font-weight: bold; text-decoration: none;">go.servicetitan.com</a>, go to **Settings ➡️ Integrations ➡️ API Application Access**, find your app, click **Edit**, and set your dynamic Webhook Endpoint Target URL (which you can copy on the next success screen):
-                                        <code style="display: block; background: #fff; border: 1px solid #d1d5db; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #1f2937;">https://your-agency-app.onrender.com/webhooks/crm?client_id=conversions-[id]</code>
-                                    </li>
-                                    <li>Register your endpoint triggers for <code>job.created</code> and <code>job.updated</code> (under Job Planning & Management v2 endpoints) to fire instantly when dispatch sheets are updated!</li>
+                                    <li>Navigate to the <strong>ServiceTitan Developer Portal</strong> at <a href="https://developer.servicetitan.io" target="_blank" style="color: #1a237e; font-weight: bold; text-decoration: none;">developer.servicetitan.io</a>.</li>
+                                    <li>Click <strong>Create and Manage Applications ➡️ Create New App</strong>. Name it <code>LeadGroove Webhook Sync</code> and set scopes <code>crm.objects.leads.read</code> / <code>jpm.objects.jobs.read</code>.</li>
+                                    <li>Log into your portal at <a href="https://go.servicetitan.com" target="_blank" style="color: #1a237e; font-weight: bold; text-decoration: none;">go.servicetitan.com</a>, go to <strong>Settings ➡️ Integrations ➡️ API Application Access</strong>, edit your app, and set your target Webhook URL below!</li>
                                 </ol>
+                                <div style="margin-top: 12px; background: white; padding: 12px; border-radius: 6px; border: 1px solid #4b5563;">
+                                    <label style="font-size: 11px; font-weight: bold; color: #1f2937; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
+                                    <div class="webhook-input-group">
+                                        <input type="text" class="webhook-input" id="wiz-sot-servicetitan-instructions-box-input" readonly value="" data-suffix="/webhooks/crm?client_id={next_id}">
+                                        <button type="button" onclick="copyText('wiz-sot-servicetitan-instructions-box-input', 'wiz-sot-servicetitan-instructions-box-btn')" id="wiz-sot-servicetitan-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <!-- CONDITIONAL INPUT: Housecall Pro Setup Instructions -->
-                        <div id="sot-housecallpro-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
-                            <div style="background-color: #fff3e0; border-left: 4px solid #e65100; padding: 15px; border-radius: 4px; color: #e65100; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                💡 <strong>Housecall Pro Webhooks Quick Setup Guide:</strong><br>
-                                <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #e65100;">
-                                    <li>Sign in to your Housecall Pro admin account. (Only <strong>Admin</strong> users can access and generate webhook API settings).</li>
-                                    <li>Navigate to <strong>My Apps</strong> from the top navigation bar, then click <strong>All Apps</strong>.</li>
-                                    <li>Select the <strong>All Apps</strong> tab, search for the <strong>Webhooks</strong> app, and click to open it.</li>
-                                    <li>Click the toggle button in the top-right corner of the page to <strong>Enable Webhooks</strong>.</li>
-                                    <li>In the <strong>Target URL</strong> field, paste your client's custom live endpoint (which you can copy on the next success screen):
-                                        <code style="display: block; background: #fff; border: 1px solid #ffcc80; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #d84315;">https://your-agency-app.onrender.com/webhooks/crm?client_id=conversions-[id]</code>
-                                    </li>
-                                    <li>Select your preferred event triggers to notify our platform. We recommend subscribing to **<code>job.completed</code>**, <code>job.created</code>, and <code>job.paid</code> to track actual conversion events.</li>
-                                    <li>Click <strong>Save</strong> to activate the webhook instantly!</li>
-                                </ol>
-                                <small style="display: block; font-style: italic; color: #bf360c; line-height: 1.4; border-top: 1px solid #ffe0b2; padding-top: 8px;">
-                                    ⚠️ <strong>Note:</strong> Webhook access in Housecall Pro requires their **MAX plan** subscription level. If you don't see the Webhooks app under All Apps, contact Housecall Pro support to verify your plan access.
-                                </small>
-                            </div>
-                        </div>
-
-                        <!-- CONDITIONAL INPUT: GoHighLevel Setup Instructions -->
                         <div id="sot-gohighlevel-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #e8eaf6; border-left: 4px solid #3f51b5; padding: 15px; border-radius: 4px; color: #1a237e; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
                                 💡 <strong>GoHighLevel (GHL) Workflow Webhook Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #1a237e;">
-                                    <li>Log into your <strong>GoHighLevel (GHL) Sub-Account / Agency Portal</strong>.</li>
-                                    <li>In the left navigation bar, go to <strong>Automation ➡️ Workflows</strong> and click <strong>+ Create Workflow</strong> (or edit an existing Lead/Sales Pipeline Workflow).</li>
-                                    <li><strong>Add Workflow Trigger</strong>: Select <strong>Opportunity Status Changed</strong> (e.g. Pipeline Stage updated to <em>Won</em>, <em>Qualified</em>, or <em>Closed</em>), <strong>Contact Tag Added</strong>, or <strong>Form Submitted</strong>.</li>
-                                    <li><strong>Add Action</strong>: Click the <strong>+ (Plus)</strong> icon in the flow canvas, search for <strong>Webhook</strong>, and select it.</li>
-                                    <li>In the Webhook Action settings:
-                                        <ul style="list-style-type: disc; padding-left: 15px; margin: 4px 0;">
-                                            <li><strong>Method</strong>: Select <strong>POST</strong></li>
-                                            <li><strong>URL</strong>: Paste your dynamic endpoint:
-                                                <code style="display: block; background: #fff; border: 1px solid #c5cae9; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #1a237e;">https://your-agency-app.onrender.com/webhooks/crm?client_id=conversions-[id]</code>
-                                            </li>
-                                        </ul>
-                                    </li>
-                                    <li>Click <strong>Save Action</strong>, toggle the Workflow status from <em>Draft</em> to <strong>Publish</strong> in the top right, and click <strong>Save</strong>! Whenever an opportunity updates or a form submits in GHL, lead status and sales value will push to LeadGrove automatically in real time!</li>
-                                </ol>
+                                <li>Log into your <strong>GoHighLevel Sub-Account / Agency Portal</strong>.</li>
+                                <li>Go to <strong>Automation ➡️ Workflows</strong> and click <strong>+ Create Workflow</strong>.</li>
+                                <li>Set Trigger to <strong>Opportunity Status Changed</strong> (e.g. Stage updated to <em>Won</em> or <em>Qualified</em>), <strong>Contact Tag Added</strong>, or <strong>Form Submitted</strong>.</li>
+                                <li>Add Action ➡️ Select <strong>Webhook</strong>, set Method to <strong>POST</strong>, and paste your target URL below.</li>
+                                <li>Toggle Workflow to <strong>Publish</strong> and save! Whenever an opportunity updates or form submits, data pushes to LeadGrove in real time.</li>
+                            </ol>
+                                <div style="margin-top: 12px; background: white; padding: 12px; border-radius: 6px; border: 1px solid #3f51b5;">
+                                    <label style="font-size: 11px; font-weight: bold; color: #1a237e; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
+                                    <div class="webhook-input-group">
+                                        <input type="text" class="webhook-input" id="wiz-sot-gohighlevel-instructions-box-input" readonly value="" data-suffix="/webhooks/crm?client_id={next_id}">
+                                        <button type="button" onclick="copyText('wiz-sot-gohighlevel-instructions-box-input', 'wiz-sot-gohighlevel-instructions-box-btn')" id="wiz-sot-gohighlevel-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-
-\n                        
-                        <!-- CONDITIONAL INPUT: QuickBooks Setup Instructions -->
+                        <div id="sot-housecallpro-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
+                            <div style="background-color: #fff3e0; border-left: 4px solid #e65100; padding: 15px; border-radius: 4px; color: #e65100; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                💡 <strong>Housecall Pro Webhooks Quick Setup Guide:</strong><br>
+                                <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #e65100;">
+                                    <li>Sign in as an <strong>Admin</strong> user in Housecall Pro.</li>
+                                    <li>Go to <strong>My Apps ➡️ All Apps</strong>, search for <strong>Webhooks</strong>, and click to open.</li>
+                                    <li>Toggle <strong>Enable Webhooks</strong> on, and paste your target URL below into <strong>Target URL</strong>.</li>
+                                    <li>Subscribe to <code>job.completed</code>, <code>job.created</code>, and <code>job.paid</code>. Save to activate!</li>
+                                </ol>
+                                <div style="margin-top: 12px; background: white; padding: 12px; border-radius: 6px; border: 1px solid #e65100;">
+                                    <label style="font-size: 11px; font-weight: bold; color: #e65100; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
+                                    <div class="webhook-input-group">
+                                        <input type="text" class="webhook-input" id="wiz-sot-housecallpro-instructions-box-input" readonly value="" data-suffix="/webhooks/crm?client_id={next_id}">
+                                        <button type="button" onclick="copyText('wiz-sot-housecallpro-instructions-box-input', 'wiz-sot-housecallpro-instructions-box-btn')" id="wiz-sot-housecallpro-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                         <div id="sot-quickbooks-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #e3f2fd; border-left: 4px solid #0288d1; padding: 15px; border-radius: 4px; color: #01579b; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                💡 <strong>QuickBooks Online Webhooks Quick Setup Guide:</strong><br>
+                                💡 <strong>QuickBooks Online Webhooks Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #0277bd;">
                                     <li>Log into the <strong>Intuit Developer Portal</strong> at <a href="https://developer.intuit.com" target="_blank" style="color: #1a237e; font-weight: bold; text-decoration: none;">developer.intuit.com</a>.</li>
-                                    <li>Go to your **Dashboard**, select your App, and navigate to **Production Settings ➡️ Webhooks** in the left sidebar menu.</li>
-                                    <li>In the **Endpoint URL** field, paste your dynamic target URL (which you can copy on the next success screen):
-                                        <code style="display: block; background: #fff; border: 1px solid #b3e5fc; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #01579b;">https://your-agency-app.onrender.com/webhooks/billing?client_id=conversions-[id]</code>
-                                    </li>
-                                    <li>Check the boxes for the event notifications you want to receive under **Invoices** or **Payments** (e.g., invoice creation and payment status updates).</li>
-                                    <li>Click **Save** to generate your **Verifier Token** (copy this key to verify QuickBooks signatures on your server!).</li>
+                                    <li>Go to <strong>Production Settings ➡️ Webhooks</strong> in your App sidebar.</li>
+                                    <li>In the <strong>Endpoint URL</strong> field, paste your dynamic target URL below.</li>
+                                    <li>Check event boxes under <strong>Invoices</strong> or <strong>Payments</strong> and click Save!</li>
                                 </ol>
-                                <small style="display: block; font-style: italic; color: #0288d1; line-height: 1.4; border-top: 1px solid #b3e5fc; padding-top: 8px;">
-                                    ⚠️ <strong>Important Note:</strong> QuickBooks Online aggregates webhook events and delivers them in **5-minute intervals**, so test events might take up to 5 minutes to appear in your logs!
-                                </small>
+                                <div style="margin-top: 12px; background: white; padding: 12px; border-radius: 6px; border: 1px solid #0288d1;">
+                                    <label style="font-size: 11px; font-weight: bold; color: #01579b; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
+                                    <div class="webhook-input-group">
+                                        <input type="text" class="webhook-input" id="wiz-sot-quickbooks-instructions-box-input" readonly value="" data-suffix="/webhooks/billing?client_id={next_id}">
+                                        <button type="button" onclick="copyText('wiz-sot-quickbooks-instructions-box-input', 'wiz-sot-quickbooks-instructions-box-btn')" id="wiz-sot-quickbooks-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-    
-                        <!-- CONDITIONAL INPUT: Xero Setup Instructions -->
                         <div id="sot-xero-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #e0f7fa; border-left: 4px solid #00b0ff; padding: 15px; border-radius: 4px; color: #006064; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                💡 <strong>Xero Webhooks Quick Setup Guide:</strong><br>
+                                💡 <strong>Xero Webhooks Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #00838f;">
-                                    <li>Log into the <strong>Xero Developer Portal</strong> at <a href="https://developer.xero.com" target="_blank" style="color: #1a237e; font-weight: bold; text-decoration: none;">developer.xero.com</a> under **My Apps**.</li>
-                                    <li>Select your App and click on the **Webhooks** tab in the left-hand navigation panel.</li>
-                                    <li>In the **Send notifications to** (Delivery URL) field, paste your custom live endpoint (which you can copy on the next success screen):
-                                        <code style="display: block; background: #fff; border: 1px solid #80deea; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #006064;">https://your-agency-app.onrender.com/webhooks/billing?client_id=conversions-[id]</code>
-                                    </li>
-                                    <li>Select your preferred event categories. We highly recommend subscribing to **Invoices** (CREATE, UPDATE) and **Contacts** (CREATE, UPDATE).</li>
-                                    <li>Click **Save**. This will generate your **Webhook Key** (also known as the signing key) which you can copy to authenticate payloads.</li>
-                                    <li>Click the **Send intent to receive** button to initiate Xero's connection validation handshake and verify your setup is active!</li>
+                                    <li>Log into <strong>Xero Developer Portal</strong> under My Apps, select your App, and open the <strong>Webhooks</strong> tab.</li>
+                                    <li>Paste your live endpoint below into the <strong>Send notifications to</strong> field.</li>
+                                    <li>Subscribe to <strong>Invoices</strong> (CREATE, UPDATE) and click Save!</li>
                                 </ol>
-                                <small style="display: block; font-style: italic; color: #00838f; line-height: 1.4; border-top: 1px solid #80deea; padding-top: 8px;">
-                                    🔒 <strong>Intent-to-Receive Handshake:</strong> To complete the setup, our platform automatically responds to Xero's secure validation checks. Ensure your SSL certificate is trusted (non-self-signed) and running on port 443.
-                                </small>
+                                <div style="margin-top: 12px; background: white; padding: 12px; border-radius: 6px; border: 1px solid #00b0ff;">
+                                    <label style="font-size: 11px; font-weight: bold; color: #006064; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
+                                    <div class="webhook-input-group">
+                                        <input type="text" class="webhook-input" id="wiz-sot-xero-instructions-box-input" readonly value="" data-suffix="/webhooks/billing?client_id={next_id}">
+                                        <button type="button" onclick="copyText('wiz-sot-xero-instructions-box-input', 'wiz-sot-xero-instructions-box-btn')" id="wiz-sot-xero-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-    
-                        <!-- CONDITIONAL INPUT: Zoho Books Setup Instructions -->
                         <div id="sot-zoho_books-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #e8f5e9; border-left: 4px solid #2e7d32; padding: 15px; border-radius: 4px; color: #1b5e20; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                💡 <strong>Zoho Books Webhooks Quick Setup Guide:</strong><br>
+                                💡 <strong>Zoho Books Webhooks Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #1b5e20;">
-                                    <li>Log into your <strong>Zoho Books Account</strong>.</li>
-                                    <li>Go to <strong>Settings (Gear Icon) ➡️ Developer Space ➡️ Webhooks</strong>.</li>
-                                    <li>Click <strong>+ New Webhook</strong>.</li>
-                                    <li>Set Name to <code>LeadGroove Sales Sync</code> and set Module to <strong>Invoices</strong> or <strong>Customer Payments</strong>.</li>
-                                    <li>In the <strong>URL to Notify</strong> field, paste your custom live endpoint (which you can copy on the next success screen):
-                                        <code style="display: block; background: #fff; border: 1px solid #a5d6a7; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #1b5e20;">https://your-agency-app.onrender.com/webhooks/billing?client_id=conversions-[id]</code>
-                                    </li>
-                                    <li>Select trigger events: **Invoice Paid** or **Payment Recorded**. Save your Webhook!</li>
+                                    <li>Go to <strong>Settings ➡️ Developer Space ➡️ Webhooks</strong> in Zoho Books and click <strong>+ New Webhook</strong>.</li>
+                                    <li>Paste your custom endpoint below into <strong>URL to Notify</strong>, set Module to <strong>Invoices</strong>, and select event <strong>Invoice Paid</strong>!</li>
                                 </ol>
+                                <div style="margin-top: 12px; background: white; padding: 12px; border-radius: 6px; border: 1px solid #2e7d32;">
+                                    <label style="font-size: 11px; font-weight: bold; color: #1b5e20; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
+                                    <div class="webhook-input-group">
+                                        <input type="text" class="webhook-input" id="wiz-sot-zoho_books-instructions-box-input" readonly value="" data-suffix="/webhooks/billing?client_id={next_id}">
+                                        <button type="button" onclick="copyText('wiz-sot-zoho_books-instructions-box-input', 'wiz-sot-zoho_books-instructions-box-btn')" id="wiz-sot-zoho_books-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-
-                        <!-- CONDITIONAL INPUT: NetSuite Setup Instructions -->
                         <div id="sot-netsuite-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #eceff1; border-left: 4px solid #455a64; padding: 15px; border-radius: 4px; color: #263238; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                💡 <strong>NetSuite SuiteScript Quick Integration Guide:</strong><br>
+                                💡 <strong>NetSuite SuiteScript Integration Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #37474f;">
-                                    <li>Deploy a minimal **SuiteScript 2.x User Event Script** on your `Invoice` or `CustomerPayment` records.</li>
-                                    <li>On the `afterSubmit` hook, write a script that triggers an outbound HTTP POST to our web receiver:
-                                        <code style="display: block; background: #fff; border: 1px solid #b0bec5; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #37474f;">https://your-agency-app.onrender.com/webhooks/billing?client_id=conversions-[id]</code>
-                                    </li>
-                                    <li>Format your JSON payload to include: `{{"customer_name": invoice.entity, "email": invoice.email, "invoice_number": invoice.id, "amount": invoice.total}}`.</li>
+                                    <li>Deploy a <strong>SuiteScript 2.x User Event Script</strong> on `Invoice` or `CustomerPayment` records.</li>
+                                    <li>On `afterSubmit`, trigger an outbound HTTP POST to your web receiver endpoint below.</li>
                                 </ol>
+                                <div style="margin-top: 12px; background: white; padding: 12px; border-radius: 6px; border: 1px solid #455a64;">
+                                    <label style="font-size: 11px; font-weight: bold; color: #263238; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
+                                    <div class="webhook-input-group">
+                                        <input type="text" class="webhook-input" id="wiz-sot-netsuite-instructions-box-input" readonly value="" data-suffix="/webhooks/billing?client_id={next_id}">
+                                        <button type="button" onclick="copyText('wiz-sot-netsuite-instructions-box-input', 'wiz-sot-netsuite-instructions-box-btn')" id="wiz-sot-netsuite-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-
-                        <!-- CONDITIONAL INPUT: Sage Setup Instructions -->
                         <div id="sot-sage-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #fff3e0; border-left: 4px solid #e65100; padding: 15px; border-radius: 4px; color: #e65100; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
                                 💡 <strong>Sage Accounting Webhooks Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #e65100;">
-                                    <li>Log into your <strong>Sage Developer Account</strong>.</li>
-                                    <li>Configure webhooks under your Active Integration profile.</li>
-                                    <li>Set the destination endpoint URL to your dynamic LeadGrove billing webhook:
-                                        <code style="display: block; background: #fff; border: 1px solid #ffcc80; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #d84315;">https://your-agency-app.onrender.com/webhooks/billing?client_id=conversions-[id]</code>
-                                    </li>
-                                    <li>Subscribe to **sales_invoice.paid** and **payment_received** webhook events to track real-time conversions.</li>
+                                    <li>In Sage Developer Portal, configure webhooks and paste your dynamic endpoint URL below.</li>
+                                    <li>Subscribe to <code>sales_invoice.paid</code> and <code>payment_received</code>!</li>
                                 </ol>
+                                <div style="margin-top: 12px; background: white; padding: 12px; border-radius: 6px; border: 1px solid #e65100;">
+                                    <label style="font-size: 11px; font-weight: bold; color: #e65100; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
+                                    <div class="webhook-input-group">
+                                        <input type="text" class="webhook-input" id="wiz-sot-sage-instructions-box-input" readonly value="" data-suffix="/webhooks/billing?client_id={next_id}">
+                                        <button type="button" onclick="copyText('wiz-sot-sage-instructions-box-input', 'wiz-sot-sage-instructions-box-btn')" id="wiz-sot-sage-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-
-                        <!-- CONDITIONAL INPUT: FreshBooks Setup Instructions -->
                         <div id="sot-freshbooks-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #f3e5f5; border-left: 4px solid #4a148c; padding: 15px; border-radius: 4px; color: #4a148c; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
                                 💡 <strong>FreshBooks Billing Webhooks Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #4a148c;">
-                                    <li>Register your application inside the <strong>FreshBooks Developer Center</strong>.</li>
-                                    <li>Subscribe to webhook notifications for your production account.</li>
-                                    <li>Set the webhook URL endpoint directly to:
-                                        <code style="display: block; background: #fff; border: 1px solid #e1bee7; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #4a148c;">https://your-agency-app.onrender.com/webhooks/billing?client_id=conversions-[id]</code>
-                                    </li>
-                                    <li>Choose trigger event: <code>invoice.payment.create</code> to synchronize billing revenue.</li>
+                                    <li>Subscribe to webhook notifications in FreshBooks Developer Center and paste your endpoint below.</li>
+                                    <li>Set trigger event to <code>invoice.payment.create</code>.</li>
                                 </ol>
+                                <div style="margin-top: 12px; background: white; padding: 12px; border-radius: 6px; border: 1px solid #4a148c;">
+                                    <label style="font-size: 11px; font-weight: bold; color: #4a148c; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
+                                    <div class="webhook-input-group">
+                                        <input type="text" class="webhook-input" id="wiz-sot-freshbooks-instructions-box-input" readonly value="" data-suffix="/webhooks/billing?client_id={next_id}">
+                                        <button type="button" onclick="copyText('wiz-sot-freshbooks-instructions-box-input', 'wiz-sot-freshbooks-instructions-box-btn')" id="wiz-sot-freshbooks-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-
-                        <!-- CONDITIONAL INPUT: Google Sheets Setup Instructions -->
                         <div id="sot-google_sheets-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #efebe9; border-left: 4px solid #4e342e; padding: 15px; border-radius: 4px; color: #4e342e; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
                                 💡 <strong>Google Sheets (Live Sync via Apps Script) Guide:</strong><br>
-                                <p style="margin: 5px 0; font-size: 12px;">Sync your spreadsheet rows instantly with this pre-built script:</p>
                                 <ol style="padding-left: 20px; font-size: 12px; color: #4e342e;">
-                                    <li>Open your Google Sheet, click on <strong>Extensions ➡️ Apps Script</strong>.</li>
-                                    <li>Wipe any default code and copy-paste the snippet below:
-                                        <pre style="background: white; border: 1px solid #d7ccc8; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 10px; overflow-x: auto; color: #3e2723; max-height: 160px;">function onEdit(e) {{
-  var sheet = e.source.getActiveSheet();
-  var range = e.range;
-  if (range.getColumn() == 5 && range.getValue() == "Paid") {{
-    var row = range.getRow();
-    var payload = {{
-      customer_name: sheet.getRange(row, 1).getValue(),
-      email: sheet.getRange(row, 2).getValue(),
-      invoice_number: sheet.getRange(row, 3).getValue(),
-      amount: parseFloat(sheet.getRange(row, 4).getValue())
-    }};
-    UrlFetchApp.fetch("https://your-agency-app.onrender.com/webhooks/billing?client_id=conversions-[id]", {{
-      method: "POST",
-      contentType: "application/json",
-      payload: JSON.stringify(payload)
-    }});
-  }}
-}}</pre>
-                                    </li>
-                                    <li>Replace the placeholders inside quotes with your actual row indexes, and hit Save! When a row's column 5 updates to "Paid", it sends the conversion instantly!</li>
+                                    <li>Open your Google Sheet, click <strong>Extensions ➡️ Apps Script</strong>.</li>
+                                    <li>Copy-paste the Apps Script snippet below and save!</li>
                                 </ol>
+                                <div style="margin-top: 12px; background: white; padding: 12px; border-radius: 6px; border: 1px solid #4e342e;">
+                                    <label style="font-size: 11px; font-weight: bold; color: #4e342e; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
+                                    <div class="webhook-input-group">
+                                        <input type="text" class="webhook-input" id="wiz-sot-google_sheets-instructions-box-input" readonly value="" data-suffix="/webhooks/billing?client_id={next_id}">
+                                        <button type="button" onclick="copyText('wiz-sot-google_sheets-instructions-box-input', 'wiz-sot-google_sheets-instructions-box-btn')" id="wiz-sot-google_sheets-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-
-                        <!-- CONDITIONAL INPUT: Zapier Setup Instructions -->
                         <div id="sot-zapier-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #fffde7; border-left: 4px solid #fbc02d; padding: 15px; border-radius: 4px; color: #f57f17; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
                                 💡 <strong>Webhooks by Zapier Custom Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #e65100;">
                                     <li>In your Zapier account, create a new Zap.</li>
-                                    <li>**Trigger:** Select any platform of choice (e.g. Stripe, PayPal, Shopify).</li>
-                                    <li>**Action:** Search for **"Webhooks by Zapier"** and select **Custom Request** or **POST**.</li>
-                                    <li>**URL Endpoint:** Paste your dynamic tracking endpoint:
-                                        <code style="display: block; background: #fff; border: 1px solid #fff59d; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 11px; margin-top: 5px; color: #e65100;">https://your-agency-app.onrender.com/webhooks/billing?client_id=conversions-[id]</code>
-                                        <small style="color: #666;">(Use `/webhooks/crm` if setting up lead qualification steps rather than sales)</small>
-                                    </li>
-                                    <li>**Payload Mapping:** Map your trigger's payload attributes into our standard database keys:
-                                        <ul style="list-style-type: disc; padding-left: 15px; margin-top: 4px;">
-                                            <li><code>customer_name</code>: Name of the contact</li>
-                                            <li><code>email</code>: Email of the customer</li>
-                                            <li><code>phone</code>: Customer phone number</li>
-                                            <li><code>amount</code>: The numeric value of the sale</li>
-                                        </ul>
-                                    </li>
+                                    <li><strong>Trigger:</strong> Select your platform (Stripe, PayPal, Shopify, custom CRM).</li>
+                                    <li><strong>Action:</strong> Select <strong>Webhooks by Zapier (Custom Request or POST)</strong> and paste your endpoint below.</li>
                                 </ol>
+                                <div style="margin-top: 12px; background: white; padding: 12px; border-radius: 6px; border: 1px solid #fbc02d;">
+                                    <label style="font-size: 11px; font-weight: bold; color: #f57f17; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
+                                    <div class="webhook-input-group">
+                                        <input type="text" class="webhook-input" id="wiz-sot-zapier-instructions-box-input" readonly value="" data-suffix="/webhooks/billing?client_id={next_id}">
+                                        <button type="button" onclick="copyText('wiz-sot-zapier-instructions-box-input', 'wiz-sot-zapier-instructions-box-btn')" id="wiz-sot-zapier-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-    
-                        <!-- CONDITIONAL INPUT: CRM Lead status tags (ServiceTitan, Housecall Pro) -->
+
+<!-- CONDITIONAL INPUT: CRM Lead status tags (ServiceTitan, Housecall Pro) -->
                         <div id="sot-lead-tags-box" class="conditional-box">
                             <label for="crm_lead_tags">Which tags/statuses under <strong>Leads</strong> signify qualification?</label>
                             <input type="text" id="crm_lead_tags" placeholder="e.g. job-booked, estimate-given, dispatched">
