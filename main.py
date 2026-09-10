@@ -3763,22 +3763,120 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             <!-- SECTION 5: Active Webhooks read-only deck -->
                             <div class="section-title" style="margin-top: 30px;">🔑 Live Webhooks & Integration URLs</div>
                             
-                            <!-- Automated Google Sheets & Google Ads Scheduled Fetch Feed Cards -->
-                            <div class="webhook-card" id="sheets-feed-webhook-card" style="border-left: 4px solid #34A853;">
-                                <div class="webhook-title" style="color: #1e7e34;">📊 Automated Google Sheets & Google Ads Feed (Standard Conversions)</div>
-                                <div class="webhook-desc">Use this live CSV feed URL inside Google Sheets via <code>=IMPORTDATA("...")</code> or directly inside Google Ads under <strong>Goals ➡️ Conversions ➡️ Uploads ➡️ Schedules</strong> for automated 24/7 offline conversion syncing!</div>
+                            <!-- SECTION A: Google Sheets Export & Ad Platform Scheduled Pulls (Google & Microsoft Ads) -->
+                            <div class="webhook-card" id="sheets-export-webhook-card" style="border-left: 4px solid #34A853;">
+                                <div class="webhook-title" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; color: #1e7e34;">
+                                    <span>📊 Section A: Google Sheets Export & Ad Platform Scheduled Pulls (Google & Microsoft Ads)</span>
+                                    
+                                    <!-- Interactive Speech Bubble Tooltip for Google Sheets & Scheduled Pull Setup -->
+                                    <span class="tooltip-icon" style="font-size: 16px; cursor: help; color: #1e7e34; margin-left: auto;">
+                                        💬
+                                        <span class="tooltip-text" style="width: 410px; max-width: 88vw; background-color: #ffffff; color: #333333; border: 2px solid #34A853; border-radius: 8px; padding: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); font-size: 12px; line-height: 1.5; bottom: 125%; right: 0; left: auto; margin-left: 0;">
+                                            <div style="font-size: 13px; font-weight: bold; color: #1e7e34; margin-bottom: 8px; border-bottom: 1px solid #c8e6c9; padding-bottom: 5px; display: flex; align-items: center; gap: 6px;">
+                                                📗 Google Sheets Export & Ad Platform Scheduled Pull Guide
+                                            </div>
+                                            
+                                            <strong style="color: #1b5e20;">1. Exporting & Editing Data in Google Sheets:</strong>
+                                            <ol style="margin: 4px 0 10px 0; padding-left: 18px; color: #444; font-size: 11px; line-height: 1.4;">
+                                                <li>Open a Google Sheet (or go to <a href="https://sheets.new" target="_blank" style="color: #1e7e34; font-weight: bold; text-decoration: underline;">sheets.new</a>).</li>
+                                                <li>Click cell <strong>A1</strong> and paste this formula:
+                                                    <code style="display: block; background: #e8f5e9; color: #1b5e20; border: 1px solid #a5d6a7; padding: 4px 6px; border-radius: 4px; font-family: monospace; font-size: 10px; margin-top: 3px; word-break: break-all;">=IMPORTDATA("https://your-agency-app.onrender.com/feeds/google-conversions.csv?client_id={active_client_id}")</code>
+                                                </li>
+                                                <li>Google Sheets automatically populates your live conversion data across columns:</li>
+                                            </ol>
+
+                                            <!-- Graphic / Visual Layout Diagram -->
+                                            <div style="background: #f8f9fa; border: 1px solid #a5d6a7; border-radius: 6px; padding: 6px; margin: 6px 0 12px 0;">
+                                                <div style="display: flex; align-items: center; gap: 5px; font-weight: bold; color: #1b5e20; font-size: 10px; margin-bottom: 4px;">
+                                                    <span style="background: #34A853; color: white; padding: 1px 5px; border-radius: 3px; font-size: 9px; font-family: monospace;">fx</span>
+                                                    =IMPORTDATA("...")
+                                                </div>
+                                                <table style="width: 100%; border-collapse: collapse; font-size: 9px; text-align: center; border: 1px solid #c8e6c9; background: white;">
+                                                    <thead>
+                                                        <tr style="background: #e8f5e9; color: #1b5e20;">
+                                                            <th style="border: 1px solid #a5d6a7; padding: 2px;">A</th>
+                                                            <th style="border: 1px solid #a5d6a7; padding: 2px;">B</th>
+                                                            <th style="border: 1px solid #a5d6a7; padding: 2px;">C</th>
+                                                            <th style="border: 1px solid #a5d6a7; padding: 2px;">D</th>
+                                                            <th style="border: 1px solid #a5d6a7; padding: 2px;">E</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <tr style="color: #555; background: #fafafa; font-weight: bold;">
+                                                            <td style="border: 1px solid #e0e0e0; padding: 2px;">GCLID / ID</td>
+                                                            <td style="border: 1px solid #e0e0e0; padding: 2px;">Name</td>
+                                                            <td style="border: 1px solid #e0e0e0; padding: 2px;">Time</td>
+                                                            <td style="border: 1px solid #e0e0e0; padding: 2px;">Value</td>
+                                                            <td style="border: 1px solid #e0e0e0; padding: 2px;">Currency</td>
+                                                        </tr>
+                                                        <tr style="color: #2e7d32;">
+                                                            <td style="border: 1px solid #e0e0e0; padding: 2px;">EAIaIQ...</td>
+                                                            <td style="border: 1px solid #e0e0e0; padding: 2px;">Offline Sale</td>
+                                                            <td style="border: 1px solid #e0e0e0; padding: 2px;">2026-09-09...</td>
+                                                            <td style="border: 1px solid #e0e0e0; padding: 2px;">450.00</td>
+                                                            <td style="border: 1px solid #e0e0e0; padding: 2px;">USD</td>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+
+                                            <strong style="color: #1b5e20;">2. Sending Data from Google Sheet to Ad Platforms via Scheduled Pull:</strong>
+                                            <ul style="margin: 4px 0 0 0; padding-left: 18px; color: #444; font-size: 11px; line-height: 1.4; list-style-type: disc;">
+                                                <li style="margin-bottom: 6px;"><strong>Google Ads Scheduled Pull:</strong> Go to <strong>Goals ➡️ Conversions ➡️ Uploads ➡️ Schedules</strong>, click <strong>+</strong>, select <strong>Google Sheets</strong> as Source, choose your Google Sheet URL, set frequency to <strong>Every 24 hours</strong>, and save!</li>
+                                                <li><strong>Microsoft (Bing) Ads Scheduled Pull:</strong> Go to <strong>Tools ➡️ Conversion Goals ➡️ Offline Conversions ➡️ Schedules</strong>, click <strong>Create Schedule</strong>, select <strong>Google Sheets</strong>, link your Sheet URL, set daily fetch, and save!</li>
+                                            </ul>
+                                        </span>
+                                    </span>
+                                </div>
+                                <div class="webhook-desc">Use this live feed URL in Google Sheets via <code>=IMPORTDATA("...")</code> to view and edit conversion data, then configure <strong>Google Ads & Microsoft Ads</strong> to automatically pull data from that Google Sheet on a recurring schedule!</div>
                                 <div class="webhook-input-group">
                                     <input type="text" class="webhook-input" id="sheets-feed-webhook" readonly value="" data-suffix="/feeds/google-conversions.csv?client_id={active_client_id}">
-                                    <button type="button" onclick="copyText('sheets-feed-webhook', 'sheets-feed-copy-btn')" id="sheets-feed-copy-btn" class="btn-copy" style="background-color: #34A853;">📋 Copy Conversions Feed URL</button>
+                                    <button type="button" onclick="copyText('sheets-feed-webhook', 'sheets-feed-copy-btn')" id="sheets-feed-copy-btn" class="btn-copy" style="background-color: #34A853;">📋 Copy Google Sheets Feed URL</button>
                                 </div>
                             </div>
-                            
-                            <div class="webhook-card" id="sheets-adj-feed-webhook-card" style="border-left: 4px solid #37474F;">
-                                <div class="webhook-title" style="color: #37474F;">⚙️ Automated Google Sheets & Google Ads Feed (Conversion Adjustments & Retractions)</div>
-                                <div class="webhook-desc">Use this live CSV feed URL in Google Sheets via <code>=IMPORTDATA("...")</code> or directly in Google Ads under <strong>Goals ➡️ Conversions ➡️ Uploads ➡️ Schedules (Adjustments tab)</strong> for automated 24/7 retractions and value restatements!</div>
+
+                            <!-- SECTION B: Direct HTTP Scheduled Imports (Google Ads, Microsoft Ads & Meta Ads) -->
+                            <div class="webhook-card" id="direct-http-feed-webhook-card" style="border-left: 4px solid #1a237e;">
+                                <div class="webhook-title" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; color: #1a237e;">
+                                    <span>⚡ Section B: Direct HTTP Scheduled Imports (Google Ads, Microsoft Ads & Meta Ads)</span>
+                                    
+                                    <!-- Interactive Speech Bubble Tooltip for Direct HTTP Imports -->
+                                    <span class="tooltip-icon" style="font-size: 16px; cursor: help; color: #1a237e; margin-left: auto;">
+                                        💬
+                                        <span class="tooltip-text" style="width: 410px; max-width: 88vw; background-color: #ffffff; color: #333333; border: 2px solid #1a237e; border-radius: 8px; padding: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); font-size: 12px; line-height: 1.5; bottom: 125%; right: 0; left: auto; margin-left: 0;">
+                                            <div style="font-size: 13px; font-weight: bold; color: #1a237e; margin-bottom: 8px; border-bottom: 1px solid #c5cae9; padding-bottom: 5px; display: flex; align-items: center; gap: 6px;">
+                                                ⚡ Direct HTTP Scheduled Import Instructions
+                                            </div>
+                                            
+                                            <strong style="color: #1a237e;">1. Google Ads Direct HTTP Import:</strong>
+                                            <ol style="margin: 4px 0 8px 0; padding-left: 18px; color: #444; font-size: 11px; line-height: 1.4;">
+                                                <li>In Google Ads, navigate to <strong>Goals ➡️ Conversions ➡️ Uploads ➡️ Schedules</strong>.</li>
+                                                <li>Click <strong>+ (Plus)</strong>, select <strong>HTTPS</strong> as Source, and paste your live LeadGrove URL below.</li>
+                                                <li>Set frequency to <strong>Every 24 hours</strong> and save! <em>(Use the Adjustments URL under the Adjustments tab for retractions).</em></li>
+                                            </ol>
+
+                                            <strong style="color: #00A4EF;">2. Microsoft Ads Direct HTTP Import:</strong>
+                                            <ol style="margin: 4px 0 8px 0; padding-left: 18px; color: #444; font-size: 11px; line-height: 1.4;">
+                                                <li>In Microsoft Advertising, go to <strong>Tools ➡️ Conversion Goals ➡️ Offline Conversions ➡️ Schedules</strong>.</li>
+                                                <li>Click <strong>Create Schedule</strong>, select <strong>HTTPS / Feed URL</strong>, paste your LeadGrove feed URL, set daily fetch, and save!</li>
+                                            </ol>
+
+                                            <strong style="color: #1877F2;">3. Meta (Facebook) Ads Scheduled Feed Import:</strong>
+                                            <ol style="margin: 4px 0 0 0; padding-left: 18px; color: #444; font-size: 11px; line-height: 1.4;">
+                                                <li>In Meta Events Manager, go to <strong>Data Sources ➡️ Add Events ➡️ Offline Events / Feed URL</strong>.</li>
+                                                <li>Select <strong>Scheduled Feed / Feed URL</strong>, paste your LeadGrove feed URL, map columns (<code>fbclid</code>, event name, timestamp, value), and save for 24/7 automated sync!</li>
+                                            </ol>
+                                        </span>
+                                    </span>
+                                </div>
+                                <div class="webhook-desc">Directly fetch live conversion feeds straight from LeadGrove via HTTP scheduled imports in <strong>Google Ads, Microsoft Ads, and Meta Ads</strong> without needing an intermediate spreadsheet!</div>
+                                <div class="webhook-input-group" style="margin-bottom: 10px;">
+                                    <input type="text" class="webhook-input" id="direct-http-conversions-webhook" readonly value="" data-suffix="/feeds/google-conversions.csv?client_id={active_client_id}">
+                                    <button type="button" onclick="copyText('direct-http-conversions-webhook', 'direct-http-conv-copy-btn')" id="direct-http-conv-copy-btn" class="btn-copy" style="background-color: #1a237e;">📋 Copy Standard Conversions HTTP URL</button>
+                                </div>
                                 <div class="webhook-input-group">
-                                    <input type="text" class="webhook-input" id="sheets-adj-feed-webhook" readonly value="" data-suffix="/feeds/google-adjustments.csv?client_id={active_client_id}">
-                                    <button type="button" onclick="copyText('sheets-adj-feed-webhook', 'sheets-adj-feed-copy-btn')" id="sheets-adj-feed-copy-btn" class="btn-copy" style="background-color: #37474F;">📋 Copy Adjustments Feed URL</button>
+                                    <input type="text" class="webhook-input" id="direct-http-adjustments-webhook" readonly value="" data-suffix="/feeds/google-adjustments.csv?client_id={active_client_id}">
+                                    <button type="button" onclick="copyText('direct-http-adjustments-webhook', 'direct-http-adj-copy-btn')" id="direct-http-adj-copy-btn" class="btn-copy" style="background-color: #37474F;">📋 Copy Adjustments Feed HTTP URL</button>
                                 </div>
                             </div>
                             
