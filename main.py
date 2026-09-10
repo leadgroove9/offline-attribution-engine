@@ -4033,7 +4033,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             </div>
                             
                             <!-- CRM webhook (Available if CRM active) -->
-                            <div class="webhook-card" id="crm-webhook-card">
+                            <div class="webhook-card" id="crm-webhook-card" style="display: none;">
                                 <div class="webhook-title" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
                                     <span id="settings-crm-webhook-title">⚙️ CRM Deal/Lead Webhook</span>
                                     
@@ -4054,7 +4054,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             </div>
                             
                             <!-- Billing webhook (Available if Accounting active) -->
-                            <div class="webhook-card" id="billing-webhook-card">
+                            <div class="webhook-card" id="billing-webhook-card" style="display: none;">
                                 <div class="webhook-title" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
                                     <span id="settings-billing-webhook-title">💳 QuickBooks / Xero Billing Webhook</span>
                                     
@@ -4075,7 +4075,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             </div>
                             
                             <!-- Email Forwarder (Available if Email active) -->
-                            <div class="webhook-card" id="email-webhook-card">
+                            <div class="webhook-card" id="email-webhook-card" style="display: none;">
                                 <div class="webhook-title">📧 Inbound Invoice & Booking Email</div>
                                 <div class="webhook-desc">Set up auto-forwarding from your email inbox to send receipts or booking alerts directly to our system for Claude to audit:</div>
                                 <div class="webhook-input-group">
@@ -4809,36 +4809,33 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     }}
                 }}
 
-                function toggleSOTFields() {{
+                                function toggleSOTFields() {{
                     const sotSelect = document.getElementById('source_of_truth');
-                    const selectedText = sotSelect.options[sotSelect.selectedIndex].text;
+                    if (!sotSelect) return;
+                    
+                    const selectedText = sotSelect.options[sotSelect.selectedIndex] ? sotSelect.options[sotSelect.selectedIndex].text : '';
                     const crmTitleSpan = document.getElementById('settings-crm-webhook-title');
                     const billingTitleSpan = document.getElementById('settings-billing-webhook-title');
-                    if (crmTitleSpan) {{{{
+                    if (crmTitleSpan) {{
                         crmTitleSpan.innerText = "⚙️ " + selectedText + " Webhook";
-                    }}}}
-                    if (billingTitleSpan) {{{{
+                    }}
+                    if (billingTitleSpan) {{
                         billingTitleSpan.innerText = "💳 " + selectedText + " Webhook";
-                    }}}}
+                    }}
                     
                     const sot = sotSelect.value;
-                    const leadGenRadio = document.querySelector('input[name="lead_gen_method"]:checked');
-                    const leadGen = leadGenRadio ? leadGenRadio.value : 'both';
                     
                     const dealBox = document.getElementById('sot-deal-tags-box');
                     const leadBox = document.getElementById('sot-lead-tags-box');
                     const emailBox = document.getElementById('sot-email-box');
-                    const hsBox = document.getElementById('sot-hubspot-instructions-box');
                     
-                    const crmCard = document.getElementById('crm-webhook-card');
-                    const billingCard = document.getElementById('billing-webhook-card');
-                    const emailCard = document.getElementById('email-webhook-card');
+                    const hsBox = document.getElementById('sot-hubspot-instructions-box');
                     const salesforceBox = document.getElementById('sot-salesforce-instructions-box');
                     const zohoBox = document.getElementById('sot-zoho-instructions-box');
                     const servicetitanBox = document.getElementById('sot-servicetitan-instructions-box');
                     const housecallproBox = document.getElementById('sot-housecallpro-instructions-box');
                     const ghlBox = document.getElementById('sot-gohighlevel-instructions-box');
-                    const ghlBox = document.getElementById('sot-gohighlevel-instructions-box');
+                    
                     const quickbooksBox = document.getElementById('sot-quickbooks-instructions-box');
                     const xeroBox = document.getElementById('sot-xero-instructions-box');
                     const zohoBooksBox = document.getElementById('sot-zoho_books-instructions-box');
@@ -4848,17 +4845,22 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     const googleSheetsBox = document.getElementById('sot-google_sheets-instructions-box');
                     const zapierBox = document.getElementById('sot-zapier-instructions-box');
                     
+                    const crmCard = document.getElementById('crm-webhook-card');
+                    const billingCard = document.getElementById('billing-webhook-card');
+                    const emailCard = document.getElementById('email-webhook-card');
+                    
                     // Hide all by default
-                    dealBox.style.display = 'none';
-                    leadBox.style.display = 'none';
-                    emailBox.style.display = 'none';
+                    if (dealBox) dealBox.style.display = 'none';
+                    if (leadBox) leadBox.style.display = 'none';
+                    if (emailBox) emailBox.style.display = 'none';
+                    
                     if (hsBox) hsBox.style.display = 'none';
                     if (salesforceBox) salesforceBox.style.display = 'none';
                     if (zohoBox) zohoBox.style.display = 'none';
                     if (servicetitanBox) servicetitanBox.style.display = 'none';
                     if (housecallproBox) housecallproBox.style.display = 'none';
                     if (ghlBox) ghlBox.style.display = 'none';
-                    if (ghlBox) ghlBox.style.display = 'none';
+                    
                     if (quickbooksBox) quickbooksBox.style.display = 'none';
                     if (xeroBox) xeroBox.style.display = 'none';
                     if (zohoBooksBox) zohoBooksBox.style.display = 'none';
@@ -4868,56 +4870,39 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     if (googleSheetsBox) googleSheetsBox.style.display = 'none';
                     if (zapierBox) zapierBox.style.display = 'none';
                     
-                    crmCard.style.display = 'none';
-                    billingCard.style.display = 'none';
-                    emailCard.style.display = 'none';
+                    if (crmCard) crmCard.style.display = 'none';
+                    if (billingCard) billingCard.style.display = 'none';
+                    if (emailCard) emailCard.style.display = 'none';
                     
-                    if (['hubspot', 'salesforce', 'zoho'].includes(sot)) {{
-                        dealBox.style.display = 'block';
-                        crmCard.style.display = 'block';
-                        if (sot === 'hubspot' && hsBox) {{
-                            hsBox.style.display = 'block';
-                        }} else if (sot === 'salesforce' && salesforceBox) {{
-                            salesforceBox.style.display = 'block';
-                        }} else if (sot === 'zoho' && zohoBox) {{
-                            zohoBox.style.display = 'block';
+                    if (['hubspot', 'salesforce', 'zoho', 'servicetitan', 'housecallpro', 'gohighlevel'].includes(sot)) {{
+                        if (crmCard) crmCard.style.display = 'block';
+                        if (['hubspot', 'salesforce', 'zoho', 'gohighlevel'].includes(sot)) {{
+                            if (dealBox) dealBox.style.display = 'block';
                         }}
-                    }} else if (['servicetitan', 'housecallpro'].includes(sot)) {{
-                        leadBox.style.display = 'block';
-                        crmCard.style.display = 'block';
-                        if (sot === 'servicetitan' && servicetitanBox) {{
-                            servicetitanBox.style.display = 'block';
-                        }} else if (sot === 'housecallpro' && housecallproBox) {{
-                            housecallproBox.style.display = 'block';
-                        }} else if (sot === 'gohighlevel' && ghlBox) {{
-                            ghlBox.style.display = 'block';
-                            dealBox.style.display = 'block';
-                            leadBox.style.display = 'block';
+                        if (['servicetitan', 'housecallpro', 'gohighlevel'].includes(sot)) {{
+                            if (leadBox) leadBox.style.display = 'block';
                         }}
+                        if (sot === 'hubspot' && hsBox) hsBox.style.display = 'block';
+                        else if (sot === 'salesforce' && salesforceBox) salesforceBox.style.display = 'block';
+                        else if (sot === 'zoho' && zohoBox) zohoBox.style.display = 'block';
+                        else if (sot === 'servicetitan' && servicetitanBox) servicetitanBox.style.display = 'block';
+                        else if (sot === 'housecallpro' && housecallproBox) housecallproBox.style.display = 'block';
+                        else if (sot === 'gohighlevel' && ghlBox) ghlBox.style.display = 'block';
                     }} else if (['quickbooks', 'xero', 'zoho_books', 'netsuite', 'sage', 'freshbooks', 'google_sheets', 'zapier'].includes(sot)) {{
-                        billingCard.style.display = 'block';
-                        if (sot === 'quickbooks' && quickbooksBox) {{
-                            quickbooksBox.style.display = 'block';
-                        }} else if (sot === 'xero' && xeroBox) {{
-                            xeroBox.style.display = 'block';
-                        }} else if (sot === 'zoho_books' && zohoBooksBox) {{
-                            zohoBooksBox.style.display = 'block';
-                        }} else if (sot === 'netsuite' && netsuiteBox) {{
-                            netsuiteBox.style.display = 'block';
-                        }} else if (sot === 'sage' && sageBox) {{
-                            sageBox.style.display = 'block';
-                        }} else if (sot === 'freshbooks' && freshbooksBox) {{
-                            freshbooksBox.style.display = 'block';
-                        }} else if (sot === 'google_sheets' && googleSheetsBox) {{
-                            googleSheetsBox.style.display = 'block';
-                        }} else if (sot === 'zapier' && zapierBox) {{
-                            zapierBox.style.display = 'block';
-                        }}
-                    }} else if (sot === 'email' || sot === 'ai_rating') {{
-                        emailBox.style.display = 'block';
-                        if (emailCard) {{
-                            emailCard.style.display = sot === 'email' ? 'block' : 'none';
-                        }}
+                        if (billingCard) billingCard.style.display = 'block';
+                        if (sot === 'quickbooks' && quickbooksBox) quickbooksBox.style.display = 'block';
+                        else if (sot === 'xero' && xeroBox) xeroBox.style.display = 'block';
+                        else if (sot === 'zoho_books' && zohoBooksBox) zohoBooksBox.style.display = 'block';
+                        else if (sot === 'netsuite' && netsuiteBox) netsuiteBox.style.display = 'block';
+                        else if (sot === 'sage' && sageBox) sageBox.style.display = 'block';
+                        else if (sot === 'freshbooks' && freshbooksBox) freshbooksBox.style.display = 'block';
+                        else if (sot === 'google_sheets' && googleSheetsBox) googleSheetsBox.style.display = 'block';
+                        else if (sot === 'zapier' && zapierBox) zapierBox.style.display = 'block';
+                    }} else if (sot === 'email') {{
+                        if (emailBox) emailBox.style.display = 'block';
+                        if (emailCard) emailCard.style.display = 'block';
+                    }} else if (sot === 'ai_rating') {{
+                        // Direct AI call auditing active
                     }}
                 }}
 
@@ -7529,18 +7514,21 @@ def add_client_page(request: Request):
                 }}
 
                 function toggleSOTFields() {
-                    const sot = document.getElementById('source_of_truth').value;
-                    const leadGenRadio = document.querySelector('input[name="lead_gen_method"]:checked');
-                    const leadGen = leadGenRadio ? leadGenRadio.value : 'both';
+                    const sotSelect = document.getElementById('source_of_truth');
+                    if (!sotSelect) return;
+                    const sot = sotSelect.value;
                     
                     const dealBox = document.getElementById('sot-deal-tags-box');
                     const leadBox = document.getElementById('sot-lead-tags-box');
                     const emailBox = document.getElementById('sot-email-box');
+                    
                     const hsBox = document.getElementById('sot-hubspot-instructions-box');
                     const salesforceBox = document.getElementById('sot-salesforce-instructions-box');
                     const zohoBox = document.getElementById('sot-zoho-instructions-box');
                     const servicetitanBox = document.getElementById('sot-servicetitan-instructions-box');
                     const housecallproBox = document.getElementById('sot-housecallpro-instructions-box');
+                    const ghlBox = document.getElementById('sot-gohighlevel-instructions-box');
+                    
                     const quickbooksBox = document.getElementById('sot-quickbooks-instructions-box');
                     const xeroBox = document.getElementById('sot-xero-instructions-box');
                     const zohoBooksBox = document.getElementById('sot-zoho_books-instructions-box');
@@ -7550,14 +7538,17 @@ def add_client_page(request: Request):
                     const googleSheetsBox = document.getElementById('sot-google_sheets-instructions-box');
                     const zapierBox = document.getElementById('sot-zapier-instructions-box');
                     
-                    dealBox.style.display = 'none';
-                    leadBox.style.display = 'none';
-                    emailBox.style.display = 'none';
+                    if (dealBox) dealBox.style.display = 'none';
+                    if (leadBox) leadBox.style.display = 'none';
+                    if (emailBox) emailBox.style.display = 'none';
+                    
                     if (hsBox) hsBox.style.display = 'none';
                     if (salesforceBox) salesforceBox.style.display = 'none';
                     if (zohoBox) zohoBox.style.display = 'none';
                     if (servicetitanBox) servicetitanBox.style.display = 'none';
                     if (housecallproBox) housecallproBox.style.display = 'none';
+                    if (ghlBox) ghlBox.style.display = 'none';
+                    
                     if (quickbooksBox) quickbooksBox.style.display = 'none';
                     if (xeroBox) xeroBox.style.display = 'none';
                     if (zohoBooksBox) zohoBooksBox.style.display = 'none';
@@ -7567,49 +7558,33 @@ def add_client_page(request: Request):
                     if (googleSheetsBox) googleSheetsBox.style.display = 'none';
                     if (zapierBox) zapierBox.style.display = 'none';
                     
-                    if (['hubspot', 'salesforce', 'zoho'].includes(sot)) {
-                        dealBox.style.display = 'block';
-                        if (sot === 'hubspot' && hsBox) {
-                            hsBox.style.display = 'block';
-                        } else if (sot === 'salesforce' && salesforceBox) {
-                            salesforceBox.style.display = 'block';
-                        } else if (sot === 'zoho' && zohoBox) {
-                            zohoBox.style.display = 'block';
+                    if (['hubspot', 'salesforce', 'zoho', 'servicetitan', 'housecallpro', 'gohighlevel'].includes(sot)) {
+                        if (['hubspot', 'salesforce', 'zoho', 'gohighlevel'].includes(sot)) {
+                            if (dealBox) dealBox.style.display = 'block';
                         }
-} else if (['servicetitan', 'housecallpro'].includes(sot)) {
-                        leadBox.style.display = 'block';
-                        if (sot === 'servicetitan' && servicetitanBox) {
-                            servicetitanBox.style.display = 'block';
-                        } else if (sot === 'housecallpro' && housecallproBox) {
-                            housecallproBox.style.display = 'block';
-                        } else if (sot === 'gohighlevel' && ghlBox) {
-                            ghlBox.style.display = 'block';
-                            dealBox.style.display = 'block';
-                            leadBox.style.display = 'block';
+                        if (['servicetitan', 'housecallpro', 'gohighlevel'].includes(sot)) {
+                            if (leadBox) leadBox.style.display = 'block';
                         }
+                        if (sot === 'hubspot' && hsBox) hsBox.style.display = 'block';
+                        else if (sot === 'salesforce' && salesforceBox) salesforceBox.style.display = 'block';
+                        else if (sot === 'zoho' && zohoBox) zohoBox.style.display = 'block';
+                        else if (sot === 'servicetitan' && servicetitanBox) servicetitanBox.style.display = 'block';
+                        else if (sot === 'housecallpro' && housecallproBox) housecallproBox.style.display = 'block';
+                        else if (sot === 'gohighlevel' && ghlBox) ghlBox.style.display = 'block';
                     } else if (['quickbooks', 'xero', 'zoho_books', 'netsuite', 'sage', 'freshbooks', 'google_sheets', 'zapier'].includes(sot)) {
-                        if (sot === 'quickbooks' && quickbooksBox) {
-                            quickbooksBox.style.display = 'block';
-                        } else if (sot === 'xero' && xeroBox) {
-                            xeroBox.style.display = 'block';
-                        } else if (sot === 'zoho_books' && zohoBooksBox) {
-                            zohoBooksBox.style.display = 'block';
-                        } else if (sot === 'netsuite' && netsuiteBox) {
-                            netsuiteBox.style.display = 'block';
-                        } else if (sot === 'sage' && sageBox) {
-                            sageBox.style.display = 'block';
-                        } else if (sot === 'freshbooks' && freshbooksBox) {
-                            freshbooksBox.style.display = 'block';
-                        } else if (sot === 'google_sheets' && googleSheetsBox) {
-                            googleSheetsBox.style.display = 'block';
-                        } else if (sot === 'zapier' && zapierBox) {
-                            zapierBox.style.display = 'block';
-                        }
-                    } else if (sot === 'email' || sot === 'ai_rating') {
-                        emailBox.style.display = 'block';
+                        if (sot === 'quickbooks' && quickbooksBox) quickbooksBox.style.display = 'block';
+                        else if (sot === 'xero' && xeroBox) xeroBox.style.display = 'block';
+                        else if (sot === 'zoho_books' && zohoBooksBox) zohoBooksBox.style.display = 'block';
+                        else if (sot === 'netsuite' && netsuiteBox) netsuiteBox.style.display = 'block';
+                        else if (sot === 'sage' && sageBox) sageBox.style.display = 'block';
+                        else if (sot === 'freshbooks' && freshbooksBox) freshbooksBox.style.display = 'block';
+                        else if (sot === 'google_sheets' && googleSheetsBox) googleSheetsBox.style.display = 'block';
+                        else if (sot === 'zapier' && zapierBox) zapierBox.style.display = 'block';
+                    } else if (sot === 'email') {
+                        if (emailBox) emailBox.style.display = 'block';
                     }
                 }
-                
+
                 function showErrorAlert(text) {
                     const alertBox = document.getElementById('alert-box');
                     alertBox.innerText = text;
