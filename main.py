@@ -4298,39 +4298,32 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     const inputEl = document.getElementById('callrail-webhook');
                     const origin = window.location.origin || '';
                     
+                    let ctSuffix = "/webhooks/callrail?client_id={active_client_id}";
                     if (provider === 'callrail') {{
                         crBox.style.display = 'flex';
                         ctmBox.style.display = 'none';
                         wcBox.style.display = 'none';
                         if (titleEl) titleEl.innerHTML = "📞 CallRail CallCompleted Webhook";
                         if (descEl) descEl.innerHTML = "Paste this dynamic endpoint into CallRail Integration Settings to sync automated call recordings and transcripts:";
-                        if (inputEl) {{
-                            const suffix = "/webhooks/callrail?client_id={active_client_id}";
-                            inputEl.setAttribute('data-suffix', suffix);
-                            inputEl.value = origin + suffix;
-                        }}
+                        ctSuffix = "/webhooks/callrail?client_id={active_client_id}";
                     }} else if (provider === 'calltrackingmetrics') {{
                         crBox.style.display = 'none';
                         ctmBox.style.display = 'flex';
                         wcBox.style.display = 'none';
                         if (titleEl) titleEl.innerHTML = "📞 CallTrackingMetrics Transcription Webhook";
                         if (descEl) descEl.innerHTML = "Paste this dynamic endpoint into CallTrackingMetrics webhook setup to sync automated call recordings and transcripts:";
-                        if (inputEl) {{
-                            const suffix = "/webhooks/calltrackingmetrics?client_id={active_client_id}";
-                            inputEl.setAttribute('data-suffix', suffix);
-                            inputEl.value = origin + suffix;
-                        }}
+                        ctSuffix = "/webhooks/calltrackingmetrics?client_id={active_client_id}";
                     }} else if (provider === 'whatconverts') {{
                         crBox.style.display = 'none';
                         ctmBox.style.display = 'none';
                         wcBox.style.display = 'flex';
                         if (titleEl) titleEl.innerHTML = "📞 WhatConverts CallCompleted Webhook";
                         if (descEl) descEl.innerHTML = "Paste this dynamic endpoint into WhatConverts webhook setup to sync automated call recordings and transcripts:";
-                        if (inputEl) {{
-                            const suffix = "/webhooks/whatconverts?client_id={active_client_id}";
-                            inputEl.setAttribute('data-suffix', suffix);
-                            inputEl.value = origin + suffix;
-                        }}
+                        ctSuffix = "/webhooks/whatconverts?client_id={active_client_id}";
+                    }}
+                    if (inputEl) {{
+                        inputEl.setAttribute('data-suffix', ctSuffix);
+                        inputEl.value = origin + ctSuffix;
                     }}
                 }}
                 
@@ -4383,7 +4376,6 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     const snapchatAds = document.getElementById('snapchat_ads_id').value.trim();
                     const chatgptAds = document.getElementById('chatgpt_ads_id').value.trim();
                     const redditAds = document.getElementById('reddit_ads_id').value.trim();
-                            const redditAds = document.getElementById('reddit_ads_id').value.trim();
                     
                     let blocks = [];
                     
@@ -4902,8 +4894,8 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         let arr = [];
                         let quote = false;
                         let cell = "";
-                        for (let i = 0; i < line.length; i++) {{
-                            let char = line[i];
+                        for (let colIdx = 0; colIdx < line.length; colIdx++) {{
+                            let char = line[colIdx];
                             if (char === '"') {{
                                 quote = !quote;
                             }} else if (char === ',' && !quote) {{
@@ -6915,47 +6907,11 @@ def add_client_page(request: Request):
                     if (direction === 1) {
                         if (currentStep === 1) {
                             const name = document.getElementById('name').value.trim();
-                            const g_ads = document.getElementById('google_ads_customer_id').value.trim();
-                            const fb_ads = document.getElementById('facebook_ads_id').value.trim();
-                            const li_ads = document.getElementById('linkedin_ads_id').value.trim();
-                            const ms_ads = document.getElementById('microsoft_ads_id').value.trim();
-                            const tt_ads = document.getElementById('tiktok_ads_id').value.trim();
-                            const tw_ads = document.getElementById('twitter_ads_id').value.trim();
-                            const pin_ads = document.getElementById('pinterest_ads_id').value.trim();
-                            const sc_ads = document.getElementById('snapchat_ads_id').value.trim();
-                            const gpt_ads = document.getElementById('chatgpt_ads_id').value.trim();
-                            const provider = document.getElementById('call_tracking_provider').value;
-                            
                             if (!name) {
-                                showErrorAlert('Please fill out Client Business Name.');
+                                showErrorAlert('Please fill out Client Business Name to continue.');
                                 return;
                             }
-                            
-                            const hasAdPlatform = g_ads || fb_ads || li_ads || ms_ads || tt_ads || tw_ads || pin_ads || sc_ads || gpt_ads;
-                            if (!hasAdPlatform) {
-                                showErrorAlert('Please enter at least one Ad Platform ID (e.g. Google Ads, Facebook, LinkedIn, Microsoft, TikTok, X, Pinterest, Snapchat, or ChatGPT Ads).');
-                                return;
-                            }
-                            
-                            if (provider === 'callrail') {
-                                const callrail = document.getElementById('callrail_company_id').value.trim();
-                                if (!callrail) {
-                                    showErrorAlert('Please enter your CallRail Client ID (Company ID).');
-                                    return;
-                                }
-                            } else if (provider === 'calltrackingmetrics') {
-                                const ctm = document.getElementById('ctm_profile_id').value.trim();
-                                if (!ctm) {
-                                    showErrorAlert('Please enter your CallTrackingMetrics Client ID (Profile ID).');
-                                    return;
-                                }
-                            } else if (provider === 'whatconverts') {
-                                const wc = document.getElementById('wc_profile_id').value.trim();
-                                if (!wc) {
-                                    showErrorAlert('Please enter your WhatConverts Client ID (Profile ID).');
-                                    return;
-                                }
-                            }
+                            hideErrorAlert();
                         }
                     }
                     
@@ -7011,8 +6967,8 @@ def add_client_page(request: Request):
                         let arr = [];
                         let quote = false;
                         let cell = "";
-                        for (let i = 0; i < line.length; i++) {
-                            let char = line[i];
+                        for (let colIdx = 0; colIdx < line.length; colIdx++) {
+                            let char = line[colIdx];
                             if (char === '"') {
                                 quote = !quote;
                             } else if (char === ',' && !quote) {
@@ -7152,7 +7108,6 @@ def add_client_page(request: Request):
                     const snapchatAds = document.getElementById('snapchat_ads_id').value.trim();
                     const chatgptAds = document.getElementById('chatgpt_ads_id').value.trim();
                     const redditAds = document.getElementById('reddit_ads_id').value.trim();
-                            const redditAds = document.getElementById('reddit_ads_id').value.trim();
                     
                     let blocks = [];
                     
@@ -7516,6 +7471,8 @@ def add_client_page(request: Request):
                 }
                 
                 async function submitWizard() {
+                    let sotUrlGroup = null;
+
                     const alertBox = document.getElementById('alert-box');
                     const nextBtn = document.getElementById('next-btn');
                     const form = document.getElementById('onboarding-form');
@@ -7551,18 +7508,6 @@ def add_client_page(request: Request):
                         twitter_ads_id: document.getElementById('twitter_ads_id').value.trim(),
                         pinterest_ads_id: document.getElementById('pinterest_ads_id').value.trim(),
                         snapchat_ads_id: document.getElementById('snapchat_ads_id').value.trim(),
-                        snapchat_ads_id: document.getElementById('snapchat_ads_id').value.trim(),
-                        chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
-                        reddit_ads_id: document.getElementById('reddit_ads_id').value.trim(),
-                        chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
-                        reddit_ads_id: document.getElementById('reddit_ads_id').value.trim(),
-                        tiktok_ads_id: document.getElementById('tiktok_ads_id').value.trim(),
-                        twitter_ads_id: document.getElementById('twitter_ads_id').value.trim(),
-                        pinterest_ads_id: document.getElementById('pinterest_ads_id').value.trim(),
-                        snapchat_ads_id: document.getElementById('snapchat_ads_id').value.trim(),
-                        snapchat_ads_id: document.getElementById('snapchat_ads_id').value.trim(),
-                        chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
-                        reddit_ads_id: document.getElementById('reddit_ads_id').value.trim(),
                         chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
                         reddit_ads_id: document.getElementById('reddit_ads_id').value.trim(),
                         lead_gen_method: document.querySelector('input[name="lead_gen_method"]:checked').value,
@@ -7636,19 +7581,19 @@ def add_client_page(request: Request):
                             if (payload.source_of_truth === 'ai_rating') {
                                 sotLabel.innerHTML = `⚡ <strong>Step 3: Direct AI Call Auditing Active!</strong><br>Since your Single Source of Truth is set to <strong>AI Rating</strong>, we have automatically fetched and audited your client's past 90 days CallRail history! Proceed directly to the dashboard to inspect their conversion upload sheets.`;
                                 // Set dummy or instructions for URL input, or just hide the input block
-                                const sotUrlGroup = document.getElementById('sot-webhook-input').parentNode;
+                                sotUrlGroup = document.getElementById('sot-webhook-input') ? document.getElementById('sot-webhook-input').parentNode : null;
                                 if (sotUrlGroup) sotUrlGroup.style.display = 'none';
                                 sotBox.style.display = 'block';
                                 
                                 // Auto-forwarding instruction if they configure email verification under AI Rating mode
                                 if ((payload.lead_gen_method === 'both' || payload.lead_gen_method === 'form') && payload.email_account) {
-                                    const host = window.location.host;
-                                    const emailDomain = host.includes('localhost') ? 'your-agency.com' : host.replace('www.', '').split(':')[0];
-                                    sotEmailAddress.value = `conversions-${data.client_id}@${emailDomain}`;
+                                    const wHost = window.location.host;
+                                    const wEmailDomain = wHost.includes('localhost') ? 'your-agency.com' : wHost.replace('www.', '').split(':')[0];
+                                    sotEmailAddress.value = `conversions-${data.client_id}@${wEmailDomain}`;
                                     sotEmailBox.style.display = 'block';
                                 }
                             } else if (['hubspot', 'salesforce', 'zoho', 'servicetitan', 'housecallpro', 'gohighlevel'].includes(payload.source_of_truth)) {
-                                const sotUrlGroup = document.getElementById('sot-webhook-input').parentNode;
+                                sotUrlGroup = document.getElementById('sot-webhook-input') ? document.getElementById('sot-webhook-input').parentNode : null;
                                 if (sotUrlGroup) sotUrlGroup.style.display = 'flex';
                                 sotLabel.innerHTML = `⚙️ <strong>Step 3: Connect Your ${payload.source_of_truth.toUpperCase()} CRM Webhook</strong><br>Copy this webhook URL and paste it into your CRM's Developer Settings or configure it in Zapier to trigger when a Lead or Deal is updated:`;
                                 sotUrlInput.value = `${window.location.origin}/webhooks/crm?client_id=${data.client_id}`;
