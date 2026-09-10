@@ -454,6 +454,7 @@ def init_db():
         ("pinterest_ads_id", "TEXT"),
         ("snapchat_ads_id", "TEXT"),
         ("chatgpt_ads_id", "TEXT"),
+        ("reddit_ads_id", "TEXT"),
         ("linkedin_ads_id", "TEXT"),
         ("microsoft_ads_id", "TEXT"),
         ("lead_gen_method", "TEXT"),
@@ -551,6 +552,7 @@ def init_db():
         ("pin_clid", "TEXT"),
         ("scclid", "TEXT"),
         ("gptclid", "TEXT"),
+        ("rdt_cid", "TEXT"),
         ("li_fat_id", "TEXT"),
         ("msclkid", "TEXT"),
         ("match_fuzzy", "TEXT DEFAULT 'NO'"),
@@ -834,6 +836,7 @@ class FormLead(BaseModel):
     pin_clid: Optional[str] = None
     scclid: Optional[str] = None
     gptclid: Optional[str] = None
+    rdt_cid: Optional[str] = None
 
 
 class ExcludedCustomer(BaseModel):
@@ -860,6 +863,7 @@ class ClientCreate(BaseModel):
     snapchat_ads_id: Optional[str] = ""
     snapchat_ads_id: Optional[str] = ""
     chatgpt_ads_id: Optional[str] = ""
+    reddit_ads_id: Optional[str] = ""
     linkedin_ads_id: Optional[str] = ""
     microsoft_ads_id: Optional[str] = ""
     lead_gen_method: str
@@ -1605,7 +1609,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
         cursor = conn.cursor()
         
         # 1. Fetch All Available Clients for the Dropdown Selector
-        cursor.execute("SELECT id, name, google_ads_customer_id, facebook_ads_id, linkedin_ads_id, microsoft_ads_id, tiktok_ads_id, twitter_ads_id, pinterest_ads_id, chatgpt_ads_id FROM clients ORDER BY name ASC")
+        cursor.execute("SELECT id, name, google_ads_customer_id, facebook_ads_id, linkedin_ads_id, microsoft_ads_id, tiktok_ads_id, twitter_ads_id, pinterest_ads_id, chatgpt_ads_id, reddit_ads_id FROM clients ORDER BY name ASC")
         clients = cursor.fetchall()
         
         # Determine filtering
@@ -1626,7 +1630,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
         if selected_client_id == 0:
             # Multi-Client (All Clients) View - Join with clients table to display client names
             cursor.execute("""
-                SELECT s.id, s.phone, s.email, s.name, s.company, s.gclid, s.source, s.qualified, s.sale_closed, s.value, s.reason, s.created_at, c.name, s.fbclid, s.li_fat_id, s.msclkid, s.match_fuzzy, s.certainty_score, s.ttclid, s.twclid, s.pin_clid, s.scclid, s.gptclid, s.adjusted, s.adjusted_value, s.adjustment_type, s.adjusted_at
+                SELECT s.id, s.phone, s.email, s.name, s.company, s.gclid, s.source, s.qualified, s.sale_closed, s.value, s.reason, s.created_at, c.name, s.fbclid, s.li_fat_id, s.msclkid, s.match_fuzzy, s.certainty_score, s.ttclid, s.twclid, s.pin_clid, s.scclid, s.gptclid, s.rdt_cid, s.adjusted, s.adjusted_value, s.adjustment_type, s.adjusted_at
                 FROM sessions s
                 LEFT JOIN clients c ON s.client_id = c.id
                 ORDER BY s.created_at DESC
@@ -1637,7 +1641,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
         else:
             # Single-Client Filtered View
             cursor.execute("""
-                SELECT s.id, s.phone, s.email, s.name, s.company, s.gclid, s.source, s.qualified, s.sale_closed, s.value, s.reason, s.created_at, c.name, s.fbclid, s.li_fat_id, s.msclkid, s.match_fuzzy, s.certainty_score, s.ttclid, s.twclid, s.pin_clid, s.scclid, s.gptclid, s.adjusted, s.adjusted_value, s.adjustment_type, s.adjusted_at
+                SELECT s.id, s.phone, s.email, s.name, s.company, s.gclid, s.source, s.qualified, s.sale_closed, s.value, s.reason, s.created_at, c.name, s.fbclid, s.li_fat_id, s.msclkid, s.match_fuzzy, s.certainty_score, s.ttclid, s.twclid, s.pin_clid, s.scclid, s.gptclid, s.rdt_cid, s.adjusted, s.adjusted_value, s.adjustment_type, s.adjusted_at
                 FROM sessions s
                 LEFT JOIN clients c ON s.client_id = c.id
                 WHERE s.client_id = ?
@@ -1671,23 +1675,24 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
     exportable_pinterest = sum(1 for r in rows if len(r) > 20 and r[20] and (r[7] == 'YES' or r[8] == 'YES'))
     exportable_snapchat = sum(1 for r in rows if len(r) > 21 and r[21] and (r[7] == 'YES' or r[8] == 'YES'))
     exportable_chatgpt = sum(1 for r in rows if len(r) > 22 and r[22] and (r[7] == 'YES' or r[8] == 'YES'))
+    exportable_reddit = sum(1 for r in rows if len(r) > 23 and r[23] and (r[7] == 'YES' or r[8] == 'YES'))
 
     # Generate the Selector Dropdown Options
     dropdown_options = ""
     if user_client_id is not None:
         restricted_clients = [c for c in clients if c[0] == user_client_id]
-        for c_id, c_name, c_ads, c_fb, c_li, c_ms, c_tt, c_tw, c_pin, c_gpt in restricted_clients:
+        for c_id, c_name, c_ads, c_fb, c_li, c_ms, c_tt, c_tw, c_pin, c_gpt, c_rdt in restricted_clients:
             dropdown_options += f'<option value="{c_id}" selected>👤 {c_name} (Ads: {c_ads})</option>'
     else:
         dropdown_options = f'<option value="0" {"selected" if selected_client_id == 0 else ""}>📂 [Show All Clients / Agency View]</option>'
-        for c_id, c_name, c_ads, c_fb, c_li, c_ms, c_tt, c_tw, c_pin, c_gpt in clients:
+        for c_id, c_name, c_ads, c_fb, c_li, c_ms, c_tt, c_tw, c_pin, c_gpt, c_rdt in clients:
             is_selected = "selected" if selected_client_id == c_id else ""
             dropdown_options += f'<option value="{c_id}" {is_selected}>👤 {c_name} (Ads: {c_ads})</option>'
 
     # Convert rows to table items
     table_rows_html = ""
     for r in rows:
-        id_val, phone, email, name, company, gclid, source, qualified, sale_closed, value, reason, created_at, client_name_linked, fbclid, li_fat_id, msclkid, match_fuzzy, certainty_score, ttclid, twclid, pin_clid, scclid, gptclid, adjusted, adjusted_value, adjustment_type, adjusted_at = r
+        id_val, phone, email, name, company, gclid, source, qualified, sale_closed, value, reason, created_at, client_name_linked, fbclid, li_fat_id, msclkid, match_fuzzy, certainty_score, ttclid, twclid, pin_clid, scclid, gptclid, rdt_cid, adjusted, adjusted_value, adjustment_type, adjusted_at = r
         
         qual_badge = '<span style="background: #e8f5e9; color: #2e7d32; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 12px;">YES</span>' if qualified == 'YES' else '<span style="background: #ffebee; color: #c62828; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 12px;">NO</span>'
         
@@ -1721,6 +1726,8 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
             click_ids_list.append(f'<span style="display:inline-block; margin-bottom: 2px;"><strong style="color: #E9B800; background: #000; padding: 1px 3px; border-radius: 2px; font-size: 10px;">SC:</strong> <code style="background: #f1f3f4; padding: 1px 4px; border-radius: 3px; font-size: 11px; display: inline-block; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;" title="{scclid}">{scclid}</code></span>')
         if gptclid:
             click_ids_list.append(f'<span style="display:inline-block; margin-bottom: 2px;"><strong style="color: #10a37f; font-size: 10px;">GPT:</strong> <code style="background: #f1f3f4; padding: 1px 4px; border-radius: 3px; font-size: 11px; display: inline-block; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;" title="{gptclid}">{gptclid}</code></span>')
+        if rdt_cid:
+            click_ids_list.append(f'<span style="display:inline-block; margin-bottom: 2px;"><strong style="color: #FF4500; font-size: 10px;">Reddit:</strong> <code style="background: #f1f3f4; padding: 1px 4px; border-radius: 3px; font-size: 11px; display: inline-block; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;" title="{rdt_cid}">{rdt_cid}</code></span>')
             
         click_ids_display = "<br>".join(click_ids_list) if click_ids_list else '<span style="color: #999; font-style: italic;">None detected</span>'
         if adjusted == 'YES' and adjustment_type == 'RETRACT':
@@ -1803,6 +1810,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
         pinterest_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Pinterest conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
         snapchat_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Snapchat conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
         chatgpt_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their ChatGPT Ads conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
+        reddit_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Reddit Ads conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
     else:
         google_export_button = f'<a href="/dashboard/export/google?client_id={selected_client_id}" class="btn-export" style="background-color: #4285F4; text-align: center; text-decoration: none; width: 100%;">📥 Download Google CSV ({exportable_google})</a>'
         google_adjustments_button = f'<a href="/dashboard/export/google-adjustments?client_id={selected_client_id}" class="btn-export" style="background-color: #37474F; text-align: center; text-decoration: none; width: 100%;">📥 Download Google Adjustments CSV ({exportable_adjustments})</a>'
@@ -1836,6 +1844,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
         pinterest_export_button = f'<a href="/dashboard/export/pinterest?client_id={selected_client_id}" class="btn-export" style="background-color: #E60023; text-align: center; text-decoration: none; width: 100%;">📥 Download Pinterest CSV ({exportable_pinterest})</a>'
         snapchat_export_button = f'<a href="/dashboard/export/snapchat?client_id={selected_client_id}" class="btn-export" style="background-color: #E9B800; color: #000; text-align: center; text-decoration: none; width: 100%;">📥 Download Snapchat CSV ({exportable_snapchat})</a>'
         chatgpt_export_button = f'<a href="/dashboard/export/chatgpt?client_id={selected_client_id}" class="btn-export" style="background-color: #10a37f; text-align: center; text-decoration: none; width: 100%;">📥 Download ChatGPT CSV ({exportable_chatgpt})</a>'
+        reddit_export_button = f'<a href="/dashboard/export/reddit?client_id={selected_client_id}" class="btn-export" style="background-color: #FF4500; text-align: center; text-decoration: none; width: 100%;">📥 Download Reddit CSV ({exportable_reddit})</a>'
 
     # Conditionally show the Client header column
     client_th_html = '<th>Client Account</th>' if selected_client_id == 0 else ''
@@ -2046,6 +2055,15 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                         "Click on the **Upload Offline CSV Match** button.",
                         "Select your downloaded ChatGPT Ads conversions CSV file.",
                         "Verify target mapping fields (ChatGPT Click ID, Event Name) and click <strong>Apply</strong>."
+                    ];
+                } else if (platform === 'reddit') {
+                    title = "🔴 Reddit Ads Offline Conversion Upload Guide";
+                    headerBg = "#FF4500";
+                    path = "Reddit Ads Manager ➡️ Events Manager ➡️ Offline Conversions";
+                    steps = [
+                        "Click the <strong>Upload Conversions (CSV)</strong> button inside Events Manager.",
+                        "Select your downloaded Reddit Ads conversions CSV file.",
+                        "Verify field mappings (<code>rdt_cid</code>, Event Name, Value, Currency) and click <strong>Submit</strong>."
                     ];
                 } else if (platform === 'google-adjustments') {
                     title = "⚙️ Google Ads Offline Adjustments Guide";
@@ -2491,6 +2509,15 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                             {chatgpt_export_button}
                             <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('chatgpt')" style="color: #10a37f; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;">📋 Instructions for uploading</a></div>
                         </div>
+                        <!-- Reddit Ads -->
+                        <div class="export-card">
+                            <div>
+                                <h4 style="color: #FF4500;">Reddit Ads (rdt_cid)</h4>
+                                <p>Export verified offline lead and purchase conversions directly into Reddit Ads Manager.</p>
+                            </div>
+                            {reddit_export_button}
+                            <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('reddit')" style="color: #FF4500; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;">📋 Instructions for uploading</a></div>
+                        </div>
                         <!-- Google Ads Adjustments -->
                         <div class="export-card">
                             <div>
@@ -2632,6 +2659,7 @@ class ClientUpdate(BaseModel):
     snapchat_ads_id: Optional[str] = ""
     snapchat_ads_id: Optional[str] = ""
     chatgpt_ads_id: Optional[str] = ""
+    reddit_ads_id: Optional[str] = ""
     linkedin_ads_id: Optional[str] = ""
     microsoft_ads_id: Optional[str] = ""
     lead_gen_method: str
@@ -3270,6 +3298,10 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                     <label for="chatgpt_ads_id">ChatGPT Ads ID</label>
                                     <input type="text" id="chatgpt_ads_id" value="{client_data.get("chatgpt_ads_id", "") or ""}" placeholder="e.g. gpt_pixel_123">
                                 </div>
+                                <div class="form-group">
+                                    <label for="reddit_ads_id">Reddit Ads Account / Pixel ID</label>
+                                    <input type="text" id="reddit_ads_id" value="{client_data.get("reddit_ads_id", "") or ""}" placeholder="e.g. rdt_pixel_456">
+                                </div>
                             </div>
                             
                             <div class="form-row">
@@ -3838,7 +3870,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             <!-- SECTION C: Zapier Multi-Network Conversions API Export (TikTok, X, Pinterest, Snapchat, LinkedIn & ChatGPT Ads) -->
                             <div class="webhook-card" id="zapier-capi-export-card" style="border-left: 4px solid #FF4F00;">
                                 <div class="webhook-title" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; color: #E65100;">
-                                    <span>⚡ Section C: Zapier Multi-Network Conversions API Export (TikTok, X, Pinterest, Snapchat, LinkedIn & ChatGPT Ads)</span>
+                                    <span>⚡ Section C: Zapier Multi-Network Conversions API Export (Reddit, TikTok, X, Pinterest, Snapchat, LinkedIn & ChatGPT Ads)</span>
                                     
                                     <!-- Interactive Speech Bubble Tooltip for Zapier CAPI Export Setup -->
                                     <span class="tooltip-icon" style="font-size: 16px; cursor: help; color: #FF4F00; margin-left: auto;">
@@ -3899,6 +3931,11 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                                             <td style="border: 1px solid #eee; padding: 3px; font-weight: bold;">🧠 ChatGPT Ads</td>
                                                             <td style="border: 1px solid #eee; padding: 3px; font-family: monospace; color: #00796b;">gptclid</td>
                                                             <td style="border: 1px solid #eee; padding: 3px;">Webhooks POST Custom</td>
+                                                        </tr>
+                                                        <tr style="color: #FF4500;">
+                                                            <td style="border: 1px solid #eee; padding: 3px; font-weight: bold;">🔴 Reddit Ads</td>
+                                                            <td style="border: 1px solid #eee; padding: 3px; font-family: monospace; color: #FF4500;">rdt_cid</td>
+                                                            <td style="border: 1px solid #eee; padding: 3px;">Reddit Conversions API</td>
                                                         </tr>
                                                     </tbody>
                                                 </table>
@@ -4339,6 +4376,8 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     const pinterestAds = document.getElementById('pinterest_ads_id').value.trim();
                     const snapchatAds = document.getElementById('snapchat_ads_id').value.trim();
                     const chatgptAds = document.getElementById('chatgpt_ads_id').value.trim();
+                    const redditAds = document.getElementById('reddit_ads_id').value.trim();
+                            const redditAds = document.getElementById('reddit_ads_id').value.trim();
                     
                     let blocks = [];
                     
@@ -4375,6 +4414,21 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             </div>
                         `);
                     }}
+                    if (redditAds) {{
+                        blocks.push(`
+                            <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #FF4500; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                                <h4 style="margin-top: 0; color: #FF4500; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                                    🔴 Reddit Ads Goal Setup (ID: ${{redditAds}})
+                                </h4>
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
+                                    <li style="margin-bottom: 8px;">Log into your <strong>Reddit Ads Manager</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Go to <strong>Events Manager ➡️ Custom Conversion Events</strong>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 1 (Qualification):</strong> Create event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>, event type <strong>Lead</strong>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 2 (Offline Sale):</strong> Create event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>, event type <strong>Purchase</strong> with dynamic currency mapping.</li>
+                                </ol>
+                            </div>
+                        `);
+                    }}
 
                     
                     if (facebookAds) {{
@@ -4403,6 +4457,21 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                     <li style="margin-bottom: 8px;">Go to <strong>Conversion Event Manager</strong> and click <strong>Create Custom Conversion Goal</strong>.</li>
                                     <li style="margin-bottom: 8px;"><strong>Goal 1 (Qualification):</strong> Name the custom offline event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>. Under action, select <strong>Lead</strong>, and set tracing to utilize secure CSV match.</li>
                                     <li style="margin-bottom: 8px;"><strong>Goal 2 (Offline Sale):</strong> Create another custom event. Name it <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>, choose event type <strong>Purchase</strong>, and ensure dynamic revenue mapping is selected.</li>
+                                </ol>
+                            </div>
+                        `);
+                    }}
+                    if (redditAds) {{
+                        blocks.push(`
+                            <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #FF4500; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                                <h4 style="margin-top: 0; color: #FF4500; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                                    🔴 Reddit Ads Goal Setup (ID: ${{redditAds}})
+                                </h4>
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
+                                    <li style="margin-bottom: 8px;">Log into your <strong>Reddit Ads Manager</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Go to <strong>Events Manager ➡️ Custom Conversion Events</strong>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 1 (Qualification):</strong> Create event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>, event type <strong>Lead</strong>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 2 (Offline Sale):</strong> Create event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>, event type <strong>Purchase</strong> with dynamic currency mapping.</li>
                                 </ol>
                             </div>
                         `);
@@ -4443,6 +4512,21 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             </div>
                         `);
                     }}
+                    if (redditAds) {{
+                        blocks.push(`
+                            <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #FF4500; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                                <h4 style="margin-top: 0; color: #FF4500; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                                    🔴 Reddit Ads Goal Setup (ID: ${{redditAds}})
+                                </h4>
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
+                                    <li style="margin-bottom: 8px;">Log into your <strong>Reddit Ads Manager</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Go to <strong>Events Manager ➡️ Custom Conversion Events</strong>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 1 (Qualification):</strong> Create event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>, event type <strong>Lead</strong>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 2 (Offline Sale):</strong> Create event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>, event type <strong>Purchase</strong> with dynamic currency mapping.</li>
+                                </ol>
+                            </div>
+                        `);
+                    }}
 
                     
                     if (microsoftAds) {{
@@ -4472,6 +4556,21 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                     <li style="margin-bottom: 8px;">Go to <strong>Conversion Event Manager</strong> and click <strong>Create Custom Conversion Goal</strong>.</li>
                                     <li style="margin-bottom: 8px;"><strong>Goal 1 (Qualification):</strong> Name the custom offline event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>. Under action, select <strong>Lead</strong>, and set tracing to utilize secure CSV match.</li>
                                     <li style="margin-bottom: 8px;"><strong>Goal 2 (Offline Sale):</strong> Create another custom event. Name it <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>, choose event type <strong>Purchase</strong>, and ensure dynamic revenue mapping is selected.</li>
+                                </ol>
+                            </div>
+                        `);
+                    }}
+                    if (redditAds) {{
+                        blocks.push(`
+                            <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #FF4500; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                                <h4 style="margin-top: 0; color: #FF4500; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                                    🔴 Reddit Ads Goal Setup (ID: ${{redditAds}})
+                                </h4>
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
+                                    <li style="margin-bottom: 8px;">Log into your <strong>Reddit Ads Manager</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Go to <strong>Events Manager ➡️ Custom Conversion Events</strong>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 1 (Qualification):</strong> Create event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>, event type <strong>Lead</strong>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 2 (Offline Sale):</strong> Create event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>, event type <strong>Purchase</strong> with dynamic currency mapping.</li>
                                 </ol>
                             </div>
                         `);
@@ -4512,6 +4611,21 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             </div>
                         `);
                     }}
+                    if (redditAds) {{
+                        blocks.push(`
+                            <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #FF4500; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                                <h4 style="margin-top: 0; color: #FF4500; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                                    🔴 Reddit Ads Goal Setup (ID: ${{redditAds}})
+                                </h4>
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
+                                    <li style="margin-bottom: 8px;">Log into your <strong>Reddit Ads Manager</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Go to <strong>Events Manager ➡️ Custom Conversion Events</strong>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 1 (Qualification):</strong> Create event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>, event type <strong>Lead</strong>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 2 (Offline Sale):</strong> Create event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>, event type <strong>Purchase</strong> with dynamic currency mapping.</li>
+                                </ol>
+                            </div>
+                        `);
+                    }}
 
                     
                     if (twitterAds) {{
@@ -4544,6 +4658,21 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                     <li style="margin-bottom: 8px;">Go to <strong>Conversion Event Manager</strong> and click <strong>Create Custom Conversion Goal</strong>.</li>
                                     <li style="margin-bottom: 8px;"><strong>Goal 1 (Qualification):</strong> Name the custom offline event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>. Under action, select <strong>Lead</strong>, and set tracing to utilize secure CSV match.</li>
                                     <li style="margin-bottom: 8px;"><strong>Goal 2 (Offline Sale):</strong> Create another custom event. Name it <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>, choose event type <strong>Purchase</strong>, and ensure dynamic revenue mapping is selected.</li>
+                                </ol>
+                            </div>
+                        `);
+                    }}
+                    if (redditAds) {{
+                        blocks.push(`
+                            <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #FF4500; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                                <h4 style="margin-top: 0; color: #FF4500; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                                    🔴 Reddit Ads Goal Setup (ID: ${{redditAds}})
+                                </h4>
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
+                                    <li style="margin-bottom: 8px;">Log into your <strong>Reddit Ads Manager</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Go to <strong>Events Manager ➡️ Custom Conversion Events</strong>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 1 (Qualification):</strong> Create event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>, event type <strong>Lead</strong>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 2 (Offline Sale):</strong> Create event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>, event type <strong>Purchase</strong> with dynamic currency mapping.</li>
                                 </ol>
                             </div>
                         `);
@@ -4596,6 +4725,21 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                     <li style="margin-bottom: 8px;">Go to <strong>Conversion Event Manager</strong> and click <strong>Create Custom Conversion Goal</strong>.</li>
                                     <li style="margin-bottom: 8px;"><strong>Goal 1 (Qualification):</strong> Name the custom offline event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>. Under action, select <strong>Lead</strong>, and set tracing to utilize secure CSV match.</li>
                                     <li style="margin-bottom: 8px;"><strong>Goal 2 (Offline Sale):</strong> Create another custom event. Name it <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>, choose event type <strong>Purchase</strong>, and ensure dynamic revenue mapping is selected.</li>
+                                </ol>
+                            </div>
+                        `);
+                    }}
+                    if (redditAds) {{
+                        blocks.push(`
+                            <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #FF4500; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                                <h4 style="margin-top: 0; color: #FF4500; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                                    🔴 Reddit Ads Goal Setup (ID: ${{redditAds}})
+                                </h4>
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
+                                    <li style="margin-bottom: 8px;">Log into your <strong>Reddit Ads Manager</strong>.</li>
+                                    <li style="margin-bottom: 8px;">Go to <strong>Events Manager ➡️ Custom Conversion Events</strong>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 1 (Qualification):</strong> Create event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>, event type <strong>Lead</strong>.</li>
+                                    <li style="margin-bottom: 8px;"><strong>Goal 2 (Offline Sale):</strong> Create event <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>, event type <strong>Purchase</strong> with dynamic currency mapping.</li>
                                 </ol>
                             </div>
                         `);
@@ -5035,14 +5179,18 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         snapchat_ads_id: document.getElementById('snapchat_ads_id').value.trim(),
                         snapchat_ads_id: document.getElementById('snapchat_ads_id').value.trim(),
                         chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
+                        reddit_ads_id: document.getElementById('reddit_ads_id').value.trim(),
                         chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
+                        reddit_ads_id: document.getElementById('reddit_ads_id').value.trim(),
                         tiktok_ads_id: document.getElementById('tiktok_ads_id').value.trim(),
                         twitter_ads_id: document.getElementById('twitter_ads_id').value.trim(),
                         pinterest_ads_id: document.getElementById('pinterest_ads_id').value.trim(),
                         snapchat_ads_id: document.getElementById('snapchat_ads_id').value.trim(),
                         snapchat_ads_id: document.getElementById('snapchat_ads_id').value.trim(),
                         chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
+                        reddit_ads_id: document.getElementById('reddit_ads_id').value.trim(),
                         chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
+                        reddit_ads_id: document.getElementById('reddit_ads_id').value.trim(),
                         lead_gen_method: document.querySelector('input[name="lead_gen_method"]:checked').value,
                         qualification_criteria: document.getElementById('qualification_criteria').value,
                         source_of_truth: document.getElementById('source_of_truth').value,
@@ -5516,6 +5664,7 @@ def update_client_settings(request: Request, client: ClientUpdate):
             "pinterest_ads_id": "Pinterest Ads ID",
             "snapchat_ads_id": "Snapchat Ads Pixel ID",
             "chatgpt_ads_id": "ChatGPT Ads ID",
+            "reddit_ads_id": "Reddit Ads Account / Pixel ID",
             "lead_gen_method": "Lead Gen Method",
             "qualification_criteria": "Qualification Criteria Option",
             "source_of_truth": "Single Source of Truth",
@@ -5546,6 +5695,7 @@ def update_client_settings(request: Request, client: ClientUpdate):
             "pinterest_ads_id": client.pinterest_ads_id or "",
             "snapchat_ads_id": client.snapchat_ads_id or "",
             "chatgpt_ads_id": client.chatgpt_ads_id or "",
+            "reddit_ads_id": client.reddit_ads_id or "",
             "lead_gen_method": client.lead_gen_method,
             "qualification_criteria": client.qualification_criteria,
             "source_of_truth": client.source_of_truth,
@@ -5583,6 +5733,7 @@ def update_client_settings(request: Request, client: ClientUpdate):
                 pinterest_ads_id = ?,
                 snapchat_ads_id = ?,
                 chatgpt_ads_id = ?,
+                reddit_ads_id = ?,
                 lead_gen_method = ?,
                 qualification_criteria = ?,
                 source_of_truth = ?,
@@ -5990,6 +6141,10 @@ def add_client_page(request: Request):
                             <div class="form-group">
                                 <label for="chatgpt_ads_id">ChatGPT Ads ID</label>
                                 <input type="text" id="chatgpt_ads_id" placeholder="e.g. gpt_pixel_123">
+                            </div>
+                            <div class="form-group">
+                                <label for="reddit_ads_id">Reddit Ads Account / Pixel ID</label>
+                                <input type="text" id="reddit_ads_id" placeholder="e.g. rdt_pixel_456">
                             </div>
                             <div class="form-group" style="visibility: hidden;">
                                 <!-- Spacer -->
@@ -7014,6 +7169,8 @@ def add_client_page(request: Request):
                     const pinterestAds = document.getElementById('pinterest_ads_id').value.trim();
                     const snapchatAds = document.getElementById('snapchat_ads_id').value.trim();
                     const chatgptAds = document.getElementById('chatgpt_ads_id').value.trim();
+                    const redditAds = document.getElementById('reddit_ads_id').value.trim();
+                            const redditAds = document.getElementById('reddit_ads_id').value.trim();
                     
                     let blocks = [];
                     
@@ -7420,14 +7577,18 @@ def add_client_page(request: Request):
                         snapchat_ads_id: document.getElementById('snapchat_ads_id').value.trim(),
                         snapchat_ads_id: document.getElementById('snapchat_ads_id').value.trim(),
                         chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
+                        reddit_ads_id: document.getElementById('reddit_ads_id').value.trim(),
                         chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
+                        reddit_ads_id: document.getElementById('reddit_ads_id').value.trim(),
                         tiktok_ads_id: document.getElementById('tiktok_ads_id').value.trim(),
                         twitter_ads_id: document.getElementById('twitter_ads_id').value.trim(),
                         pinterest_ads_id: document.getElementById('pinterest_ads_id').value.trim(),
                         snapchat_ads_id: document.getElementById('snapchat_ads_id').value.trim(),
                         snapchat_ads_id: document.getElementById('snapchat_ads_id').value.trim(),
                         chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
+                        reddit_ads_id: document.getElementById('reddit_ads_id').value.trim(),
                         chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
+                        reddit_ads_id: document.getElementById('reddit_ads_id').value.trim(),
                         lead_gen_method: document.querySelector('input[name="lead_gen_method"]:checked').value,
                         qualification_criteria: document.getElementById('qualification_criteria').value,
                         source_of_truth: document.getElementById('source_of_truth').value,
@@ -7737,7 +7898,7 @@ def backfill_historical_callrail_leads(client_id: int, qualification_criteria_co
         
         cursor.execute("""
             INSERT INTO sessions (
-                client_id, phone, name, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, gptclid, source, qualified, sale_closed, value, reason, model_used, raw_data, created_at
+                client_id, phone, name, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, gptclid, rdt_cid, source, qualified, sale_closed, value, reason, model_used, raw_data, created_at
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
@@ -8684,6 +8845,67 @@ def export_pinterest_conversions(request: Request, client_id: int):
     }
     return StreamingResponse(output, headers=headers)
 
+
+@app.get("/dashboard/export/reddit")
+def export_reddit_conversions(request: Request, client_id: int):
+    email = is_authenticated(request)
+    if not email:
+        return RedirectResponse(url="/login", status_code=303)
+    """
+    Exports qualified and closed conversions that have a valid rdt_cid
+    into a Reddit Ads-compliant Offline Conversions CSV format.
+    """
+    try:
+        conn = db_router.connect()
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT name, reddit_ads_id FROM clients WHERE id = ?", (client_id,))
+        client_row = cursor.fetchone()
+        if not client_row:
+            raise HTTPException(status_code=400, detail="Invalid client ID")
+        
+        client_name = client_row[0]
+        pixel_id = client_row[1] or ""
+        
+        cursor.execute("""
+            SELECT rdt_cid, qualified, sale_closed, value, created_at
+            FROM sessions
+            WHERE client_id = ? AND rdt_cid IS NOT NULL AND rdt_cid != '' AND (qualified = 'YES' OR sale_closed = 'YES')
+            ORDER BY created_at DESC
+        """, (client_id,))
+        rows = cursor.fetchall()
+        conn.close()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    writer.writerow(["rdt_cid", "Event Name", "Event Time", "Value", "Currency", "Reddit Ads ID"])
+    
+    for r in rows:
+        rdt_cid, qualified, sale_closed, value, created_at = r
+        conv_time = f"{created_at} +0000" if created_at else ""
+        
+        if sale_closed == 'YES':
+            event_name = "LeadGroove Offline Sale"
+            event_val = float(value or 0.0)
+        else:
+            event_name = "LeadGroove Qualified Lead"
+            event_val = 1.0
+            
+        writer.writerow([rdt_cid, event_name, conv_time, f"{event_val:.2f}", "USD", pixel_id])
+            
+    output.seek(0)
+    safe_filename = re.sub(r'\s+', '-', client_name.strip().lower())
+    
+    headers = {
+        'Content-Disposition': f'attachment; filename="reddit_ads_conversions_{safe_filename}.csv"',
+        'Content-Type': 'text/csv'
+    }
+    return StreamingResponse(output, headers=headers)
+
+
 @app.get("/dashboard/export/chatgpt")
 def export_chatgpt_conversions(request: Request, client_id: int):
     email = is_authenticated(request)
@@ -9168,6 +9390,7 @@ async def receive_calltrackingmetrics_webhook(request: Request, client_id: Optio
         pin_clid = payload.get('pin_clid') or payload.get('pinterest_click_id')
         scclid = payload.get('scclid') or payload.get('snapchat_click_id')
         gptclid = payload.get('gptclid') or payload.get('chatgpt_click_id')
+        rdt_cid = payload.get('rdt_cid') or payload.get('reddit_click_id') or payload.get('rdt_click_id')
         
         landing_page = payload.get('landing_page_url') or payload.get('landing_page') or ""
         referrer_url = payload.get('referrer_url') or payload.get('referring_url') or ""
@@ -9190,6 +9413,8 @@ async def receive_calltrackingmetrics_webhook(request: Request, client_id: Optio
             scclid = extract_param_from_url(landing_page, 'scclid') or extract_param_from_url(referrer_url, 'scclid')
         if not gptclid:
             gptclid = extract_param_from_url(landing_page, 'gptclid') or extract_param_from_url(referrer_url, 'gptclid')
+        if not rdt_cid:
+            rdt_cid = extract_param_from_url(landing_page, 'rdt_cid') or extract_param_from_url(referrer_url, 'rdt_cid')
         if not ttclid:
             ttclid = extract_param_from_url(landing_page, 'ttclid') or extract_param_from_url(referrer_url, 'ttclid')
         if not twclid:
@@ -9200,6 +9425,8 @@ async def receive_calltrackingmetrics_webhook(request: Request, client_id: Optio
             scclid = extract_param_from_url(landing_page, 'scclid') or extract_param_from_url(referrer_url, 'scclid')
         if not gptclid:
             gptclid = extract_param_from_url(landing_page, 'gptclid') or extract_param_from_url(referrer_url, 'gptclid')
+        if not rdt_cid:
+            rdt_cid = extract_param_from_url(landing_page, 'rdt_cid') or extract_param_from_url(referrer_url, 'rdt_cid')
         if not ttclid:
             ttclid = extract_param_from_url(landing_page, 'ttclid') or extract_param_from_url(referrer_url, 'ttclid')
         if not twclid:
@@ -9210,6 +9437,8 @@ async def receive_calltrackingmetrics_webhook(request: Request, client_id: Optio
             scclid = extract_param_from_url(landing_page, 'scclid') or extract_param_from_url(referrer_url, 'scclid')
         if not gptclid:
             gptclid = extract_param_from_url(landing_page, 'gptclid') or extract_param_from_url(referrer_url, 'gptclid')
+        if not rdt_cid:
+            rdt_cid = extract_param_from_url(landing_page, 'rdt_cid') or extract_param_from_url(referrer_url, 'rdt_cid')
             
         caller_name = payload.get('caller_name') or payload.get('customer_name') or payload.get('name', 'Unknown Caller')
         raw_phone = payload.get('caller_number') or payload.get('customer_phone_number') or payload.get('phone')
@@ -9273,7 +9502,7 @@ async def receive_calltrackingmetrics_webhook(request: Request, client_id: Optio
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO sessions (
-                client_id, phone, name, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, gptclid, source, qualified, sale_closed, value, reason, model_used, raw_data
+                client_id, phone, name, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, gptclid, rdt_cid, source, qualified, sale_closed, value, reason, model_used, raw_data
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
@@ -9364,6 +9593,7 @@ async def receive_whatconverts_webhook(request: Request, client_id: Optional[int
         pin_clid = payload.get('pin_clid') or payload.get('pinterest_click_id')
         scclid = payload.get('scclid') or payload.get('snapchat_click_id')
         gptclid = payload.get('gptclid') or payload.get('chatgpt_click_id')
+        rdt_cid = payload.get('rdt_cid') or payload.get('reddit_click_id') or payload.get('rdt_click_id')
         
         landing_page = payload.get('landing_page_url') or payload.get('landing_page') or ""
         referrer_url = payload.get('referrer_url') or payload.get('referring_url') or ""
@@ -9386,6 +9616,8 @@ async def receive_whatconverts_webhook(request: Request, client_id: Optional[int
             scclid = extract_param_from_url(landing_page, 'scclid') or extract_param_from_url(referrer_url, 'scclid')
         if not gptclid:
             gptclid = extract_param_from_url(landing_page, 'gptclid') or extract_param_from_url(referrer_url, 'gptclid')
+        if not rdt_cid:
+            rdt_cid = extract_param_from_url(landing_page, 'rdt_cid') or extract_param_from_url(referrer_url, 'rdt_cid')
         if not ttclid:
             ttclid = extract_param_from_url(landing_page, 'ttclid') or extract_param_from_url(referrer_url, 'ttclid')
         if not twclid:
@@ -9396,6 +9628,8 @@ async def receive_whatconverts_webhook(request: Request, client_id: Optional[int
             scclid = extract_param_from_url(landing_page, 'scclid') or extract_param_from_url(referrer_url, 'scclid')
         if not gptclid:
             gptclid = extract_param_from_url(landing_page, 'gptclid') or extract_param_from_url(referrer_url, 'gptclid')
+        if not rdt_cid:
+            rdt_cid = extract_param_from_url(landing_page, 'rdt_cid') or extract_param_from_url(referrer_url, 'rdt_cid')
         if not ttclid:
             ttclid = extract_param_from_url(landing_page, 'ttclid') or extract_param_from_url(referrer_url, 'ttclid')
         if not twclid:
@@ -9406,6 +9640,8 @@ async def receive_whatconverts_webhook(request: Request, client_id: Optional[int
             scclid = extract_param_from_url(landing_page, 'scclid') or extract_param_from_url(referrer_url, 'scclid')
         if not gptclid:
             gptclid = extract_param_from_url(landing_page, 'gptclid') or extract_param_from_url(referrer_url, 'gptclid')
+        if not rdt_cid:
+            rdt_cid = extract_param_from_url(landing_page, 'rdt_cid') or extract_param_from_url(referrer_url, 'rdt_cid')
             
         caller_name = payload.get('caller_name') or payload.get('customer_name') or payload.get('name', 'Unknown Caller')
         raw_phone = payload.get('caller_phone') or payload.get('caller_number') or payload.get('phone_number') or payload.get('phone')
@@ -9469,7 +9705,7 @@ async def receive_whatconverts_webhook(request: Request, client_id: Optional[int
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO sessions (
-                client_id, phone, name, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, gptclid, source, qualified, sale_closed, value, reason, model_used, raw_data
+                client_id, phone, name, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, gptclid, rdt_cid, source, qualified, sale_closed, value, reason, model_used, raw_data
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
@@ -9563,6 +9799,7 @@ async def receive_callrail_webhook(request: Request, client_id: Optional[int] = 
         pin_clid = payload.get('pin_clid') or payload.get('pinterest_click_id')
         scclid = payload.get('scclid') or payload.get('snapchat_click_id')
         gptclid = payload.get('gptclid') or payload.get('chatgpt_click_id')
+        rdt_cid = payload.get('rdt_cid') or payload.get('reddit_click_id') or payload.get('rdt_click_id')
         
         # Fallback to milestones block if top-level fields are missing in payload
         milestones = payload.get("milestones")
@@ -9608,6 +9845,8 @@ async def receive_callrail_webhook(request: Request, client_id: Optional[int] = 
             scclid = extract_param_from_url(landing_page, 'scclid') or extract_param_from_url(referrer_url, 'scclid')
         if not gptclid:
             gptclid = extract_param_from_url(landing_page, 'gptclid') or extract_param_from_url(referrer_url, 'gptclid')
+        if not rdt_cid:
+            rdt_cid = extract_param_from_url(landing_page, 'rdt_cid') or extract_param_from_url(referrer_url, 'rdt_cid')
         if not ttclid:
             ttclid = extract_param_from_url(landing_page, 'ttclid') or extract_param_from_url(referrer_url, 'ttclid')
         if not twclid:
@@ -9618,6 +9857,8 @@ async def receive_callrail_webhook(request: Request, client_id: Optional[int] = 
             scclid = extract_param_from_url(landing_page, 'scclid') or extract_param_from_url(referrer_url, 'scclid')
         if not gptclid:
             gptclid = extract_param_from_url(landing_page, 'gptclid') or extract_param_from_url(referrer_url, 'gptclid')
+        if not rdt_cid:
+            rdt_cid = extract_param_from_url(landing_page, 'rdt_cid') or extract_param_from_url(referrer_url, 'rdt_cid')
         if not ttclid:
             ttclid = extract_param_from_url(landing_page, 'ttclid') or extract_param_from_url(referrer_url, 'ttclid')
         if not twclid:
@@ -9628,6 +9869,8 @@ async def receive_callrail_webhook(request: Request, client_id: Optional[int] = 
             scclid = extract_param_from_url(landing_page, 'scclid') or extract_param_from_url(referrer_url, 'scclid')
         if not gptclid:
             gptclid = extract_param_from_url(landing_page, 'gptclid') or extract_param_from_url(referrer_url, 'gptclid')
+        if not rdt_cid:
+            rdt_cid = extract_param_from_url(landing_page, 'rdt_cid') or extract_param_from_url(referrer_url, 'rdt_cid')
             
         caller_name = payload.get('customer_name', 'Unknown Caller')
         raw_phone = payload.get('customer_phone_number')
@@ -9707,7 +9950,7 @@ async def receive_callrail_webhook(request: Request, client_id: Optional[int] = 
         
         cursor.execute("""
             INSERT INTO sessions (
-                client_id, phone, name, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, gptclid, source, qualified, sale_closed, value, reason, model_used, raw_data
+                client_id, phone, name, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, gptclid, rdt_cid, source, qualified, sale_closed, value, reason, model_used, raw_data
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
@@ -9789,7 +10032,7 @@ async def receive_form_lead(lead: FormLead, client_id: Optional[int] = None):
         conn = db_router.connect()
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO sessions (client_id, phone, email, name, company, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, gptclid, source, qualified, sale_closed, reason)
+            INSERT INTO sessions (client_id, phone, email, name, company, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, gptclid, rdt_cid, source, qualified, sale_closed, reason)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             resolved_client_id, 
