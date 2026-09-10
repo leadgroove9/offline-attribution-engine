@@ -3838,6 +3838,59 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                     <input type="text" id="email_account" value="{client_data.get("email_account", "") or ""}" placeholder="e.g. bookings@clientcompany.com">
                                 </div>
                             </div>
+
+                            <!-- SOT Dynamic Webhook Card (Positioned directly under SOT Selection) -->
+                            <!-- CRM webhook (Available if CRM active) -->
+                            <div class="webhook-card" id="crm-webhook-card" style="display: none; margin-top: 15px;">
+                                <div class="webhook-title" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                                    <span id="settings-crm-webhook-title">⚙️ CRM Deal/Lead Webhook</span>
+                                    
+                                    <!-- Check Logs Hover Link -->
+                                    <span class="tooltip-icon" style="font-size: 11px; font-weight: bold; margin-left: auto; cursor: help;">
+                                        <a href="javascript:void(0)" style="color: #1a237e; text-decoration: underline;">check logs</a>
+                                        <span class="tooltip-text" style="width: 290px;">
+                                            <strong>Last 5 Received Payloads:</strong><br>
+                                            {last_crm_logs_html}
+                                        </span>
+                                    </span>
+                                </div>
+                                <div class="webhook-desc">Paste this dynamic endpoint into your CRM or Zapier workflow to push lead updates to LeadGrove:</div>
+                                <div class="webhook-input-group">
+                                    <input type="text" class="webhook-input" id="crm-webhook" readonly value="" data-suffix="/webhooks/crm?client_id={active_client_id}">
+                                    <button type="button" onclick="copyText('crm-webhook', 'crm-copy-btn')" id="crm-copy-btn" class="btn-copy">📋 Copy Webhook URL</button>
+                                </div>
+                            </div>
+                            
+                            <!-- Billing webhook (Available if Accounting active) -->
+                            <div class="webhook-card" id="billing-webhook-card" style="display: none; margin-top: 15px;">
+                                <div class="webhook-title" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                                    <span id="settings-billing-webhook-title">💳 QuickBooks / Xero Billing Webhook</span>
+                                    
+                                    <!-- Check Logs Hover Link -->
+                                    <span class="tooltip-icon" style="font-size: 11px; font-weight: bold; margin-left: auto; cursor: help;">
+                                        <a href="javascript:void(0)" style="color: #1a237e; text-decoration: underline;">check logs</a>
+                                        <span class="tooltip-text" style="width: 290px;">
+                                            <strong>Last 5 Received Payments:</strong><br>
+                                            {last_billing_logs_html}
+                                        </span>
+                                    </span>
+                                </div>
+                                <div class="webhook-desc">Link your paid transaction updates directly using this endpoint to register closed invoice values:</div>
+                                <div class="webhook-input-group">
+                                    <input type="text" class="webhook-input" id="billing-webhook" readonly value="" data-suffix="/webhooks/billing?client_id={active_client_id}">
+                                    <button type="button" onclick="copyText('billing-webhook', 'billing-copy-btn')" id="billing-copy-btn" class="btn-copy">📋 Copy Webhook URL</button>
+                                </div>
+                            </div>
+                            
+                            <!-- Email Forwarder (Available if Email active) -->
+                            <div class="webhook-card" id="email-webhook-card" style="display: none; margin-top: 15px;">
+                                <div class="webhook-title">📧 Inbound Invoice & Booking Email</div>
+                                <div class="webhook-desc">Set up auto-forwarding from your email inbox to send receipts or booking alerts directly to our system for Claude to audit:</div>
+                                <div class="webhook-input-group">
+                                    <input type="text" class="webhook-input" id="email-webhook" readonly value="" data-suffix="conversions-{active_client_id}@your-agency.com">
+                                    <button type="button" onclick="copyText('email-webhook', 'em-copy-btn')" id="em-copy-btn" class="btn-copy">📋 Copy Email Address</button>
+                                </div>
+                            </div>
                             
                             <!-- SECTION 5: Active Webhooks read-only deck -->
                             <div class="section-title" style="margin-top: 30px;">🔑 Live Webhooks & Integration URLs</div>
@@ -4054,57 +4107,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                 </div>
                             </div>
                             
-                            <!-- CRM webhook (Available if CRM active) -->
-                            <div class="webhook-card" id="crm-webhook-card" style="display: none;">
-                                <div class="webhook-title" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
-                                    <span id="settings-crm-webhook-title">⚙️ CRM Deal/Lead Webhook</span>
-                                    
-                                    <!-- Check Logs Hover Link -->
-                                    <span class="tooltip-icon" style="font-size: 11px; font-weight: bold; margin-left: auto; cursor: help;">
-                                        <a href="javascript:void(0)" style="color: #1a237e; text-decoration: underline;">check logs</a>
-                                        <span class="tooltip-text" style="width: 290px;">
-                                            <strong>Last 5 Received Payloads:</strong><br>
-                                            {last_crm_logs_html}
-                                        </span>
-                                    </span>
-                                </div>
-                                <div class="webhook-desc">Use this URL inside Zapier or your CRM's developer workspace to push offline lead status updates back to our platform:</div>
-                                <div class="webhook-input-group">
-                                    <input type="text" class="webhook-input" id="crm-webhook" readonly value="" data-suffix="/webhooks/crm?client_id={active_client_id}">
-                                    <button type="button" onclick="copyText('crm-webhook', 'crm-copy-btn')" id="crm-copy-btn" class="btn-copy">📋 Copy</button>
-                                </div>
-                            </div>
-                            
-                            <!-- Billing webhook (Available if Accounting active) -->
-                            <div class="webhook-card" id="billing-webhook-card" style="display: none;">
-                                <div class="webhook-title" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
-                                    <span id="settings-billing-webhook-title">💳 QuickBooks / Xero Billing Webhook</span>
-                                    
-                                    <!-- Check Logs Hover Link -->
-                                    <span class="tooltip-icon" style="font-size: 11px; font-weight: bold; margin-left: auto; cursor: help;">
-                                        <a href="javascript:void(0)" style="color: #1a237e; text-decoration: underline;">check logs</a>
-                                        <span class="tooltip-text" style="width: 290px;">
-                                            <strong>Last 5 Received Payments:</strong><br>
-                                            {last_billing_logs_html}
-                                        </span>
-                                    </span>
-                                </div>
-                                <div class="webhook-desc">Link your paid transaction updates directly using this endpoint to register closed invoice values:</div>
-                                <div class="webhook-input-group">
-                                    <input type="text" class="webhook-input" id="billing-webhook" readonly value="" data-suffix="/webhooks/billing?client_id={active_client_id}">
-                                    <button type="button" onclick="copyText('billing-webhook', 'billing-copy-btn')" id="billing-copy-btn" class="btn-copy">📋 Copy</button>
-                                </div>
-                            </div>
-                            
-                            <!-- Email Forwarder (Available if Email active) -->
-                            <div class="webhook-card" id="email-webhook-card" style="display: none;">
-                                <div class="webhook-title">📧 Inbound Invoice & Booking Email</div>
-                                <div class="webhook-desc">Set up auto-forwarding from your email inbox to send receipts or booking alerts directly to our system for Claude to audit:</div>
-                                <div class="webhook-input-group">
-                                    <input type="text" class="webhook-input" id="email-webhook" readonly value="" data-suffix="conversions-{active_client_id}@your-agency.com">
-                                    <button type="button" onclick="copyText('email-webhook', 'em-copy-btn')" id="em-copy-btn" class="btn-copy">📋 Copy</button>
-                                </div>
-                            </div>
+
                         </div>
 
                     </div>
@@ -4303,18 +4306,24 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                 }});
 
                 // Auto-populate the active hostname into webhook input fields
-                window.addEventListener('DOMContentLoaded', () => {{
+                                window.addEventListener('DOMContentLoaded', () => {{
                     const origin = window.location.origin;
                     const host = window.location.host;
                     const emailDomain = host.includes('localhost') ? 'your-agency.com' : host.replace('www.', '').split(':')[0];
                     
                     document.querySelectorAll('.webhook-input').forEach(input => {{
                         const suffix = input.getAttribute('data-suffix');
-                        if (suffix.startsWith('conversions-')) {{
-                            // Email address, omit origin prefix
-                            input.value = suffix;
-                        }} else {{
+                        if (suffix && suffix.startsWith('conversions-')) {{
+                            input.value = `conversions-{active_client_id}@${{emailDomain}}`;
+                        }} else if (suffix) {{
                             input.value = origin + suffix;
+                        }}
+                    }});
+                    
+                    // Dynamically replace placeholder origins inside code instruction blocks
+                    document.querySelectorAll('code').forEach(el => {{
+                        if (el.innerText.includes('https://your-agency-app.onrender.com')) {{
+                            el.innerText = el.innerText.replaceAll('https://your-agency-app.onrender.com', origin);
                         }}
                     }});
                     
