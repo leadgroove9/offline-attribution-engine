@@ -4861,11 +4861,9 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         else if (sot === 'google_sheets' && googleSheetsBox) googleSheetsBox.style.display = 'block';
                         else if (sot === 'zapier' && zapierBox) zapierBox.style.display = 'block';
                         
-                    }} else if (sot === 'email') {{
+                    }} else if (sot === 'email' || sot === 'ai_rating') {{
                         if (emailBox) emailBox.style.display = 'block';
-                        if (emailCard) emailCard.style.display = 'block';
-                    }} else if (sot === 'ai_rating') {{
-                        // Direct AI call auditing active - no external webhook needed
+                        if (sot === 'email' && emailCard) emailCard.style.display = 'block';
                     }}
                 }}
 
@@ -7454,7 +7452,7 @@ def add_client_page(request: Request):
                         else if (sot === 'freshbooks' && freshbooksBox) freshbooksBox.style.display = 'block';
                         else if (sot === 'google_sheets' && googleSheetsBox) googleSheetsBox.style.display = 'block';
                         else if (sot === 'zapier' && zapierBox) zapierBox.style.display = 'block';
-                    } else if (sot === 'email') {
+                    } else if (sot === 'email' || sot === 'ai_rating') {
                         if (emailBox) emailBox.style.display = 'block';
                     }
                 }
