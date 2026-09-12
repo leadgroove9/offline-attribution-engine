@@ -3112,6 +3112,12 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     color: white !important;
                 }}
                 
+                
+                .tab-btn {{ background: none; border: none; padding: 10px 15px; font-size: 13px; font-weight: bold; color: #666; cursor: pointer; border-bottom: 2px solid transparent; }}
+                .tab-btn.active {{ color: #1a237e; border-bottom-color: #1a237e; }}
+                .btn-modal-close {{ background-color: #1a237e; color: white; border: none; padding: 8px 18px; border-radius: 5px; font-weight: bold; font-size: 13px; cursor: pointer; transition: background 0.2s; }}
+                .btn-modal-close:hover {{ background-color: #0d1b2a; }}
+
                 /* Speech Bubble Tooltip Styles */
                 .tooltip-icon {{
                     position: relative;
@@ -4062,14 +4068,14 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     </div>
 
                     <!-- App Password Modal Overlay -->
-                    <div id="app-password-modal" class="modal-overlay" style="display: none;">
-                        <div class="modal-card">
+                    <div id="app-password-modal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center;">
+                        <div class="modal-card" style="background: white; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); max-width: 550px; width: 90%; text-align: left; overflow: hidden; display: flex; flex-direction: column;">
                             <!-- Header -->
-                            <div class="modal-header">
+                            <div class="modal-header" style="background: #1a237e; color: white; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;">
                                 <h3 style="margin: 0; font-size: 18px; color: #1a237e; display: flex; align-items: center; gap: 8px;">
                                     🔐 Generate a Secure App Password
                                 </h3>
-                                <span class="modal-close" onclick="closeAppPasswordModal()">&times;</span>
+                                <span class="modal-close" onclick="closeAppPasswordModal()" style="font-size: 24px; font-weight: bold; cursor: pointer; color: white; opacity: 0.8;">&times;</span>
                             </div>
 
                             <!-- Body -->
@@ -5934,6 +5940,12 @@ def add_client_page(request: Request):
                     color: white !important;
                 }
                 
+                
+                .tab-btn {{ background: none; border: none; padding: 10px 15px; font-size: 13px; font-weight: bold; color: #666; cursor: pointer; border-bottom: 2px solid transparent; }}
+                .tab-btn.active {{ color: #1a237e; border-bottom-color: #1a237e; }}
+                .btn-modal-close {{ background-color: #1a237e; color: white; border: none; padding: 8px 18px; border-radius: 5px; font-weight: bold; font-size: 13px; cursor: pointer; transition: background 0.2s; }}
+                .btn-modal-close:hover {{ background-color: #0d1b2a; }}
+
                 /* Speech Bubble Tooltip Styles */
                 .tooltip-icon {
                     position: relative;
@@ -6748,14 +6760,14 @@ def add_client_page(request: Request):
                 
 
                 <!-- App Password Modal Overlay -->
-                <div id="app-password-modal" class="modal-overlay" style="display: none;">
-                    <div class="modal-card">
+                <div id="app-password-modal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center;">
+                    <div class="modal-card" style="background: white; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); max-width: 550px; width: 90%; text-align: left; overflow: hidden; display: flex; flex-direction: column;">
                         <!-- Header -->
-                        <div class="modal-header">
+                        <div class="modal-header" style="background: #1a237e; color: white; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;">
                             <h3 style="margin: 0; font-size: 18px; color: #1a237e; display: flex; align-items: center; gap: 8px;">
                                 🔐 Generate a Secure App Password
                             </h3>
-                            <span class="modal-close" onclick="closeAppPasswordModal()">&times;</span>
+                            <span class="modal-close" onclick="closeAppPasswordModal()" style="font-size: 24px; font-weight: bold; cursor: pointer; color: white; opacity: 0.8;">&times;</span>
                         </div>
 
                         <!-- Body -->
