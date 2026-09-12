@@ -423,6 +423,7 @@ def init_db():
             source_of_truth TEXT,
             email_provider TEXT,
             email_account TEXT,
+            email_app_password TEXT,
             crm_deal_tags TEXT,
             crm_won_deal_tags TEXT,
             crm_lead_tags TEXT,
@@ -469,6 +470,7 @@ def init_db():
         ("source_of_truth", "TEXT"),
         ("email_provider", "TEXT"),
         ("email_account", "TEXT"),
+        ("email_app_password", "TEXT"),
         ("crm_deal_tags", "TEXT"),
         ("crm_won_deal_tags", "TEXT"),
         ("crm_lead_tags", "TEXT"),
@@ -578,17 +580,17 @@ def init_db():
     cursor.execute("SELECT COUNT(*) FROM clients")
     if cursor.fetchone()[0] == 0:
         mock_clients = [
-            ("Priority Plumbing", "comp_plumbing", "123-456-7890", "fb_plumb_99", "", "", "both", "C", "hubspot", "", "", "appointment-booked", "closed-won", "", "all", "NO"),
-            ("Apex HVAC & Air", "comp_hvac", "987-654-3210", "", "", "ms_hvac_88", "both", "E", "servicetitan", "", "", "", "", "completed-lead", "all", "NO"),
-            ("Metro Dental Care", "comp_dental", "555-123-4567", "", "li_dental_77", "", "both", "C", "email", "gmail", "bookings@metrodental.com", "", "", "", "maximum_one", "YES")
+            ("Priority Plumbing", "comp_plumbing", "123-456-7890", "fb_plumb_99", "", "", "both", "C", "hubspot", "", "", "", "appointment-booked", "closed-won", "", "all", "NO"),
+            ("Apex HVAC & Air", "comp_hvac", "987-654-3210", "", "", "ms_hvac_88", "both", "E", "servicetitan", "", "", "", "", "", "completed-lead", "all", "NO"),
+            ("Metro Dental Care", "comp_dental", "555-123-4567", "", "li_dental_77", "", "both", "C", "email", "gmail", "bookings@metrodental.com", "", "", "", "", "maximum_one", "YES")
         ]
         cursor.executemany("""
             INSERT INTO clients (
                 name, callrail_company_id, google_ads_customer_id, facebook_ads_id, linkedin_ads_id, microsoft_ads_id,
-                lead_gen_method, qualification_criteria, source_of_truth, email_provider, email_account,
+                lead_gen_method, qualification_criteria, source_of_truth, email_provider, email_account, email_app_password,
                 crm_deal_tags, crm_won_deal_tags, crm_lead_tags, lead_count_rule, exclude_past_customers
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, mock_clients)
         print("Seeded 3 mock agency clients successfully!")
         
@@ -896,6 +898,7 @@ class ClientCreate(BaseModel):
     source_of_truth: str
     email_provider: Optional[str] = ""
     email_account: Optional[str] = ""
+    email_app_password: Optional[str] = ""
     crm_deal_tags: Optional[str] = ""
     crm_won_deal_tags: Optional[str] = ""
     crm_lead_tags: Optional[str] = ""
@@ -2692,6 +2695,7 @@ class ClientUpdate(BaseModel):
     source_of_truth: str
     email_provider: Optional[str] = ""
     email_account: Optional[str] = ""
+    email_app_password: Optional[str] = ""
     crm_deal_tags: Optional[str] = ""
     crm_won_deal_tags: Optional[str] = ""
     crm_lead_tags: Optional[str] = ""
@@ -3763,34 +3767,44 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                         {provider_options}
                                     </select>
                                 </div>
-                                <div class="form-group" style="margin-bottom: 0;">
+                                <div class="form-group">
+                                    <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 5px;">
+                                        <label for="email_account" style="font-weight: bold; margin-bottom: 0;">Integration Email Address (Inbox to Monitor)</label>
+                                        
+                                        <!-- Speech Bubble Tooltip -->
+                                        <span class="tooltip-icon">
+                                            💬
+                                            <span class="tooltip-text">
+                                                Forward your customer booking emails, invoice alerts, or form lead replies to:<br>
+                                                <strong class="settings-forwarding-email" style="color: #81c784; word-break: break-all;">conversions-{active_client_id}@your-agency.com</strong>
+                                            </span>
+                                        </span>
+                                        
+                                        <!-- Check Logs Hover Link -->
+                                        <span class="tooltip-icon" style="font-size: 11px; font-weight: bold; margin-left: 5px;">
+                                            <a href="javascript:void(0)" style="color: #1a237e; text-decoration: underline;">check logs</a>
+                                            <span class="tooltip-text" style="width: 290px;">
+                                                <strong>Last 5 Analyzed Emails:</strong><br>
+                                                {last_emails_html}
+                                            </span>
+                                        </span>
+                                    </div>
+                                    <input type="text" id="email_account" value="{client_data.get("email_account", "") or ""}" placeholder="e.g. bookings@clientcompany.com">
+                                    <small style="color: #666; font-size: 11px; margin-top: 4px; display: block;">
+                                        Enter your client's email inbox address where form leads or booking receipts arrive.
+                                    </small>
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0; margin-top: 15px;">
                                     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 5px;">
-                                        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                                            <label for="email_account" style="font-weight: bold; margin-bottom: 0;">Onboarding Integration Email Account</label>
-                                            
-                                            <!-- Speech Bubble Tooltip -->
-                                            <span class="tooltip-icon">
-                                                💬
-                                                <span class="tooltip-text">
-                                                    Forward your customer booking emails, invoice alerts, or form lead replies to:<br>
-                                                    <strong class="settings-forwarding-email" style="color: #81c784; word-break: break-all;">conversions-{active_client_id}@your-agency.com</strong>
-                                                </span>
-                                            </span>
-                                            
-                                            <!-- Check Logs Hover Link -->
-                                            <span class="tooltip-icon" style="font-size: 11px; font-weight: bold; margin-left: 5px;">
-                                                <a href="javascript:void(0)" style="color: #1a237e; text-decoration: underline;">check logs</a>
-                                                <span class="tooltip-text" style="width: 290px;">
-                                                    <strong>Last 5 Analyzed Emails:</strong><br>
-                                                    {last_emails_html}
-                                                </span>
-                                            </span>
-                                        </div>
+                                        <label for="email_app_password" style="font-weight: bold; margin-bottom: 0;">16-Character App Password / IMAP Key</label>
                                         <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none; display: flex; align-items: center; gap: 4px;">
                                             🔑 How to get an App Password?
                                         </a>
                                     </div>
-                                    <input type="text" id="email_account" value="{client_data.get("email_account", "") or ""}" placeholder="e.g. bookings@clientcompany.com">
+                                    <input type="password" id="email_app_password" value="{client_data.get("email_app_password", "") or ""}" placeholder="e.g. abcd efgh ijkl mnop">
+                                    <small style="color: #666; font-size: 11px; margin-top: 4px; display: block;">
+                                        Enter your provider's 16-character security code to grant AI read-only access.
+                                    </small>
                                 </div>
                             </div>
 
@@ -5239,6 +5253,8 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         source_of_truth: document.getElementById('source_of_truth').value,
                         email_provider: document.getElementById('email_provider').value,
                         email_account: document.getElementById('email_account').value.trim(),
+                        email_app_password: document.getElementById('email_app_password').value.trim(),
+                        email_app_password: document.getElementById('email_app_password').value.trim(),
                         crm_deal_tags: document.getElementById('crm_deal_tags').value.trim(),
                         crm_won_deal_tags: document.getElementById('crm_won_deal_tags').value.trim(),
                         crm_lead_tags: document.getElementById('crm_lead_tags').value.trim(),
@@ -5713,6 +5729,7 @@ def update_client_settings(request: Request, client: ClientUpdate):
             "source_of_truth": "Single Source of Truth",
             "email_provider": "Email Provider",
             "email_account": "Email Integration Account",
+            "email_app_password": "Email Integration App Password",
             "crm_deal_tags": "CRM Deal Tags",
             "crm_won_deal_tags": "CRM Won Deal Tags",
             "crm_lead_tags": "CRM Lead Qualification Tags",
@@ -5744,6 +5761,7 @@ def update_client_settings(request: Request, client: ClientUpdate):
             "source_of_truth": client.source_of_truth,
             "email_provider": client.email_provider or "",
             "email_account": client.email_account or "",
+            "email_app_password": client.email_app_password or "",
             "crm_deal_tags": client.crm_deal_tags or "",
             "crm_won_deal_tags": client.crm_won_deal_tags or "",
             "crm_lead_tags": client.crm_lead_tags or "",
@@ -5782,6 +5800,7 @@ def update_client_settings(request: Request, client: ClientUpdate):
                 source_of_truth = ?,
                 email_provider = ?,
                 email_account = ?,
+                email_app_password = ?,
                 crm_deal_tags = ?,
                 crm_won_deal_tags = ?,
                 crm_lead_tags = ?,
@@ -5811,6 +5830,8 @@ def update_client_settings(request: Request, client: ClientUpdate):
             client.source_of_truth,
             client.email_provider,
             client.email_account,
+            client.email_app_password,
+            client.email_app_password,
             client.crm_deal_tags,
             client.crm_won_deal_tags,
             client.crm_lead_tags,
@@ -6596,37 +6617,44 @@ def add_client_page(request: Request):
                                     <option value="custom_imap">Custom IMAP (Secure Server)</option>
                                 </select>
                             </div>
-                            <div class="form-group" style="margin-bottom: 0;">
+                            <div class="form-group">
+                                <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 5px;">
+                                    <label for="email_account" style="font-weight: bold; margin-bottom: 0;">Integration Email Address (Inbox to Monitor)</label>
+                                    
+                                    <!-- Speech Bubble Tooltip -->
+                                    <span class="tooltip-icon">
+                                        💬
+                                        <span class="tooltip-text">
+                                            Forward your booking emails, invoice alerts, or form replies to your custom system address:<br>
+                                            <strong class="wizard-forwarding-email" style="color: #81c784; word-break: break-all;">conversions-[id]@your-agency.com</strong><br>
+                                            <span style="font-size: 9px; color: #ccc;">(Your actual ID will show up on the next screen once profile is created)</span>
+                                        </span>
+                                    </span>
+                                    
+                                    <!-- Check Logs Hover Link -->
+                                    <span class="tooltip-icon" style="font-size: 11px; font-weight: bold; margin-left: 5px;">
+                                        <a href="javascript:void(0)" style="color: #1a237e; text-decoration: underline;">check logs</a>
+                                        <span class="tooltip-text" style="width: 290px;">
+                                            <strong>Last 5 Emails Analyzed by System:</strong><br>
+                                            <span style="color: #ccc; font-style: italic;">No emails analyzed yet (Onboarding in progress).</span>
+                                        </span>
+                                    </span>
+                                </div>
+                                <input type="text" id="email_account" placeholder="e.g. bookings@clientcompany.com">
+                                <small style="color: #666; font-size: 11px; margin-top: 4px; display: block;">
+                                    Enter your client's email inbox address where form leads or booking receipts arrive.
+                                </small>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0; margin-top: 15px;">
                                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 5px;">
-                                    <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                                        <label for="email_account" style="font-weight: bold; margin-bottom: 0;">Onboarding Integration Email Account</label>
-                                        
-                                        <!-- Speech Bubble Tooltip -->
-                                        <span class="tooltip-icon">
-                                            💬
-                                            <span class="tooltip-text">
-                                                Forward your booking emails, invoice alerts, or form replies to your custom system address:<br>
-                                                <strong class="wizard-forwarding-email" style="color: #81c784; word-break: break-all;">conversions-[id]@your-agency.com</strong><br>
-                                                <span style="font-size: 9px; color: #ccc;">(Your actual ID will show up on the next screen once profile is created)</span>
-                                            </span>
-                                        </span>
-                                        
-                                        <!-- Check Logs Hover Link -->
-                                        <span class="tooltip-icon" style="font-size: 11px; font-weight: bold; margin-left: 5px;">
-                                            <a href="javascript:void(0)" style="color: #1a237e; text-decoration: underline;">check logs</a>
-                                            <span class="tooltip-text" style="width: 290px;">
-                                                <strong>Last 5 Emails Analyzed by System:</strong><br>
-                                                <span style="color: #ccc; font-style: italic;">No emails analyzed yet (Onboarding in progress).</span>
-                                            </span>
-                                        </span>
-                                    </div>
+                                    <label for="email_app_password" style="font-weight: bold; margin-bottom: 0;">16-Character App Password / IMAP Key</label>
                                     <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none; display: flex; align-items: center; gap: 4px;">
                                         🔑 How to get an App Password?
                                     </a>
                                 </div>
-                                <input type="text" id="email_account" placeholder="e.g. bookings@clientcompany.com">
+                                <input type="password" id="email_app_password" placeholder="e.g. abcd efgh ijkl mnop">
                                 <small style="color: #666; font-size: 11px; margin-top: 4px; display: block;">
-                                    Your system will securely monitor this inbox for transcript files & booking notifications.
+                                    Enter your provider's 16-character security code to grant AI read-only access.
                                 </small>
                             </div>
                         </div>
