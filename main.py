@@ -481,7 +481,15 @@ def init_db():
         ("ctm_account_id", "TEXT"),
         ("ctm_profile_id", "TEXT"),
         ("wc_account_id", "TEXT"),
-        ("wc_profile_id", "TEXT")
+        ("wc_profile_id", "TEXT"),
+        ("email_account_2", "TEXT"),
+        ("email_app_password_2", "TEXT"),
+        ("email_account_3", "TEXT"),
+        ("email_app_password_3", "TEXT"),
+        ("email_account_4", "TEXT"),
+        ("email_app_password_4", "TEXT"),
+        ("email_account_5", "TEXT"),
+        ("email_app_password_5", "TEXT")
     ]
     for col_name, col_type in cols_to_verify:
         if col_name not in existing_cols:
@@ -899,6 +907,14 @@ class ClientCreate(BaseModel):
     email_provider: Optional[str] = ""
     email_account: Optional[str] = ""
     email_app_password: Optional[str] = ""
+    email_account_2: Optional[str] = ""
+    email_app_password_2: Optional[str] = ""
+    email_account_3: Optional[str] = ""
+    email_app_password_3: Optional[str] = ""
+    email_account_4: Optional[str] = ""
+    email_app_password_4: Optional[str] = ""
+    email_account_5: Optional[str] = ""
+    email_app_password_5: Optional[str] = ""
     crm_deal_tags: Optional[str] = ""
     crm_won_deal_tags: Optional[str] = ""
     crm_lead_tags: Optional[str] = ""
@@ -2696,6 +2712,14 @@ class ClientUpdate(BaseModel):
     email_provider: Optional[str] = ""
     email_account: Optional[str] = ""
     email_app_password: Optional[str] = ""
+    email_account_2: Optional[str] = ""
+    email_app_password_2: Optional[str] = ""
+    email_account_3: Optional[str] = ""
+    email_app_password_3: Optional[str] = ""
+    email_account_4: Optional[str] = ""
+    email_app_password_4: Optional[str] = ""
+    email_account_5: Optional[str] = ""
+    email_app_password_5: Optional[str] = ""
     crm_deal_tags: Optional[str] = ""
     crm_won_deal_tags: Optional[str] = ""
     crm_lead_tags: Optional[str] = ""
@@ -3759,7 +3783,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                 <input type="text" id="crm_lead_tags" value="{client_data.get("crm_lead_tags", "") or ""}" placeholder="e.g. job-booked, estimate-given">
                             </div>
                             
-                            <!-- CONDITIONAL: Email settings fallback -->
+                                                        <!-- CONDITIONAL: Email settings fallback -->
                             <div id="sot-email-box" class="conditional-box">
                                 <div class="form-group">
                                     <label for="email_provider">Email Provider</label>
@@ -3767,9 +3791,11 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                         {provider_options}
                                     </select>
                                 </div>
+                                
+                                <!-- Sales Agent Inbox #1 (Primary) -->
                                 <div class="form-group">
                                     <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 5px;">
-                                        <label for="email_account" style="font-weight: bold; margin-bottom: 0;">Integration Email Address (Inbox to Monitor)</label>
+                                        <label for="email_account" style="font-weight: bold; margin-bottom: 0;">Sales Agent Inbox #1 (Primary Email to Monitor)</label>
                                         
                                         <!-- Speech Bubble Tooltip -->
                                         <span class="tooltip-icon">
@@ -3789,22 +3815,85 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                             </span>
                                         </span>
                                     </div>
-                                    <input type="text" id="email_account" value="{client_data.get("email_account", "") or ""}" placeholder="e.g. bookings@clientcompany.com">
+                                    <input type="text" id="email_account" value="{client_data.get("email_account", "") or ""}" placeholder="e.g. agent1@clientcompany.com">
                                     <small style="color: #666; font-size: 11px; margin-top: 4px; display: block;">
-                                        Enter your client's email inbox address where form leads or booking receipts arrive.
+                                        Enter primary sales agent email address where form leads or booking receipts arrive.
                                     </small>
                                 </div>
-                                <div class="form-group" style="margin-bottom: 0; margin-top: 15px;">
+                                <div class="form-group" style="margin-top: 12px;">
                                     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 5px;">
-                                        <label for="email_app_password" style="font-weight: bold; margin-bottom: 0;">16-Character App Password / IMAP Key</label>
+                                        <label for="email_app_password" style="font-weight: bold; margin-bottom: 0;">Inbox #1 App Password / IMAP Key</label>
                                         <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none; display: flex; align-items: center; gap: 4px;">
                                             🔑 How to get an App Password?
                                         </a>
                                     </div>
                                     <input type="password" id="email_app_password" value="{client_data.get("email_app_password", "") or ""}" placeholder="e.g. abcd efgh ijkl mnop">
-                                    <small style="color: #666; font-size: 11px; margin-top: 4px; display: block;">
-                                        Enter your provider's 16-character security code to grant AI read-only access.
-                                    </small>
+                                </div>
+
+                                <!-- Sales Agent Inbox #2 -->
+                                <div id="sot-agent-inbox-2" style="margin-top: 20px; padding-top: 15px; border-top: 1px dashed #ccc; display: {'block' if (client_data.get('email_account_2') or client_data.get('email_app_password_2')) else 'none'};">
+                                    <div class="form-group">
+                                        <label for="email_account_2" style="font-weight: bold;">Sales Agent Inbox #2 (Optional Email to Monitor)</label>
+                                        <input type="text" id="email_account_2" value="{client_data.get("email_account_2", "") or ""}" placeholder="e.g. agent2@clientcompany.com">
+                                    </div>
+                                    <div class="form-group" style="margin-top: 10px;">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 5px;">
+                                            <label for="email_app_password_2" style="font-weight: bold;">Inbox #2 App Password / IMAP Key</label>
+                                            <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none;">🔑 How to get an App Password?</a>
+                                        </div>
+                                        <input type="password" id="email_app_password_2" value="{client_data.get("email_app_password_2", "") or ""}" placeholder="e.g. abcd efgh ijkl mnop">
+                                    </div>
+                                </div>
+
+                                <!-- Sales Agent Inbox #3 -->
+                                <div id="sot-agent-inbox-3" style="margin-top: 20px; padding-top: 15px; border-top: 1px dashed #ccc; display: {'block' if (client_data.get('email_account_3') or client_data.get('email_app_password_3')) else 'none'};">
+                                    <div class="form-group">
+                                        <label for="email_account_3" style="font-weight: bold;">Sales Agent Inbox #3 (Optional Email to Monitor)</label>
+                                        <input type="text" id="email_account_3" value="{client_data.get("email_account_3", "") or ""}" placeholder="e.g. agent3@clientcompany.com">
+                                    </div>
+                                    <div class="form-group" style="margin-top: 10px;">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 5px;">
+                                            <label for="email_app_password_3" style="font-weight: bold;">Inbox #3 App Password / IMAP Key</label>
+                                            <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none;">🔑 How to get an App Password?</a>
+                                        </div>
+                                        <input type="password" id="email_app_password_3" value="{client_data.get("email_app_password_3", "") or ""}" placeholder="e.g. abcd efgh ijkl mnop">
+                                    </div>
+                                </div>
+
+                                <!-- Sales Agent Inbox #4 -->
+                                <div id="sot-agent-inbox-4" style="margin-top: 20px; padding-top: 15px; border-top: 1px dashed #ccc; display: {'block' if (client_data.get('email_account_4') or client_data.get('email_app_password_4')) else 'none'};">
+                                    <div class="form-group">
+                                        <label for="email_account_4" style="font-weight: bold;">Sales Agent Inbox #4 (Optional Email to Monitor)</label>
+                                        <input type="text" id="email_account_4" value="{client_data.get("email_account_4", "") or ""}" placeholder="e.g. agent4@clientcompany.com">
+                                    </div>
+                                    <div class="form-group" style="margin-top: 10px;">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 5px;">
+                                            <label for="email_app_password_4" style="font-weight: bold;">Inbox #4 App Password / IMAP Key</label>
+                                            <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none;">🔑 How to get an App Password?</a>
+                                        </div>
+                                        <input type="password" id="email_app_password_4" value="{client_data.get("email_app_password_4", "") or ""}" placeholder="e.g. abcd efgh ijkl mnop">
+                                    </div>
+                                </div>
+
+                                <!-- Sales Agent Inbox #5 -->
+                                <div id="sot-agent-inbox-5" style="margin-top: 20px; padding-top: 15px; border-top: 1px dashed #ccc; display: {'block' if (client_data.get('email_account_5') or client_data.get('email_app_password_5')) else 'none'};">
+                                    <div class="form-group">
+                                        <label for="email_account_5" style="font-weight: bold;">Sales Agent Inbox #5 (Optional Email to Monitor)</label>
+                                        <input type="text" id="email_account_5" value="{client_data.get("email_account_5", "") or ""}" placeholder="e.g. agent5@clientcompany.com">
+                                    </div>
+                                    <div class="form-group" style="margin-top: 10px;">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 5px;">
+                                            <label for="email_app_password_5" style="font-weight: bold;">Inbox #5 App Password / IMAP Key</label>
+                                            <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none;">🔑 How to get an App Password?</a>
+                                        </div>
+                                        <input type="password" id="email_app_password_5" value="{client_data.get("email_app_password_5", "") or ""}" placeholder="e.g. abcd efgh ijkl mnop">
+                                    </div>
+                                </div>
+
+                                <div style="margin-top: 15px; text-align: left;">
+                                    <button type="button" id="btn-add-sales-agent" onclick="addSalesAgentInboxRow()" style="background: #e8eaf6; color: #1a237e; border: 1px solid #c5cae9; padding: 8px 14px; border-radius: 6px; font-weight: bold; font-size: 12px; cursor: pointer; transition: all 0.2s;">
+                                        ➕ Add Another Sales Agent Inbox (Up to 5 Inboxes)
+                                    </button>
                                 </div>
                             </div>
 
@@ -4256,6 +4345,53 @@ def view_settings(request: Request, client_id: Optional[int] = None):
             </div>
             
             <script>
+
+                
+                function addSalesAgentInboxRow() {{
+                    for (let i = 2; i <= 5; i++) {{
+                        const row = document.getElementById('sot-agent-inbox-' + i);
+                        if (row && (row.style.display === 'none' || getComputedStyle(row).display === 'none')) {{
+                            row.style.display = 'block';
+                            const emailInput = document.getElementById('email_account_' + i);
+                            if (emailInput) emailInput.focus();
+                            break;
+                        }}
+                    }}
+                    let hiddenCount = 0;
+                    for (let i = 2; i <= 5; i++) {{
+                        const row = document.getElementById('sot-agent-inbox-' + i);
+                        if (row && (row.style.display === 'none' || getComputedStyle(row).display === 'none')) {{
+                            hiddenCount++;
+                        }}
+                    }}
+                    if (hiddenCount === 0) {{
+                        const btn = document.getElementById('btn-add-sales-agent');
+                        if (btn) btn.style.display = 'none';
+                    }}
+                }}
+
+                function addSalesAgentInboxRowWiz() {{
+                    for (let i = 2; i <= 5; i++) {{
+                        const row = document.getElementById('wiz-agent-inbox-' + i);
+                        if (row && (row.style.display === 'none' || getComputedStyle(row).display === 'none')) {{
+                            row.style.display = 'block';
+                            const emailInput = document.getElementById('email_account_' + i);
+                            if (emailInput) emailInput.focus();
+                            break;
+                        }}
+                    }}
+                    let hiddenCount = 0;
+                    for (let i = 2; i <= 5; i++) {{
+                        const row = document.getElementById('wiz-agent-inbox-' + i);
+                        if (row && (row.style.display === 'none' || getComputedStyle(row).display === 'none')) {{
+                            hiddenCount++;
+                        }}
+                    }}
+                    if (hiddenCount === 0) {{
+                        const btn = document.getElementById('wiz-btn-add-sales-agent');
+                        if (btn) btn.style.display = 'none';
+                    }}
+                }}
 
                 function openAppPasswordModal() {{
                     const providerSelect = document.getElementById('email_provider');
@@ -5253,8 +5389,24 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         source_of_truth: document.getElementById('source_of_truth').value,
                         email_provider: document.getElementById('email_provider').value,
                         email_account: document.getElementById('email_account').value.trim(),
+                        email_app_password: document.getElementById('email_app_password') ? document.getElementById('email_app_password').value.trim() : '',
+                        email_account_2: document.getElementById('email_account_2') ? document.getElementById('email_account_2').value.trim() : '',
+                        email_app_password_2: document.getElementById('email_app_password_2') ? document.getElementById('email_app_password_2').value.trim() : '',
+                        email_account_3: document.getElementById('email_account_3') ? document.getElementById('email_account_3').value.trim() : '',
+                        email_app_password_3: document.getElementById('email_app_password_3') ? document.getElementById('email_app_password_3').value.trim() : '',
+                        email_account_4: document.getElementById('email_account_4') ? document.getElementById('email_account_4').value.trim() : '',
+                        email_app_password_4: document.getElementById('email_app_password_4') ? document.getElementById('email_app_password_4').value.trim() : '',
+                        email_account_5: document.getElementById('email_account_5') ? document.getElementById('email_account_5').value.trim() : '',
+                        email_app_password_5: document.getElementById('email_app_password_5') ? document.getElementById('email_app_password_5').value.trim() : '',
                         email_app_password: document.getElementById('email_app_password').value.trim(),
-                        email_app_password: document.getElementById('email_app_password').value.trim(),
+                        email_account_2: document.getElementById('email_account_2') ? document.getElementById('email_account_2').value.trim() : '',
+                        email_app_password_2: document.getElementById('email_app_password_2') ? document.getElementById('email_app_password_2').value.trim() : '',
+                        email_account_3: document.getElementById('email_account_3') ? document.getElementById('email_account_3').value.trim() : '',
+                        email_app_password_3: document.getElementById('email_app_password_3') ? document.getElementById('email_app_password_3').value.trim() : '',
+                        email_account_4: document.getElementById('email_account_4') ? document.getElementById('email_account_4').value.trim() : '',
+                        email_app_password_4: document.getElementById('email_app_password_4') ? document.getElementById('email_app_password_4').value.trim() : '',
+                        email_account_5: document.getElementById('email_account_5') ? document.getElementById('email_account_5').value.trim() : '',
+                        email_app_password_5: document.getElementById('email_app_password_5') ? document.getElementById('email_app_password_5').value.trim() : '',
                         crm_deal_tags: document.getElementById('crm_deal_tags').value.trim(),
                         crm_won_deal_tags: document.getElementById('crm_won_deal_tags').value.trim(),
                         crm_lead_tags: document.getElementById('crm_lead_tags').value.trim(),
@@ -5728,8 +5880,16 @@ def update_client_settings(request: Request, client: ClientUpdate):
             "qualification_criteria": "Qualification Criteria Option",
             "source_of_truth": "Single Source of Truth",
             "email_provider": "Email Provider",
-            "email_account": "Email Integration Account",
-            "email_app_password": "Email Integration App Password",
+            "email_account": "Email Integration Account #1",
+            "email_app_password": "Email Integration App Password #1",
+            "email_account_2": "Email Integration Account #2",
+            "email_app_password_2": "Email Integration App Password #2",
+            "email_account_3": "Email Integration Account #3",
+            "email_app_password_3": "Email Integration App Password #3",
+            "email_account_4": "Email Integration Account #4",
+            "email_app_password_4": "Email Integration App Password #4",
+            "email_account_5": "Email Integration Account #5",
+            "email_app_password_5": "Email Integration App Password #5",
             "crm_deal_tags": "CRM Deal Tags",
             "crm_won_deal_tags": "CRM Won Deal Tags",
             "crm_lead_tags": "CRM Lead Qualification Tags",
@@ -5762,6 +5922,14 @@ def update_client_settings(request: Request, client: ClientUpdate):
             "email_provider": client.email_provider or "",
             "email_account": client.email_account or "",
             "email_app_password": client.email_app_password or "",
+            "email_account_2": client.email_account_2 or "",
+            "email_app_password_2": client.email_app_password_2 or "",
+            "email_account_3": client.email_account_3 or "",
+            "email_app_password_3": client.email_app_password_3 or "",
+            "email_account_4": client.email_account_4 or "",
+            "email_app_password_4": client.email_app_password_4 or "",
+            "email_account_5": client.email_account_5 or "",
+            "email_app_password_5": client.email_app_password_5 or "",
             "crm_deal_tags": client.crm_deal_tags or "",
             "crm_won_deal_tags": client.crm_won_deal_tags or "",
             "crm_lead_tags": client.crm_lead_tags or "",
@@ -5801,6 +5969,14 @@ def update_client_settings(request: Request, client: ClientUpdate):
                 email_provider = ?,
                 email_account = ?,
                 email_app_password = ?,
+                email_account_2 = ?,
+                email_app_password_2 = ?,
+                email_account_3 = ?,
+                email_app_password_3 = ?,
+                email_account_4 = ?,
+                email_app_password_4 = ?,
+                email_account_5 = ?,
+                email_app_password_5 = ?,
                 crm_deal_tags = ?,
                 crm_won_deal_tags = ?,
                 crm_lead_tags = ?,
@@ -5831,6 +6007,22 @@ def update_client_settings(request: Request, client: ClientUpdate):
             client.email_provider,
             client.email_account,
             client.email_app_password,
+            client.email_account_2,
+            client.email_app_password_2,
+            client.email_account_3,
+            client.email_app_password_3,
+            client.email_account_4,
+            client.email_app_password_4,
+            client.email_account_5,
+            client.email_app_password_5,
+            client.email_account_2,
+            client.email_app_password_2,
+            client.email_account_3,
+            client.email_app_password_3,
+            client.email_account_4,
+            client.email_app_password_4,
+            client.email_account_5,
+            client.email_app_password_5,
             client.email_app_password,
             client.crm_deal_tags,
             client.crm_won_deal_tags,
@@ -6607,7 +6799,7 @@ def add_client_page(request: Request):
                             <input type="text" id="crm_lead_tags" placeholder="e.g. job-booked, estimate-given, dispatched">
                         </div>
                         
-                        <!-- CONDITIONAL INPUT: Email account fallback settings -->
+                                                <!-- CONDITIONAL INPUT: Email account fallback settings -->
                         <div id="sot-email-box" class="conditional-box">
                             <div class="form-group">
                                 <label for="email_provider">Email Provider</label>
@@ -6617,9 +6809,11 @@ def add_client_page(request: Request):
                                     <option value="custom_imap">Custom IMAP (Secure Server)</option>
                                 </select>
                             </div>
+
+                            <!-- Sales Agent Inbox #1 (Primary) -->
                             <div class="form-group">
                                 <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 5px;">
-                                    <label for="email_account" style="font-weight: bold; margin-bottom: 0;">Integration Email Address (Inbox to Monitor)</label>
+                                    <label for="email_account" style="font-weight: bold; margin-bottom: 0;">Sales Agent Inbox #1 (Primary Email to Monitor)</label>
                                     
                                     <!-- Speech Bubble Tooltip -->
                                     <span class="tooltip-icon">
@@ -6640,22 +6834,85 @@ def add_client_page(request: Request):
                                         </span>
                                     </span>
                                 </div>
-                                <input type="text" id="email_account" placeholder="e.g. bookings@clientcompany.com">
+                                <input type="text" id="email_account" placeholder="e.g. agent1@clientcompany.com">
                                 <small style="color: #666; font-size: 11px; margin-top: 4px; display: block;">
-                                    Enter your client's email inbox address where form leads or booking receipts arrive.
+                                    Enter primary sales agent email address where form leads arrive.
                                 </small>
                             </div>
-                            <div class="form-group" style="margin-bottom: 0; margin-top: 15px;">
+                            <div class="form-group" style="margin-top: 12px;">
                                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 5px;">
-                                    <label for="email_app_password" style="font-weight: bold; margin-bottom: 0;">16-Character App Password / IMAP Key</label>
+                                    <label for="email_app_password" style="font-weight: bold; margin-bottom: 0;">Inbox #1 App Password / IMAP Key</label>
                                     <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none; display: flex; align-items: center; gap: 4px;">
                                         🔑 How to get an App Password?
                                     </a>
                                 </div>
                                 <input type="password" id="email_app_password" placeholder="e.g. abcd efgh ijkl mnop">
-                                <small style="color: #666; font-size: 11px; margin-top: 4px; display: block;">
-                                    Enter your provider's 16-character security code to grant AI read-only access.
-                                </small>
+                            </div>
+
+                            <!-- Sales Agent Inbox #2 -->
+                            <div id="wiz-agent-inbox-2" style="margin-top: 20px; padding-top: 15px; border-top: 1px dashed #ccc; display: none;">
+                                <div class="form-group">
+                                    <label for="email_account_2" style="font-weight: bold;">Sales Agent Inbox #2 (Optional Email to Monitor)</label>
+                                    <input type="text" id="email_account_2" placeholder="e.g. agent2@clientcompany.com">
+                                </div>
+                                <div class="form-group" style="margin-top: 10px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 5px;">
+                                        <label for="email_app_password_2" style="font-weight: bold;">Inbox #2 App Password / IMAP Key</label>
+                                        <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none;">🔑 How to get an App Password?</a>
+                                    </div>
+                                    <input type="password" id="email_app_password_2" placeholder="e.g. abcd efgh ijkl mnop">
+                                </div>
+                            </div>
+
+                            <!-- Sales Agent Inbox #3 -->
+                            <div id="wiz-agent-inbox-3" style="margin-top: 20px; padding-top: 15px; border-top: 1px dashed #ccc; display: none;">
+                                <div class="form-group">
+                                    <label for="email_account_3" style="font-weight: bold;">Sales Agent Inbox #3 (Optional Email to Monitor)</label>
+                                    <input type="text" id="email_account_3" placeholder="e.g. agent3@clientcompany.com">
+                                </div>
+                                <div class="form-group" style="margin-top: 10px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 5px;">
+                                        <label for="email_app_password_3" style="font-weight: bold;">Inbox #3 App Password / IMAP Key</label>
+                                        <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none;">🔑 How to get an App Password?</a>
+                                    </div>
+                                    <input type="password" id="email_app_password_3" placeholder="e.g. abcd efgh ijkl mnop">
+                                </div>
+                            </div>
+
+                            <!-- Sales Agent Inbox #4 -->
+                            <div id="wiz-agent-inbox-4" style="margin-top: 20px; padding-top: 15px; border-top: 1px dashed #ccc; display: none;">
+                                <div class="form-group">
+                                    <label for="email_account_4" style="font-weight: bold;">Sales Agent Inbox #4 (Optional Email to Monitor)</label>
+                                    <input type="text" id="email_account_4" placeholder="e.g. agent4@clientcompany.com">
+                                </div>
+                                <div class="form-group" style="margin-top: 10px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 5px;">
+                                        <label for="email_app_password_4" style="font-weight: bold;">Inbox #4 App Password / IMAP Key</label>
+                                        <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none;">🔑 How to get an App Password?</a>
+                                    </div>
+                                    <input type="password" id="email_app_password_4" placeholder="e.g. abcd efgh ijkl mnop">
+                                </div>
+                            </div>
+
+                            <!-- Sales Agent Inbox #5 -->
+                            <div id="wiz-agent-inbox-5" style="margin-top: 20px; padding-top: 15px; border-top: 1px dashed #ccc; display: none;">
+                                <div class="form-group">
+                                    <label for="email_account_5" style="font-weight: bold;">Sales Agent Inbox #5 (Optional Email to Monitor)</label>
+                                    <input type="text" id="email_account_5" placeholder="e.g. agent5@clientcompany.com">
+                                </div>
+                                <div class="form-group" style="margin-top: 10px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 5px;">
+                                        <label for="email_app_password_5" style="font-weight: bold;">Inbox #5 App Password / IMAP Key</label>
+                                        <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none;">🔑 How to get an App Password?</a>
+                                    </div>
+                                    <input type="password" id="email_app_password_5" placeholder="e.g. abcd efgh ijkl mnop">
+                                </div>
+                            </div>
+
+                            <div style="margin-top: 15px; text-align: left;">
+                                <button type="button" id="wiz-btn-add-sales-agent" onclick="addSalesAgentInboxRowWiz()" style="background: #e8eaf6; color: #1a237e; border: 1px solid #c5cae9; padding: 8px 14px; border-radius: 6px; font-weight: bold; font-size: 12px; cursor: pointer; transition: all 0.2s;">
+                                    ➕ Add Another Sales Agent Inbox (Up to 5 Inboxes)
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -7625,6 +7882,15 @@ def add_client_page(request: Request):
                         source_of_truth: document.getElementById('source_of_truth').value,
                         email_provider: document.getElementById('email_provider').value,
                         email_account: document.getElementById('email_account').value.trim(),
+                        email_app_password: document.getElementById('email_app_password') ? document.getElementById('email_app_password').value.trim() : '',
+                        email_account_2: document.getElementById('email_account_2') ? document.getElementById('email_account_2').value.trim() : '',
+                        email_app_password_2: document.getElementById('email_app_password_2') ? document.getElementById('email_app_password_2').value.trim() : '',
+                        email_account_3: document.getElementById('email_account_3') ? document.getElementById('email_account_3').value.trim() : '',
+                        email_app_password_3: document.getElementById('email_app_password_3') ? document.getElementById('email_app_password_3').value.trim() : '',
+                        email_account_4: document.getElementById('email_account_4') ? document.getElementById('email_account_4').value.trim() : '',
+                        email_app_password_4: document.getElementById('email_app_password_4') ? document.getElementById('email_app_password_4').value.trim() : '',
+                        email_account_5: document.getElementById('email_account_5') ? document.getElementById('email_account_5').value.trim() : '',
+                        email_app_password_5: document.getElementById('email_app_password_5') ? document.getElementById('email_app_password_5').value.trim() : '',
                         crm_deal_tags: document.getElementById('crm_deal_tags').value.trim(),
                         crm_won_deal_tags: document.getElementById('crm_won_deal_tags').value.trim(),
                         crm_lead_tags: document.getElementById('crm_lead_tags').value.trim(),
@@ -8013,7 +8279,7 @@ def create_client(request: Request, client: ClientCreate):
                 call_tracking_provider, ctm_account_id, ctm_profile_id, wc_account_id, wc_profile_id,
                 tiktok_ads_id, twitter_ads_id, pinterest_ads_id, snapchat_ads_id, chatgpt_ads_id
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             client.name, 
             client.callrail_account_id or None,
