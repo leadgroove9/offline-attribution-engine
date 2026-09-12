@@ -4085,12 +4085,15 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                 </p>
 
                                 <!-- Provider Tabs -->
-                                <div style="display: flex; border-bottom: 2px solid #e0e0e0; margin-bottom: 15px;">
+                                <div style="display: flex; border-bottom: 2px solid #e0e0e0; margin-bottom: 15px; flex-wrap: wrap;">
                                     <button type="button" id="tab-btn-google" class="tab-btn active" onclick="switchModalTab('google')">
                                         📁 Google Workspace / Gmail
                                     </button>
                                     <button type="button" id="tab-btn-ms" class="tab-btn" onclick="switchModalTab('ms')">
                                         📁 Microsoft 365 / Outlook
+                                    </button>
+                                    <button type="button" id="tab-btn-imap" class="tab-btn" onclick="switchModalTab('imap')">
+                                        🌐 Custom IMAP / cPanel / Other
                                     </button>
                                 </div>
 
@@ -4113,6 +4116,17 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                         <li style="margin-bottom: 8px;">Select <strong>App Password</strong> from the dropdown menu and click <strong>Add</strong>.</li>
                                         <li style="margin-bottom: 8px;">Name it (e.g., <code>LeadGroove Offline Tracker</code>) and click <strong>Next</strong>.</li>
                                         <li style="margin-bottom: 8px;">Copy the <strong>16-character password key</strong> immediately before closing the confirmation window.</li>
+                                    </ol>
+                                </div>
+
+                                <!-- Tab Content: Custom IMAP / Other Providers -->
+                                <div id="modal-tab-imap" class="tab-content" style="display: none;">
+                                    <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; color: #333; margin: 0;">
+                                        <li style="margin-bottom: 8px;">Log into your hosting control panel or email admin settings (e.g., <strong>cPanel, Webmail, Yahoo, iCloud, Fastmail, Zoho Mail, GoDaddy, or Namecheap</strong>).</li>
+                                        <li style="margin-bottom: 8px;">Navigate to <strong>Email Accounts ➡️ Security / Two-Factor Authentication</strong> or <strong>App Passwords</strong>.</li>
+                                        <li style="margin-bottom: 8px;">If your email provider enforces 2FA (e.g., Yahoo, Apple iCloud, Zoho), create a dedicated <strong>App Password</strong> named <code>LeadGroove IMAP Sync</code>.</li>
+                                        <li style="margin-bottom: 8px;">If your server uses standard IMAP authentication (e.g., cPanel, Webmail, self-hosted server), use your standard account email password.</li>
+                                        <li style="margin-bottom: 8px;">Ensure IMAP access is enabled on port <strong>993 (SSL/TLS)</strong> or port <strong>143 (STARTTLS)</strong>.</li>
                                     </ol>
                                 </div>
 
@@ -4230,6 +4244,15 @@ def view_settings(request: Request, client_id: Optional[int] = None):
             <script>
 
                 function openAppPasswordModal() {{
+                    const providerSelect = document.getElementById('email_provider');
+                    const selectedProvider = providerSelect ? providerSelect.value : 'gmail';
+                    if (selectedProvider === 'outlook') {{
+                        switchModalTab('ms');
+                    }} else if (selectedProvider === 'custom_imap') {{
+                        switchModalTab('imap');
+                    }} else {{
+                        switchModalTab('google');
+                    }}
                     document.getElementById('app-password-modal').style.display = 'flex';
                 }}
                 
@@ -4238,17 +4261,30 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                 }}
                 
                 function switchModalTab(provider) {{
-                    document.getElementById('tab-btn-google').classList.remove('active');
-                    document.getElementById('tab-btn-ms').classList.remove('active');
-                    document.getElementById('modal-tab-google').style.display = 'none';
-                    document.getElementById('modal-tab-ms').style.display = 'none';
+                    const btnG = document.getElementById('tab-btn-google');
+                    const btnM = document.getElementById('tab-btn-ms');
+                    const btnI = document.getElementById('tab-btn-imap');
+                    const tabG = document.getElementById('modal-tab-google');
+                    const tabM = document.getElementById('modal-tab-ms');
+                    const tabI = document.getElementById('modal-tab-imap');
+                    
+                    if (btnG) btnG.classList.remove('active');
+                    if (btnM) btnM.classList.remove('active');
+                    if (btnI) btnI.classList.remove('active');
+                    
+                    if (tabG) tabG.style.display = 'none';
+                    if (tabM) tabM.style.display = 'none';
+                    if (tabI) tabI.style.display = 'none';
                     
                     if (provider === 'google') {{
-                        document.getElementById('tab-btn-google').classList.add('active');
-                        document.getElementById('modal-tab-google').style.display = 'block';
-                    }} else {{
-                        document.getElementById('tab-btn-ms').classList.add('active');
-                        document.getElementById('modal-tab-ms').style.display = 'block';
+                        if (btnG) btnG.classList.add('active');
+                        if (tabG) tabG.style.display = 'block';
+                    }} else if (provider === 'ms') {{
+                        if (btnM) btnM.classList.add('active');
+                        if (tabM) tabM.style.display = 'block';
+                    }} else if (provider === 'imap') {{
+                        if (btnI) btnI.classList.add('active');
+                        if (tabI) tabI.style.display = 'block';
                     }}
                 }}
 
@@ -6777,12 +6813,15 @@ def add_client_page(request: Request):
                             </p>
 
                             <!-- Provider Tabs -->
-                            <div style="display: flex; border-bottom: 2px solid #e0e0e0; margin-bottom: 15px;">
+                            <div style="display: flex; border-bottom: 2px solid #e0e0e0; margin-bottom: 15px; flex-wrap: wrap;">
                                 <button type="button" id="tab-btn-google" class="tab-btn active" onclick="switchModalTab('google')">
                                     📁 Google Workspace / Gmail
                                 </button>
                                 <button type="button" id="tab-btn-ms" class="tab-btn" onclick="switchModalTab('ms')">
                                     📁 Microsoft 365 / Outlook
+                                </button>
+                                <button type="button" id="tab-btn-imap" class="tab-btn" onclick="switchModalTab('imap')">
+                                    🌐 Custom IMAP / cPanel / Other
                                 </button>
                             </div>
 
@@ -6808,6 +6847,17 @@ def add_client_page(request: Request):
                                 </ol>
                             </div>
 
+                            <!-- Tab Content: Custom IMAP / Other Providers -->
+                            <div id="modal-tab-imap" class="tab-content" style="display: none;">
+                                <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; color: #333; margin: 0;">
+                                    <li style="margin-bottom: 8px;">Log into your hosting control panel or email admin settings (e.g., <strong>cPanel, Webmail, Yahoo, iCloud, Fastmail, Zoho Mail, GoDaddy, or Namecheap</strong>).</li>
+                                    <li style="margin-bottom: 8px;">Navigate to <strong>Email Accounts ➡️ Security / Two-Factor Authentication</strong> or <strong>App Passwords</strong>.</li>
+                                    <li style="margin-bottom: 8px;">If your email provider enforces 2FA (e.g., Yahoo, Apple iCloud, Zoho), create a dedicated <strong>App Password</strong> named <code>LeadGroove IMAP Sync</code>.</li>
+                                    <li style="margin-bottom: 8px;">If your server uses standard IMAP authentication (e.g., cPanel, Webmail, self-hosted server), use your standard account email password.</li>
+                                    <li style="margin-bottom: 8px;">Ensure IMAP access is enabled on port <strong>993 (SSL/TLS)</strong> or port <strong>143 (STARTTLS)</strong>.</li>
+                                </ol>
+                            </div>
+
                             <!-- Security Footnote -->
                             <div style="background-color: #f1f8e9; border-left: 4px solid #2e7d32; padding: 12px; margin-top: 20px; border-radius: 4px;">
                                 <p style="margin: 0; font-size: 11px; line-height: 1.4; color: #1b5e20;">
@@ -6829,6 +6879,15 @@ def add_client_page(request: Request):
             <script>
 
                 function openAppPasswordModal() {
+                    const providerSelect = document.getElementById('email_provider');
+                    const selectedProvider = providerSelect ? providerSelect.value : 'gmail';
+                    if (selectedProvider === 'outlook') {
+                        switchModalTab('ms');
+                    } else if (selectedProvider === 'custom_imap') {
+                        switchModalTab('imap');
+                    } else {
+                        switchModalTab('google');
+                    }
                     document.getElementById('app-password-modal').style.display = 'flex';
                 }
                 
@@ -6837,17 +6896,30 @@ def add_client_page(request: Request):
                 }
                 
                 function switchModalTab(provider) {
-                    document.getElementById('tab-btn-google').classList.remove('active');
-                    document.getElementById('tab-btn-ms').classList.remove('active');
-                    document.getElementById('modal-tab-google').style.display = 'none';
-                    document.getElementById('modal-tab-ms').style.display = 'none';
+                    const btnG = document.getElementById('tab-btn-google');
+                    const btnM = document.getElementById('tab-btn-ms');
+                    const btnI = document.getElementById('tab-btn-imap');
+                    const tabG = document.getElementById('modal-tab-google');
+                    const tabM = document.getElementById('modal-tab-ms');
+                    const tabI = document.getElementById('modal-tab-imap');
+                    
+                    if (btnG) btnG.classList.remove('active');
+                    if (btnM) btnM.classList.remove('active');
+                    if (btnI) btnI.classList.remove('active');
+                    
+                    if (tabG) tabG.style.display = 'none';
+                    if (tabM) tabM.style.display = 'none';
+                    if (tabI) tabI.style.display = 'none';
                     
                     if (provider === 'google') {
-                        document.getElementById('tab-btn-google').classList.add('active');
-                        document.getElementById('modal-tab-google').style.display = 'block';
-                    } else {
-                        document.getElementById('tab-btn-ms').classList.add('active');
-                        document.getElementById('modal-tab-ms').style.display = 'block';
+                        if (btnG) btnG.classList.add('active');
+                        if (tabG) tabG.style.display = 'block';
+                    } else if (provider === 'ms') {
+                        if (btnM) btnM.classList.add('active');
+                        if (tabM) tabM.style.display = 'block';
+                    } else if (provider === 'imap') {
+                        if (btnI) btnI.classList.add('active');
+                        if (tabI) tabI.style.display = 'block';
                     }
                 }
 
