@@ -3775,7 +3775,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                         <span class="tooltip-icon">
                                             💬
                                             <span class="tooltip-text">
-                                                Forward your customer booking emails, invoice alerts, or form lead replies to:<br>
+                                                As a secondary option, you can also have AI monitor your incoming emails by cc'ing a copy of every email correspondence to:<br>
                                                 <strong class="settings-forwarding-email" style="color: #81c784; word-break: break-all;">conversions-{active_client_id}@your-agency.com</strong>
                                             </span>
                                         </span>
@@ -6625,7 +6625,7 @@ def add_client_page(request: Request):
                                     <span class="tooltip-icon">
                                         💬
                                         <span class="tooltip-text">
-                                            Forward your booking emails, invoice alerts, or form replies to your custom system address:<br>
+                                            As a secondary option, you can also have AI monitor your incoming emails by cc'ing a copy of every email correspondence to:<br>
                                             <strong class="wizard-forwarding-email" style="color: #81c784; word-break: break-all;">conversions-[id]@your-agency.com</strong><br>
                                             <span style="font-size: 9px; color: #ccc;">(Your actual ID will show up on the next screen once profile is created)</span>
                                         </span>
