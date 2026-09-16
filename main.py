@@ -1004,7 +1004,76 @@ def get_register(request: Request, error: Optional[str] = None, invite_token: Op
                     Already have an account? <a href="/login">Log In</a>
                 </div>
             </div>
-        </body>
+            <script>
+        function toggleCustomDateInputs() {
+            const rangeSelect = document.getElementById('date_range_select');
+            const customContainer = document.getElementById('custom_date_container');
+            if (rangeSelect && customContainer) {
+                if (rangeSelect.value === 'custom') {
+                    customContainer.style.display = 'flex';
+                } else {
+                    customContainer.style.display = 'none';
+                }
+            }
+        }
+
+        function setQuickDate(rangeVal) {
+            const rangeSelect = document.getElementById('date_range_select');
+            if (rangeSelect) {
+                rangeSelect.value = rangeVal;
+                toggleCustomDateInputs();
+                filterDashboard();
+            }
+        }
+
+        function exportFilteredLeads(e) {
+            if (e) e.preventDefault();
+            const clientSelect = document.getElementById('dashboard_client_select');
+            const rangeSelect = document.getElementById('date_range_select');
+            const startInput = document.getElementById('start_date_input');
+            const endInput = document.getElementById('end_date_input');
+            
+            const clientId = clientSelect ? clientSelect.value : '';
+            const dateRange = rangeSelect ? rangeSelect.value : 'all';
+            
+            let url = `/dashboard/export/leads?client_id=${clientId}&date_range=${dateRange}`;
+            
+            if (dateRange === 'custom') {
+                if (startInput && startInput.value) {
+                    url += `&start_date=${encodeURIComponent(startInput.value)}`;
+                }
+                if (endInput && endInput.value) {
+                    url += `&end_date=${encodeURIComponent(endInput.value)}`;
+                }
+            }
+            
+            window.location.href = url;
+        }
+
+        function filterDashboard() {
+            const clientSelect = document.getElementById('dashboard_client_select');
+            const rangeSelect = document.getElementById('date_range_select');
+            const startInput = document.getElementById('start_date_input');
+            const endInput = document.getElementById('end_date_input');
+            
+            const clientId = clientSelect ? clientSelect.value : '';
+            const dateRange = rangeSelect ? rangeSelect.value : 'all';
+            
+            let url = `/dashboard?client_id=${clientId}&date_range=${dateRange}`;
+            
+            if (dateRange === 'custom') {
+                if (startInput && startInput.value) {
+                    url += `&start_date=${encodeURIComponent(startInput.value)}`;
+                }
+                if (endInput && endInput.value) {
+                    url += `&end_date=${encodeURIComponent(endInput.value)}`;
+                }
+            }
+            
+            window.location.href = url;
+        }
+    </script>
+</body>
     </html>
     """
 
@@ -1636,8 +1705,155 @@ def read_root(request: Request):
     """
 
 
+
+def is_in_date_range(created_at_val, date_range: str, start_date_str: str, end_date_str: str) -> bool:
+    if not date_range or date_range == "all":
+        return True
+    if not created_at_val:
+        return True
+    try:
+        from datetime import datetime, timedelta
+        dt = None
+        if isinstance(created_at_val, datetime):
+            dt = created_at_val
+        else:
+            s_clean = str(created_at_val).strip()
+            if "T" in s_clean:
+                s_clean = s_clean.replace("T", " ")
+            s_clean = s_clean.split(".")[0]
+            try:
+                dt = datetime.strptime(s_clean, "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                try:
+                    dt = datetime.strptime(s_clean, "%Y-%m-%d")
+                except ValueError:
+                    return True
+                    
+        now = datetime.now()
+        if date_range in ["1d", "today"]:
+            cutoff = now - timedelta(days=1)
+            return dt >= cutoff
+        elif date_range == "7d":
+            cutoff = now - timedelta(days=7)
+            return dt >= cutoff
+        elif date_range == "30d":
+            cutoff = now - timedelta(days=30)
+            return dt >= cutoff
+        elif date_range == "90d":
+            cutoff = now - timedelta(days=90)
+            return dt >= cutoff
+        elif date_range == "custom":
+            valid = True
+            if start_date_str and start_date_str.strip():
+                s_dt = datetime.strptime(start_date_str.strip(), "%Y-%m-%d")
+                valid = valid and (dt >= s_dt)
+            if end_date_str and end_date_str.strip():
+                e_dt = datetime.strptime(end_date_str.strip(), "%Y-%m-%d") + timedelta(days=1)
+                valid = valid and (dt < e_dt)
+            return valid
+    except Exception as e:
+        print(f"Date filter parse exception: {e}")
+        return True
+    return True
+
+
+@app.get("/dashboard/export/leads")
+def export_filtered_leads(
+    request: Request,
+    client_id: Optional[int] = None,
+    date_range: Optional[str] = "all",
+    start_date: Optional[str] = "",
+    end_date: Optional[str] = ""
+):
+    email = is_authenticated(request)
+    if not email:
+        raise HTTPException(status_code=401, detail="Session expired. Please log in again.")
+    user_role, user_client_id = get_user_role_and_client(email)
+    
+    conn = db_router.connect()
+    cursor = conn.cursor()
+    
+    selected_client_id = client_id if client_id is not None else 0
+    if user_client_id is not None:
+        selected_client_id = user_client_id
+        
+    if selected_client_id == 0:
+        cursor.execute("""
+            SELECT s.id, s.phone, s.email, s.name, s.company, s.gclid, s.source, s.qualified, s.sale_closed, s.value, s.reason, s.created_at, c.name, s.fbclid, s.li_fat_id, s.msclkid, s.match_fuzzy, s.certainty_score, s.ttclid, s.twclid, s.pin_clid, s.scclid, s.gptclid, s.rdt_cid, s.model_used
+            FROM sessions s
+            LEFT JOIN clients c ON s.client_id = c.id
+            ORDER BY s.created_at DESC
+        """)
+    else:
+        cursor.execute("""
+            SELECT s.id, s.phone, s.email, s.name, s.company, s.gclid, s.source, s.qualified, s.sale_closed, s.value, s.reason, s.created_at, c.name, s.fbclid, s.li_fat_id, s.msclkid, s.match_fuzzy, s.certainty_score, s.ttclid, s.twclid, s.pin_clid, s.scclid, s.gptclid, s.rdt_cid, s.model_used
+            FROM sessions s
+            LEFT JOIN clients c ON s.client_id = c.id
+            WHERE s.client_id = ?
+            ORDER BY s.created_at DESC
+        """, (selected_client_id,))
+        
+    raw_rows = cursor.fetchall()
+    conn.close()
+    
+    filtered_rows = [r for r in raw_rows if is_in_date_range(r[11], date_range, start_date, end_date)]
+    
+    import io, csv
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    writer.writerow([
+        "Session ID", "Client Name", "Date & Time", "Lead Name / Phone", "Source Channel",
+        "AI Qualified", "Sale Closed", "Sales Value ($)", "Audit Reason / Summary", "Model Used",
+        "GCLID", "FBCLID", "MSCLKID", "LI_FAT_ID", "TTCLID", "TWCLID", "PIN_CLID", "GPTCLID", "RDT_CID"
+    ])
+    
+    for r in filtered_rows:
+        s_id = r[0]
+        phone = r[1] or ""
+        email_str = r[2] or ""
+        name = r[3] or ""
+        company = r[4] or ""
+        gclid = r[5] or ""
+        source = r[6] or ""
+        qualified = r[7] or "NO"
+        sale_closed = r[8] or "NO"
+        val = float(r[9] or 0.0)
+        reason = r[10] or ""
+        created_at = r[11] or ""
+        client_name = r[12] or "Unknown Client"
+        fbclid = r[13] or ""
+        li_fat_id = r[14] or ""
+        msclkid = r[15] or ""
+        ttclid = r[18] or ""
+        twclid = r[19] or ""
+        pin_clid = r[20] or ""
+        scclid = r[21] or ""
+        gptclid = r[22] or ""
+        rdt_cid = r[23] or ""
+        model_used = r[24] or ""
+        
+        display_contact = f"{name} ({phone})" if name and name != "Unknown Caller" else phone
+        
+        writer.writerow([
+            s_id, client_name, created_at, display_contact, source, qualified, sale_closed, f"{val:.2f}", reason, model_used,
+            gclid, fbclid, msclkid, li_fat_id, ttclid, twclid, pin_clid, gptclid, rdt_cid
+        ])
+        
+    output.seek(0)
+    filename_client = f"client_{selected_client_id}" if selected_client_id else "all_clients"
+    filename_range = f"{date_range}" if date_range else "all_time"
+    filename = f"filtered_leads_{filename_client}_{filename_range}.csv"
+    
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
 @app.get("/dashboard", response_class=HTMLResponse)
-def view_dashboard(request: Request, client_id: Optional[int] = None):
+def view_dashboard(request: Request, client_id: Optional[int] = None, date_range: Optional[str] = "all", start_date: Optional[str] = "", end_date: Optional[str] = ""):
     email = is_authenticated(request)
     if not email:
         return RedirectResponse(url="/login", status_code=303)
@@ -1703,11 +1919,40 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
     except Exception as e:
         return f"<html><body><h3>❌ Database Error: {e}</h3></body></html>"
 
+    # Filter by date range
+    raw_rows = rows
+    rows = [r for r in raw_rows if is_in_date_range(r[11], date_range, start_date, end_date)]
+
     # Count analytics
     total_leads = len(rows)
     qualified_leads = sum(1 for r in rows if r[7] == 'YES')
     sales_closed = sum(1 for r in rows if r[8] == 'YES')
     total_revenue = sum(float(r[9] or 0.0) for r in rows)
+    
+    opt_all = "selected" if date_range in [None, "all", ""] else ""
+    opt_1d = "selected" if date_range in ["1d", "today"] else ""
+    opt_7d = "selected" if date_range == "7d" else ""
+    opt_30d = "selected" if date_range == "30d" else ""
+    opt_90d = "selected" if date_range == "90d" else ""
+    opt_custom = "selected" if date_range == "custom" else ""
+    
+    start_date_val = start_date or ""
+    end_date_val = end_date or ""
+    
+    active_client_name = client_name_header
+            
+    if date_range in ["1d", "today"]:
+        date_range_label = "1 Day (Today)"
+    elif date_range == "7d":
+        date_range_label = "Last 7 Days"
+    elif date_range == "30d":
+        date_range_label = "Last 30 Days"
+    elif date_range == "90d":
+        date_range_label = "Last 90 Days"
+    elif date_range == "custom":
+        date_range_label = f"Custom: {start_date_val or 'Start'} to {end_date_val or 'Present'}"
+    else:
+        date_range_label = "All Time" 
     
     # Count how many of these leads have click IDs for each channel (and are either qualified or closed)
     exportable_google = sum(1 for r in rows if r[5] and (r[7] == 'YES' or r[8] == 'YES'))
@@ -2210,7 +2455,8 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                 <select id="upload_client_id" style="padding: 6px 12px; font-size: 13px; border-radius: 4px; border: 1px solid #9fa8da; font-weight: 600; outline: none; cursor: pointer; color: #1a237e; background: white;">
             """
             for c_id, c_name, *rest in clients:
-                upload_client_selector_html += f'<option value="{c_id}">👤 {c_name}</option>'
+                sel_up = 'selected' if c_id == selected_client_id else ''
+                upload_client_selector_html += f'<option value="{c_id}" {sel_up}>👤 {c_name}</option>'
             upload_client_selector_html += """
                 </select>
             </div>
@@ -2483,11 +2729,35 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                     </div>
                     
                     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                        <div class="client-selector-container">
+                        <div class="client-selector-container" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
                             <span class="client-label">Viewing Account:</span>
-                            <select class="client-select" onchange="window.location.href='/dashboard?client_id='+this.value">
+                            <select id="dashboard_client_select" class="client-select" onchange="filterDashboard()">
                                 {dropdown_options}
                             </select>
+
+                            <span class="client-label" style="margin-left: 10px;">📅 Date Filter:</span>
+                            <select id="date_range_select" class="client-select" onchange="toggleCustomDateInputs(); filterDashboard();" style="padding: 6px 12px; border-radius: 4px; border: 1px solid #9fa8da; font-weight: 600;">
+                                <option value="all" {opt_all}>All Time</option>
+                                <option value="1d" {opt_1d}>1 Day (Today)</option>
+                                <option value="7d" {opt_7d}>Last 7 Days</option>
+                                <option value="30d" {opt_30d}>Last 30 Days</option>
+                                <option value="90d" {opt_90d}>Last 90 Days</option>
+                                <option value="custom" {opt_custom}>📅 Custom Range...</option>
+                            </select>
+
+                            <div id="custom_date_container" style="display: {'flex' if date_range == 'custom' else 'none'}; align-items: center; gap: 6px;">
+                                <input type="date" id="start_date_input" value="{start_date_val}" onchange="filterDashboard()" style="padding: 5px 8px; border-radius: 4px; border: 1px solid #9fa8da; font-size: 12px;">
+                                <span style="color: #555; font-size: 12px; font-weight: bold;">to</span>
+                                <input type="date" id="end_date_input" value="{end_date_val}" onchange="filterDashboard()" style="padding: 5px 8px; border-radius: 4px; border: 1px solid #9fa8da; font-size: 12px;">
+                            </div>
+
+                            <div style="display: flex; gap: 4px; margin-left: 5px;">
+                                <button type="button" onclick="setQuickDate('1d')" class="btn-copy" style="padding: 5px 9px; font-size: 11px; background: {'#1a237e' if date_range == '1d' else '#e8eaf6'}; color: {'#fff' if date_range == '1d' else '#1a237e'}; border: none; cursor: pointer;">1D</button>
+                                <button type="button" onclick="setQuickDate('7d')" class="btn-copy" style="padding: 5px 9px; font-size: 11px; background: {'#1a237e' if date_range == '7d' else '#e8eaf6'}; color: {'#fff' if date_range == '7d' else '#1a237e'}; border: none; cursor: pointer;">7D</button>
+                                <button type="button" onclick="setQuickDate('30d')" class="btn-copy" style="padding: 5px 9px; font-size: 11px; background: {'#1a237e' if date_range == '30d' else '#e8eaf6'}; color: {'#fff' if date_range == '30d' else '#1a237e'}; border: none; cursor: pointer;">30D</button>
+                                <button type="button" onclick="setQuickDate('90d')" class="btn-copy" style="padding: 5px 9px; font-size: 11px; background: {'#1a237e' if date_range == '90d' else '#e8eaf6'}; color: {'#fff' if date_range == '90d' else '#1a237e'}; border: none; cursor: pointer;">90D</button>
+                                <button type="button" onclick="setQuickDate('all')" class="btn-copy" style="padding: 5px 9px; font-size: 11px; background: {'#1a237e' if date_range in [None, 'all', ''] else '#e8eaf6'}; color: {'#fff' if date_range in [None, 'all', ''] else '#1a237e'}; border: none; cursor: pointer;">All</button>
+                            </div>
                         </div>
                         {settings_btn_html}
                         {onboard_btn_html}
@@ -2676,7 +2946,20 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                 {global_modals_html}
 
                 <!-- Table -->
-                <h3 style="margin: 0 0 15px 0; color: #1a237e;">Lead Activity Log</h3>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+            <h3 style="margin: 0; color: #1a237e; display: flex; align-items: center; gap: 8px;">
+                📊 Lead Activity Log
+                <span style="font-size: 12px; font-weight: normal; background: #e8eaf6; color: #1a237e; padding: 3px 10px; border-radius: 12px;">Showing {total_leads} entries ({date_range_label})</span>
+            </h3>
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <a href="#" onclick="exportFilteredLeads(event)" class="btn-copy" style="background-color: #2e7d32; text-decoration: none; padding: 8px 14px; font-size: 12px; font-weight: bold; color: white; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                    📥 Export Filtered Leads CSV ({total_leads})
+                </a>
+                <div style="font-size: 12px; color: #666; font-style: italic;">
+                    Active: <strong>{active_client_name}</strong> | <strong>{date_range_label}</strong>
+                </div>
+            </div>
+        </div>
                 <div class="table-responsive">
                     <table>
                         <thead>
