@@ -7033,8 +7033,13 @@ def add_client_page(request: Request):
                         <input type="text" id="webhook-url-input" readonly style="flex: 1; padding: 10px; border-radius: 6px; border: 1px solid #ced4da; font-family: monospace; font-size: 12px; background-color: #f8f9fa;">
                         <button type="button" onclick="copyWebhookUrl('webhook-url-input', 'copy-btn')" id="copy-btn" class="btn-submit" style="margin: 0; width: auto; white-space: nowrap; padding: 0 15px; font-size: 14px; background-color: #2e7d32;">📋 Copy URL</button>
                     </div>
-                    <div id="call-tracking-instructions-reminder" class="instructions" style="text-align: left; background-color: #fff3cd; border-left-color: #ffc107; color: #856404; font-size: 11px; margin-top: -10px; margin-bottom: 25px; padding: 8px 12px;">
-                        ⚠️ <strong>Reminder:</strong> Set the trigger inside CallRail integration settings to <strong>"Call Completed"</strong> so transcripts are compiled.
+                    <div id="call-tracking-instructions-reminder" class="instructions" style="text-align: left; background-color: #fff3cd; border-left-color: #ffc107; color: #856404; font-size: 11px; margin-top: -10px; margin-bottom: 25px; padding: 12px 15px;">
+                        ⚠️ <strong>CallRail Setup Checklist (Inbound & Outbound Call Recording & Transcripts):</strong><br>
+                        <ol style="margin: 6px 0 0 0; padding-left: 18px; line-height: 1.6; font-size: 11px;">
+                            <li>Log into <strong>CallRail</strong> and go to <strong>Settings ➡️ Company / Numbers ➡️ Call Recording & Transcripts</strong>.</li>
+                            <li>Ensure both <strong>Inbound & Outbound Call Recording</strong> and <strong>Speech-to-Text Transcripts</strong> are toggled <strong>ON</strong> in English for all target tracking numbers.</li>
+                            <li>Go to <strong>Integrations ➡️ Webhooks</strong>, paste your dynamic target URL (above), and set the trigger event to <strong>"Call Completed"</strong> so complete call recordings and transcripts are compiled and sent to LeadGrove automatically!</li>
+                        </ol>
                     </div>
 
                     <!-- CRM / Billing Program Connection Step (Shown conditionally) -->
@@ -7919,20 +7924,41 @@ def add_client_page(request: Request):
                             document.getElementById('registered-client-name').innerText = payload.name;
                             let liveWebhook = `${window.location.origin}/webhooks/callrail?client_id=${data.client_id}`;
                             let providerName = "CallRail";
-                            let providerInstructions = "Set the trigger inside CallRail integration settings to <strong>'Call Completed'</strong> so transcripts are compiled.";
+                            let providerInstructions = `
+                                <strong>CallRail Setup Checklist (Inbound & Outbound Call Recording & Transcripts):</strong><br>
+                                <ol style="margin: 6px 0 0 0; padding-left: 18px; line-height: 1.6; font-size: 11px;">
+                                    <li>Log into <strong>CallRail</strong> and go to <strong>Settings ➡️ Company / Numbers ➡️ Call Recording & Transcripts</strong>.</li>
+                                    <li>Ensure both <strong>Inbound & Outbound Call Recording</strong> and <strong>Speech-to-Text Transcripts</strong> are toggled <strong>ON</strong> in English for all target tracking numbers.</li>
+                                    <li>Go to <strong>Integrations ➡️ Webhooks</strong>, paste your dynamic target URL (above), and set the trigger event to <strong>"Call Completed"</strong> so complete call recordings and transcripts are compiled and sent to LeadGrove automatically!</li>
+                                </ol>
+                            `;
                             if (payload.call_tracking_provider === 'calltrackingmetrics') {
                                 liveWebhook = `${window.location.origin}/webhooks/calltrackingmetrics?client_id=${data.client_id}`;
                                 providerName = "CallTrackingMetrics";
-                                providerInstructions = "Configure a webhook in CallTrackingMetrics to trigger when a <strong>Call/Transcription is completed</strong>.";
+                                providerInstructions = `
+                                    <strong>CallTrackingMetrics Setup Checklist (Inbound & Outbound Call Recording & Transcripts):</strong><br>
+                                    <ol style="margin: 6px 0 0 0; padding-left: 18px; line-height: 1.6; font-size: 11px;">
+                                        <li>Log into <strong>CallTrackingMetrics</strong> and navigate to <strong>Numbers ➡️ Call Settings / Account Settings</strong>.</li>
+                                        <li>Turn on <strong>Call Recording</strong> and enable <strong>Speech-to-Text / Automated Transcriptions</strong> for both inbound and outbound calls.</li>
+                                        <li>Go to <strong>Settings ➡️ Webhooks</strong>, paste your dynamic target URL (above), and set the trigger to fire when <strong>Call / Transcription is Completed</strong> so full logs are delivered to LeadGrove.</li>
+                                    </ol>
+                                `;
                             } else if (payload.call_tracking_provider === 'whatconverts') {
                                 liveWebhook = `${window.location.origin}/webhooks/whatconverts?client_id=${data.client_id}`;
                                 providerName = "WhatConverts";
-                                providerInstructions = "Configure a webhook trigger in WhatConverts for <strong>Phone Calls</strong> and make sure <strong>Transcriptions</strong> are enabled.";
+                                providerInstructions = `
+                                    <strong>WhatConverts Setup Checklist (Inbound & Outbound Call Recording & Transcripts):</strong><br>
+                                    <ol style="margin: 6px 0 0 0; padding-left: 18px; line-height: 1.6; font-size: 11px;">
+                                        <li>Log into <strong>WhatConverts</strong> and navigate to <strong>Tracking ➡️ Phone Calls / Call Settings</strong>.</li>
+                                        <li>Ensure <strong>Call Recording</strong> and <strong>Call Transcriptions</strong> are toggled <strong>ON</strong> for both inbound and outbound call flows.</li>
+                                        <li>Go to <strong>Integrations ➡️ Webhooks</strong>, paste your dynamic target URL (above), and create a trigger for <strong>Phone Calls</strong> with <strong>Transcriptions</strong> enabled.</li>
+                                    </ol>
+                                `;
                             }
                             document.getElementById('webhook-url-input').value = liveWebhook;
                             document.getElementById('call-tracking-provider-title').innerHTML = `Step 2: Configure ${providerName} Integration`;
                             document.getElementById('call-tracking-provider-span').innerText = providerName;
-                            document.getElementById('call-tracking-instructions-reminder').innerHTML = `⚠️ <strong>Reminder:</strong> ${providerInstructions}`;
+                            document.getElementById('call-tracking-instructions-reminder').innerHTML = `⚠️ ${providerInstructions}`;
                             
                                                         // CRM / Billing / Email custom success steps
                             const sotBox = document.getElementById('sot-instructions-box');
