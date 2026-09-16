@@ -3785,6 +3785,28 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                 </div>
                             </div>
                         </div>
+                        <div id="sot-monthly-email-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
+                            <div style="background-color: #e8eaf6; border-left: 4px solid #1a237e; padding: 15px; border-radius: 4px; color: #1a237e; font-size: 13px; line-height: 1.6; margin-bottom: 0; text-align: left;">
+                                💡 <strong>Monthly Sales Spreadsheet Email Ingestion Setup Guide:</strong><br>
+                                <ol style="padding-left: 20px; margin-top: 10px; margin-bottom: 10px; line-height: 1.8; font-size: 12px; color: #1a237e;">
+                                    <li><strong>Setup Email Forwarding:</strong> Set up automated forwarding or email your monthly sales spreadsheet directly to:<br>
+                                        <div style="margin-top: 6px; margin-bottom: 6px; background: white; padding: 10px; border-radius: 6px; border: 1px solid #c5cae9; display: inline-block;">
+                                            <code class="monthly-forwarding-email" style="font-size: 13px; font-weight: bold; color: #2e7d32; font-family: monospace;">conversions-{active_client_id}@your-agency.com</code>
+                                        </div>
+                                    </li>
+                                    <li><strong>Specify Qualification & Revenue Tags:</strong> In the fields above, specify which tags or cell statuses (e.g. <code>appointment-booked</code>, <code>closed-won</code>, <code>paid</code>) indicate qualified leads and purchase revenue.</li>
+                                    <li><strong>Format Spreadsheet Column Headings:</strong> Ensure Row 1 of your spreadsheet includes matching column headers:
+                                        <ul style="list-style-type: disc; padding-left: 20px; margin-top: 5px; margin-bottom: 5px;">
+                                            <li><code>Phone</code> (or <code>Phone Number</code>) — Required to match original callers / web leads</li>
+                                            <li><code>Status</code> (or <code>Stage</code> / <code>Tag</code>) — Matching the tags specified in Step #2 above</li>
+                                            <li><code>Amount</code> (or <code>Revenue</code> / <code>Total</code>) — The purchase dollar value</li>
+                                            <li><code>Email</code> / <code>Name</code> — Optional customer details</li>
+                                        </ul>
+                                    </li>
+                                </ol>
+                            </div>
+                        </div>
+
 
 <!-- CONDITIONAL: CRM Lead status tags -->
                             <div id="sot-lead-tags-box" class="conditional-box">
@@ -4620,6 +4642,9 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             input.value = origin + suffix;
                         }}
                     }});
+                    document.querySelectorAll('.monthly-forwarding-email').forEach(el => {{
+                        el.innerText = `conversions-{active_client_id}@${{emailDomain}}`;
+                    }});
                     
                     // Dynamically replace placeholder origins inside code instruction blocks
                     document.querySelectorAll('code').forEach(el => {{
@@ -5171,6 +5196,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     const freshbooksBox = document.getElementById('sot-freshbooks-instructions-box');
                     const googleSheetsBox = document.getElementById('sot-google_sheets-instructions-box');
                     const zapierBox = document.getElementById('sot-zapier-instructions-box');
+                    const monthlyEmailBox = document.getElementById('sot-monthly-email-instructions-box');
                     
                     const crmCard = document.getElementById('crm-webhook-card');
                     const billingCard = document.getElementById('billing-webhook-card');
@@ -5197,6 +5223,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     if (freshbooksBox) freshbooksBox.style.display = 'none';
                     if (googleSheetsBox) googleSheetsBox.style.display = 'none';
                     if (zapierBox) zapierBox.style.display = 'none';
+                    if (monthlyEmailBox) monthlyEmailBox.style.display = 'none';
                     
                     // 2. Reset / Hide all SOT webhook cards in Section 5
                     if (crmCard) crmCard.style.display = 'none';
@@ -5210,7 +5237,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     if (crmPlatforms.includes(sot)) {{
                         if (crmCard) crmCard.style.display = 'block';
                         
-                        if (['hubspot', 'salesforce', 'zoho', 'gohighlevel', 'google_sheets'].includes(sot)) {{
+                        if (['hubspot', 'salesforce', 'zoho', 'gohighlevel', 'google_sheets', 'email'].includes(sot)) {{
                             if (dealBox) dealBox.style.display = 'block';
                         }}
                         if (['servicetitan', 'housecallpro', 'gohighlevel'].includes(sot)) {{
@@ -5235,14 +5262,14 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         else if (sot === 'freshbooks' && freshbooksBox) freshbooksBox.style.display = 'block';
                         else if (sot === 'google_sheets' && googleSheetsBox) {{ googleSheetsBox.style.display = 'block'; if (dealBox) dealBox.style.display = 'block'; }}
                         else if (sot === 'zapier' && zapierBox) zapierBox.style.display = 'block';
-                        
-                    }} else const origin = window.location.origin || '';
-                    document.querySelectorAll('.webhook-input').forEach(input => {{
-                        const suffix = input.getAttribute('data-suffix');
-                        if (suffix && (!input.value || input.value.trim() === '')) {{
-                            input.value = origin + suffix;
+                    }} else if (sot === 'email' || sot === 'ai_rating') {{
+                        if (emailBox) emailBox.style.display = 'block';
+                        if (sot === 'email' && emailCard) emailCard.style.display = 'block';
+                        if (sot === 'ai_rating' && voipBox) {{
+                            voipBox.style.display = 'block';
+                            toggleVoipInstructions();
                         }}
-                    }});
+                    }}
                     if (sot === 'email' || sot === 'ai_rating') {{
                         if (emailBox) emailBox.style.display = 'block';
                         if (sot === 'email' && emailCard) emailCard.style.display = 'block';
@@ -6995,6 +7022,28 @@ def add_client_page(request: Request):
                                 </div>
                             </div>
                         </div>
+                        <div id="sot-monthly-email-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
+                            <div style="background-color: #e8eaf6; border-left: 4px solid #1a237e; padding: 15px; border-radius: 4px; color: #1a237e; font-size: 13px; line-height: 1.6; margin-bottom: 0; text-align: left;">
+                                💡 <strong>Monthly Sales Spreadsheet Email Ingestion Setup Guide:</strong><br>
+                                <ol style="padding-left: 20px; margin-top: 10px; margin-bottom: 10px; line-height: 1.8; font-size: 12px; color: #1a237e;">
+                                    <li><strong>Setup Email Forwarding:</strong> Set up automated forwarding or email your monthly sales spreadsheet directly to:<br>
+                                        <div style="margin-top: 6px; margin-bottom: 6px; background: white; padding: 10px; border-radius: 6px; border: 1px solid #c5cae9; display: inline-block;">
+                                            <code class="monthly-forwarding-email" style="font-size: 13px; font-weight: bold; color: #2e7d32; font-family: monospace;">conversions-[id]@your-agency.com</code>
+                                        </div>
+                                    </li>
+                                    <li><strong>Specify Qualification & Revenue Tags:</strong> In the fields above, specify which tags or cell statuses (e.g. <code>appointment-booked</code>, <code>closed-won</code>, <code>paid</code>) indicate qualified leads and purchase revenue.</li>
+                                    <li><strong>Format Spreadsheet Column Headings:</strong> Ensure Row 1 of your spreadsheet includes matching column headers:
+                                        <ul style="list-style-type: disc; padding-left: 20px; margin-top: 5px; margin-bottom: 5px;">
+                                            <li><code>Phone</code> (or <code>Phone Number</code>) — Required to match original callers / web leads</li>
+                                            <li><code>Status</code> (or <code>Stage</code> / <code>Tag</code>) — Matching the tags specified in Step #2 above</li>
+                                            <li><code>Amount</code> (or <code>Revenue</code> / <code>Total</code>) — The purchase dollar value</li>
+                                            <li><code>Email</code> / <code>Name</code> — Optional customer details</li>
+                                        </ul>
+                                    </li>
+                                </ol>
+                            </div>
+                        </div>
+
 
 <!-- CONDITIONAL INPUT: CRM Lead status tags (ServiceTitan, Housecall Pro) -->
                         <div id="sot-lead-tags-box" class="conditional-box">
@@ -7584,6 +7633,9 @@ def add_client_page(request: Request):
                     if (wizardEmailLabel) {
                         wizardEmailLabel.innerText = `conversions-[id]@${emailDomain}`;
                     }
+                    document.querySelectorAll('.monthly-forwarding-email').forEach(el => {
+                        el.innerText = `conversions-[id]@${emailDomain}`;
+                    });
                     document.querySelectorAll('.webhook-input').forEach(input => {
                         const suffix = input.getAttribute('data-suffix');
                         if (suffix) {
@@ -8166,6 +8218,7 @@ def add_client_page(request: Request):
                     const freshbooksBox = document.getElementById('sot-freshbooks-instructions-box');
                     const googleSheetsBox = document.getElementById('sot-google_sheets-instructions-box');
                     const zapierBox = document.getElementById('sot-zapier-instructions-box');
+                    const monthlyEmailBox = document.getElementById('sot-monthly-email-instructions-box');
                     
                     if (dealBox) dealBox.style.display = 'none';
                     if (leadBox) leadBox.style.display = 'none';
@@ -8187,9 +8240,10 @@ def add_client_page(request: Request):
                     if (freshbooksBox) freshbooksBox.style.display = 'none';
                     if (googleSheetsBox) googleSheetsBox.style.display = 'none';
                     if (zapierBox) zapierBox.style.display = 'none';
+                    if (monthlyEmailBox) monthlyEmailBox.style.display = 'none';
                     
                     if (['hubspot', 'salesforce', 'zoho', 'servicetitan', 'housecallpro', 'gohighlevel'].includes(sot)) {
-                        if (['hubspot', 'salesforce', 'zoho', 'gohighlevel', 'google_sheets'].includes(sot)) {
+                        if (['hubspot', 'salesforce', 'zoho', 'gohighlevel', 'google_sheets', 'email'].includes(sot)) {
                             if (dealBox) dealBox.style.display = 'block';
                         }
                         if (['servicetitan', 'housecallpro', 'gohighlevel'].includes(sot)) {
@@ -8210,13 +8264,13 @@ def add_client_page(request: Request):
                         else if (sot === 'freshbooks' && freshbooksBox) freshbooksBox.style.display = 'block';
                         else if (sot === 'google_sheets' && googleSheetsBox) { googleSheetsBox.style.display = 'block'; if (dealBox) dealBox.style.display = 'block'; }
                         else if (sot === 'zapier' && zapierBox) zapierBox.style.display = 'block';
-                    } else const origin = window.location.origin || '';
-                    document.querySelectorAll('.webhook-input').forEach(input => {
-                        const suffix = input.getAttribute('data-suffix');
-                        if (suffix && (!input.value || input.value.trim() === '')) {
-                            input.value = origin + suffix;
+                    } else if (sot === 'email' || sot === 'ai_rating') {
+                        if (emailBox) emailBox.style.display = 'block';
+                        if (sot === 'ai_rating' && voipBox) {
+                            voipBox.style.display = 'block';
+                            toggleVoipInstructions();
                         }
-                    });
+                    }
                     if (sot === 'email' || sot === 'ai_rating') {
                         if (emailBox) emailBox.style.display = 'block';
                         if (sot === 'ai_rating' && voipBox) {
