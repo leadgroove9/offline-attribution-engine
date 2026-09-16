@@ -3768,23 +3768,69 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                 </div>
                             </div>
                         </div>
-                        <div id="sot-zapier-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
-                            <div style="background-color: #fffde7; border-left: 4px solid #fbc02d; padding: 15px; border-radius: 4px; color: #f57f17; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                                <div id="sot-zapier-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #f57c00; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
+                            <div style="background-color: #fff3e0; border-left: 4px solid #ff9800; padding: 15px; border-radius: 4px; color: #e65100; font-size: 13px; line-height: 1.6; margin-bottom: 0; text-align: left;">
                                 💡 <strong>Webhooks by Zapier Custom Setup Guide:</strong><br>
-                                <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #e65100;">
-                                    <li>In your Zapier account, create a new Zap.</li>
-                                    <li><strong>Trigger:</strong> Select your platform (Stripe, PayPal, Shopify, custom CRM).</li>
-                                    <li><strong>Action:</strong> Select <strong>Webhooks by Zapier (Custom Request or POST)</strong> and paste your endpoint below.</li>
+                                <ol style="padding-left: 20px; margin-top: 10px; margin-bottom: 10px; line-height: 1.8; font-size: 12px; color: #e65100;">
+                                    <li><strong>Indicate Conversion Tags Above:</strong> In the fields above, enter the exact tags or statuses (e.g. <code>appointment-booked</code>, <code>closed-won</code>, <code>paid</code>) that signify a <strong>Qualified Lead</strong> and a <strong>Won Deal</strong> in your pipeline.</li>
+                                    <li><strong>Create a Zap in Zapier:</strong> Set your <strong>Trigger</strong> app (e.g. Stripe, PayPal, Typeform, Calendly, or custom CRM).</li>
+                                    <li><strong>Add Webhook Action:</strong> Add an Action step, select <strong>Webhooks by Zapier ➡️ Custom Request (POST) or POST</strong>, and paste your endpoint URL below into the <strong>URL</strong> field.</li>
+                                    <li><strong>Map Payload Data Fields:</strong> Map your trigger data to these key parameters so LeadGrove accurately parses your conversions:
+                                        <ul style="list-style-type: disc; padding-left: 20px; margin-top: 5px; margin-bottom: 5px;">
+                                            <li><code>phone</code> (or <code>phone_number</code>) — Customer phone number (used to match original ad click)</li>
+                                            <li><code>status</code> (or <code>stage</code> / <code>tag</code>) — Matching the tags specified in Step 1</li>
+                                            <li><code>amount</code> (or <code>value</code>) — Transaction dollar revenue for won deals (e.g. <code>450.00</code>)</li>
+                                            <li><code>email</code> / <code>name</code> — Customer email and name</li>
+                                        </ul>
+                                    </li>
                                 </ol>
+
+                                <!-- Visual Diagram: Zapier Workflow Mapping -->
+                                <div style="margin-top: 15px; margin-bottom: 15px; background: white; border: 1px solid #ffe0b2; border-radius: 8px; padding: 15px;">
+                                    <div style="font-size: 11px; font-weight: bold; color: #e65100; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; text-align: center;">
+                                        ⚡ ZAPIER WEBHOOK CONFIGURATION ARCHITECTURE
+                                    </div>
+                                    <div style="display: flex; align-items: center; justify-content: space-around; gap: 8px; flex-wrap: wrap; text-align: center; margin-bottom: 12px;">
+                                        <div style="background: #fff8e1; border: 1px solid #ffe0b2; border-radius: 6px; padding: 10px; min-width: 120px; flex: 1;">
+                                            <div style="font-size: 18px;">📥</div>
+                                            <div style="font-weight: bold; font-size: 11px; color: #e65100;">1. Trigger App</div>
+                                            <div style="font-size: 10px; color: #795548;">CRM, Form, Stripe</div>
+                                        </div>
+                                        <div style="font-size: 16px; color: #ff9800; font-weight: bold;">➔</div>
+                                        <div style="background: #fff3e0; border: 1px solid #ffcc80; border-radius: 6px; padding: 10px; min-width: 130px; flex: 1;">
+                                            <div style="font-size: 18px;">⚡</div>
+                                            <div style="font-weight: bold; font-size: 11px; color: #e65100;">2. Webhooks by Zapier</div>
+                                            <div style="font-size: 10px; color: #795548;">Action: POST Method</div>
+                                        </div>
+                                        <div style="font-size: 16px; color: #ff9800; font-weight: bold;">➔</div>
+                                        <div style="background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 6px; padding: 10px; min-width: 120px; flex: 1;">
+                                            <div style="font-size: 18px;">🎯</div>
+                                            <div style="font-weight: bold; font-size: 11px; color: #2e7d32;">3. LeadGrove Engine</div>
+                                            <div style="font-size: 10px; color: #388e3c;">Ad Network Uploads</div>
+                                        </div>
+                                    </div>
+
+                                    <div style="background: #263238; color: #eceff1; border-radius: 6px; padding: 12px; font-family: monospace; font-size: 11px; line-height: 1.6; text-align: left;">
+                                        <div style="color: #ffb74d; font-weight: bold; margin-bottom: 4px;">// Zapier Action Setup Mockup</div>
+                                        <div><span style="color: #80cbc4;">Action Event :</span> <span style="color: #fff;">POST</span></div>
+                                        <div><span style="color: #80cbc4;">URL          :</span> <span style="color: #fff;">[YOUR TARGET WEBHOOK URL BELOW]</span></div>
+                                        <div><span style="color: #80cbc4;">Payload Type :</span> <span style="color: #fff;">json</span></div>
+                                        <div><span style="color: #80cbc4;">Data Fields  :</span></div>
+                                        <div style="padding-left: 15px;"><span style="color: #81c784;">phone</span>  ➡️  <span style="color: #b0bec5;">1. Customer Phone Number</span></div>
+                                        <div style="padding-left: 15px;"><span style="color: #81c784;">status</span> ➡️  <span style="color: #b0bec5;">1. Deal Stage / Status Tag</span></div>
+                                        <div style="padding-left: 15px;"><span style="color: #81c784;">amount</span> ➡️  <span style="color: #b0bec5;">1. Purchase Revenue ($)</span></div>
+                                    </div>
+                                </div>
+
                                 <div style="margin-top: 12px; background: white; padding: 12px; border-radius: 6px; border: 1px solid #fbc02d;">
                                     <label style="font-size: 11px; font-weight: bold; color: #f57f17; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
                                     <div class="webhook-input-group">
-                                        <input type="text" class="webhook-input" id="sot-zapier-instructions-box-input" readonly value="" data-suffix="/webhooks/billing?client_id={active_client_id}">
+                                        <input type="text" class="webhook-input" id="sot-zapier-instructions-box-input" readonly value="" data-suffix="/webhooks/crm?client_id={active_client_id}">
                                         <button type="button" onclick="copyText('sot-zapier-instructions-box-input', 'sot-zapier-instructions-box-btn')" id="sot-zapier-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                        </div></div>
                         <div id="sot-monthly-email-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #e8eaf6; border-left: 4px solid #1a237e; padding: 15px; border-radius: 4px; color: #1a237e; font-size: 13px; line-height: 1.6; margin-bottom: 0; text-align: left;">
                                 💡 <strong>Monthly Sales Spreadsheet Email Ingestion Setup Guide:</strong><br>
@@ -5237,7 +5283,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     if (crmPlatforms.includes(sot)) {{
                         if (crmCard) crmCard.style.display = 'block';
                         
-                        if (['hubspot', 'salesforce', 'zoho', 'gohighlevel', 'google_sheets', 'email'].includes(sot)) {{
+                        if (['hubspot', 'salesforce', 'zoho', 'gohighlevel', 'google_sheets', 'email', 'zapier'].includes(sot)) {{
                             if (dealBox) dealBox.style.display = 'block';
                         }}
                         if (['servicetitan', 'housecallpro', 'gohighlevel'].includes(sot)) {{
@@ -7000,23 +7046,69 @@ def add_client_page(request: Request):
                                 </div>
                             </div>
                         </div>
-                        <div id="sot-zapier-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
-                            <div style="background-color: #fffde7; border-left: 4px solid #fbc02d; padding: 15px; border-radius: 4px; color: #f57f17; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
+                                                <div id="sot-zapier-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #f57c00; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
+                            <div style="background-color: #fff3e0; border-left: 4px solid #ff9800; padding: 15px; border-radius: 4px; color: #e65100; font-size: 13px; line-height: 1.6; margin-bottom: 0; text-align: left;">
                                 💡 <strong>Webhooks by Zapier Custom Setup Guide:</strong><br>
-                                <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #e65100;">
-                                    <li>In your Zapier account, create a new Zap.</li>
-                                    <li><strong>Trigger:</strong> Select your platform (Stripe, PayPal, Shopify, custom CRM).</li>
-                                    <li><strong>Action:</strong> Select <strong>Webhooks by Zapier (Custom Request or POST)</strong> and paste your endpoint below.</li>
+                                <ol style="padding-left: 20px; margin-top: 10px; margin-bottom: 10px; line-height: 1.8; font-size: 12px; color: #e65100;">
+                                    <li><strong>Indicate Conversion Tags Above:</strong> In the fields above, enter the exact tags or statuses (e.g. <code>appointment-booked</code>, <code>closed-won</code>, <code>paid</code>) that signify a <strong>Qualified Lead</strong> and a <strong>Won Deal</strong> in your pipeline.</li>
+                                    <li><strong>Create a Zap in Zapier:</strong> Set your <strong>Trigger</strong> app (e.g. Stripe, PayPal, Typeform, Calendly, or custom CRM).</li>
+                                    <li><strong>Add Webhook Action:</strong> Add an Action step, select <strong>Webhooks by Zapier ➡️ Custom Request (POST) or POST</strong>, and paste your endpoint URL below into the <strong>URL</strong> field.</li>
+                                    <li><strong>Map Payload Data Fields:</strong> Map your trigger data to these key parameters so LeadGrove accurately parses your conversions:
+                                        <ul style="list-style-type: disc; padding-left: 20px; margin-top: 5px; margin-bottom: 5px;">
+                                            <li><code>phone</code> (or <code>phone_number</code>) — Customer phone number (used to match original ad click)</li>
+                                            <li><code>status</code> (or <code>stage</code> / <code>tag</code>) — Matching the tags specified in Step 1</li>
+                                            <li><code>amount</code> (or <code>value</code>) — Transaction dollar revenue for won deals (e.g. <code>450.00</code>)</li>
+                                            <li><code>email</code> / <code>name</code> — Customer email and name</li>
+                                        </ul>
+                                    </li>
                                 </ol>
+
+                                <!-- Visual Diagram: Zapier Workflow Mapping -->
+                                <div style="margin-top: 15px; margin-bottom: 15px; background: white; border: 1px solid #ffe0b2; border-radius: 8px; padding: 15px;">
+                                    <div style="font-size: 11px; font-weight: bold; color: #e65100; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; text-align: center;">
+                                        ⚡ ZAPIER WEBHOOK CONFIGURATION ARCHITECTURE
+                                    </div>
+                                    <div style="display: flex; align-items: center; justify-content: space-around; gap: 8px; flex-wrap: wrap; text-align: center; margin-bottom: 12px;">
+                                        <div style="background: #fff8e1; border: 1px solid #ffe0b2; border-radius: 6px; padding: 10px; min-width: 120px; flex: 1;">
+                                            <div style="font-size: 18px;">📥</div>
+                                            <div style="font-weight: bold; font-size: 11px; color: #e65100;">1. Trigger App</div>
+                                            <div style="font-size: 10px; color: #795548;">CRM, Form, Stripe</div>
+                                        </div>
+                                        <div style="font-size: 16px; color: #ff9800; font-weight: bold;">➔</div>
+                                        <div style="background: #fff3e0; border: 1px solid #ffcc80; border-radius: 6px; padding: 10px; min-width: 130px; flex: 1;">
+                                            <div style="font-size: 18px;">⚡</div>
+                                            <div style="font-weight: bold; font-size: 11px; color: #e65100;">2. Webhooks by Zapier</div>
+                                            <div style="font-size: 10px; color: #795548;">Action: POST Method</div>
+                                        </div>
+                                        <div style="font-size: 16px; color: #ff9800; font-weight: bold;">➔</div>
+                                        <div style="background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 6px; padding: 10px; min-width: 120px; flex: 1;">
+                                            <div style="font-size: 18px;">🎯</div>
+                                            <div style="font-weight: bold; font-size: 11px; color: #2e7d32;">3. LeadGrove Engine</div>
+                                            <div style="font-size: 10px; color: #388e3c;">Ad Network Uploads</div>
+                                        </div>
+                                    </div>
+
+                                    <div style="background: #263238; color: #eceff1; border-radius: 6px; padding: 12px; font-family: monospace; font-size: 11px; line-height: 1.6; text-align: left;">
+                                        <div style="color: #ffb74d; font-weight: bold; margin-bottom: 4px;">// Zapier Action Setup Mockup</div>
+                                        <div><span style="color: #80cbc4;">Action Event :</span> <span style="color: #fff;">POST</span></div>
+                                        <div><span style="color: #80cbc4;">URL          :</span> <span style="color: #fff;">[YOUR TARGET WEBHOOK URL BELOW]</span></div>
+                                        <div><span style="color: #80cbc4;">Payload Type :</span> <span style="color: #fff;">json</span></div>
+                                        <div><span style="color: #80cbc4;">Data Fields  :</span></div>
+                                        <div style="padding-left: 15px;"><span style="color: #81c784;">phone</span>  ➡️  <span style="color: #b0bec5;">1. Customer Phone Number</span></div>
+                                        <div style="padding-left: 15px;"><span style="color: #81c784;">status</span> ➡️  <span style="color: #b0bec5;">1. Deal Stage / Status Tag</span></div>
+                                        <div style="padding-left: 15px;"><span style="color: #81c784;">amount</span> ➡️  <span style="color: #b0bec5;">1. Purchase Revenue ($)</span></div>
+                                    </div>
+                                </div>
+
                                 <div style="margin-top: 12px; background: white; padding: 12px; border-radius: 6px; border: 1px solid #fbc02d;">
                                     <label style="font-size: 11px; font-weight: bold; color: #f57f17; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
                                     <div class="webhook-input-group">
-                                        <input type="text" class="webhook-input" id="wiz-sot-zapier-instructions-box-input" readonly value="" data-suffix="/webhooks/billing?client_id={next_id}">
+                                        <input type="text" class="webhook-input" id="wiz-sot-zapier-instructions-box-input" readonly value="" data-suffix="/webhooks/crm?client_id={next_id}">
                                         <button type="button" onclick="copyText('wiz-sot-zapier-instructions-box-input', 'wiz-sot-zapier-instructions-box-btn')" id="wiz-sot-zapier-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                        </div></div>
                         <div id="sot-monthly-email-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #e8eaf6; border-left: 4px solid #1a237e; padding: 15px; border-radius: 4px; color: #1a237e; font-size: 13px; line-height: 1.6; margin-bottom: 0; text-align: left;">
                                 💡 <strong>Monthly Sales Spreadsheet Email Ingestion Setup Guide:</strong><br>
@@ -8238,7 +8330,7 @@ def add_client_page(request: Request):
                     if (monthlyEmailBox) monthlyEmailBox.style.display = 'none';
                     
                     if (['hubspot', 'salesforce', 'zoho', 'servicetitan', 'housecallpro', 'gohighlevel'].includes(sot)) {
-                        if (['hubspot', 'salesforce', 'zoho', 'gohighlevel', 'google_sheets', 'email'].includes(sot)) {
+                        if (['hubspot', 'salesforce', 'zoho', 'gohighlevel', 'google_sheets', 'email', 'zapier'].includes(sot)) {
                             if (dealBox) dealBox.style.display = 'block';
                         }
                         if (['servicetitan', 'housecallpro', 'gohighlevel'].includes(sot)) {
