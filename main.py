@@ -5230,7 +5230,9 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     }} else if (sot === 'email' || sot === 'ai_rating') {{
                         if (emailBox) emailBox.style.display = 'block';
                         if (sot === 'email' && emailCard) emailCard.style.display = 'block';
-                        if (sot === 'ai_rating' && voipBox) {{
+                        const leadGenEl = document.querySelector('input[name="lead_gen_method"]:checked');
+                        const leadGenVal = leadGenEl ? leadGenEl.value : 'both';
+                        if (sot === 'ai_rating' && voipBox && leadGenVal !== 'form') {{
                             voipBox.style.display = 'block';
                             toggleVoipInstructions();
                         }}
@@ -8180,7 +8182,9 @@ def add_client_page(request: Request):
                         else if (sot === 'zapier' && zapierBox) zapierBox.style.display = 'block';
                     } else if (sot === 'email' || sot === 'ai_rating') {
                         if (emailBox) emailBox.style.display = 'block';
-                        if (sot === 'ai_rating' && voipBox) {
+                        const leadGenEl = document.querySelector('input[name="lead_gen_method"]:checked');
+                        const leadGenVal = leadGenEl ? leadGenEl.value : 'both';
+                        if (sot === 'ai_rating' && voipBox && leadGenVal !== 'form') {
                             voipBox.style.display = 'block';
                             toggleVoipInstructions();
                         }
