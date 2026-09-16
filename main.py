@@ -3745,15 +3745,24 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         </div>
                         <div id="sot-google_sheets-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #efebe9; border-left: 4px solid #4e342e; padding: 15px; border-radius: 4px; color: #4e342e; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                💡 <strong>Google Sheets (Live Sync via Apps Script) Guide:</strong><br>
-                                <ol style="padding-left: 20px; font-size: 12px; color: #4e342e;">
-                                    <li>Open your Google Sheet, click <strong>Extensions ➡️ Apps Script</strong>.</li>
-                                    <li>Copy-paste the Apps Script snippet below and save!</li>
+                                💡 <strong>Google Sheets (Live Sync via Apps Script) Setup Guide:</strong><br>
+                                <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #4e342e;">
+                                    <li><strong>Define Lead & Won Deal Tags Above:</strong> Enter status tags in the <em>Qualified Lead Tags</em> and <em>Won Deal Tags</em> boxes above (e.g. <code>appointment-booked</code> or <code>closed-won</code>).</li>
+                                    <li><strong>Format Row 1 Column Headings:</strong> Ensure your Google Sheet contains these standard Row 1 headers:
+                                        <ul style="list-style-type: disc; padding-left: 15px; margin: 4px 0;">
+                                            <li><code>Phone</code> (or <code>Phone Number</code>): Required to match lead phone numbers with CallRail/form sessions.</li>
+                                            <li><code>Email</code> (or <code>Email Address</code>): Optional secondary customer identifier.</li>
+                                            <li><code>Status</code> (or <code>Lead Status</code> / <code>Stage</code>): Cell value indicating lead stage (must match tags defined above).</li>
+                                            <li><code>Amount</code> (or <code>Revenue</code> / <code>Value</code> / <code>Total</code>): Dollar amount of closed sale (e.g. <code>450.00</code>).</li>
+                                            <li><code>Name</code> (or <code>Customer Name</code>): Optional customer name for audit logs.</li>
+                                        </ul>
+                                    </li>
+                                    <li><strong>Connect Apps Script Sync:</strong> Open your Google Sheet, click <strong>Extensions ➡️ Apps Script</strong>, paste the Apps Script webhook trigger, and set your target endpoint URL below!</li>
                                 </ol>
                                 <div style="margin-top: 12px; background: white; padding: 12px; border-radius: 6px; border: 1px solid #4e342e;">
                                     <label style="font-size: 11px; font-weight: bold; color: #4e342e; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
                                     <div class="webhook-input-group">
-                                        <input type="text" class="webhook-input" id="sot-google_sheets-instructions-box-input" readonly value="" data-suffix="/webhooks/billing?client_id={active_client_id}">
+                                        <input type="text" class="webhook-input" id="sot-google_sheets-instructions-box-input" readonly value="" data-suffix="/webhooks/crm?client_id={active_client_id}">
                                         <button type="button" onclick="copyText('sot-google_sheets-instructions-box-input', 'sot-google_sheets-instructions-box-btn')" id="sot-google_sheets-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
                                     </div>
                                 </div>
@@ -5201,7 +5210,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     if (crmPlatforms.includes(sot)) {{
                         if (crmCard) crmCard.style.display = 'block';
                         
-                        if (['hubspot', 'salesforce', 'zoho', 'gohighlevel'].includes(sot)) {{
+                        if (['hubspot', 'salesforce', 'zoho', 'gohighlevel', 'google_sheets'].includes(sot)) {{
                             if (dealBox) dealBox.style.display = 'block';
                         }}
                         if (['servicetitan', 'housecallpro', 'gohighlevel'].includes(sot)) {{
@@ -5230,9 +5239,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     }} else if (sot === 'email' || sot === 'ai_rating') {{
                         if (emailBox) emailBox.style.display = 'block';
                         if (sot === 'email' && emailCard) emailCard.style.display = 'block';
-                        const leadGenEl = document.querySelector('input[name="lead_gen_method"]:checked');
-                        const leadGenVal = leadGenEl ? leadGenEl.value : 'both';
-                        if (sot === 'ai_rating' && voipBox && leadGenVal !== 'form') {{
+                        if (sot === 'ai_rating' && voipBox) {{
                             voipBox.style.display = 'block';
                             toggleVoipInstructions();
                         }}
@@ -6941,15 +6948,24 @@ def add_client_page(request: Request):
                         </div>
                         <div id="sot-google_sheets-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #efebe9; border-left: 4px solid #4e342e; padding: 15px; border-radius: 4px; color: #4e342e; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                💡 <strong>Google Sheets (Live Sync via Apps Script) Guide:</strong><br>
-                                <ol style="padding-left: 20px; font-size: 12px; color: #4e342e;">
-                                    <li>Open your Google Sheet, click <strong>Extensions ➡️ Apps Script</strong>.</li>
-                                    <li>Copy-paste the Apps Script snippet below and save!</li>
+                                💡 <strong>Google Sheets (Live Sync via Apps Script) Setup Guide:</strong><br>
+                                <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #4e342e;">
+                                    <li><strong>Define Lead & Won Deal Tags Above:</strong> Enter status tags in the <em>Qualified Lead Tags</em> and <em>Won Deal Tags</em> boxes above (e.g. <code>appointment-booked</code> or <code>closed-won</code>).</li>
+                                    <li><strong>Format Row 1 Column Headings:</strong> Ensure your Google Sheet contains these standard Row 1 headers:
+                                        <ul style="list-style-type: disc; padding-left: 15px; margin: 4px 0;">
+                                            <li><code>Phone</code> (or <code>Phone Number</code>): Required to match lead phone numbers with CallRail/form sessions.</li>
+                                            <li><code>Email</code> (or <code>Email Address</code>): Optional secondary customer identifier.</li>
+                                            <li><code>Status</code> (or <code>Lead Status</code> / <code>Stage</code>): Cell value indicating lead stage (must match tags defined above).</li>
+                                            <li><code>Amount</code> (or <code>Revenue</code> / <code>Value</code> / <code>Total</code>): Dollar amount of closed sale (e.g. <code>450.00</code>).</li>
+                                            <li><code>Name</code> (or <code>Customer Name</code>): Optional customer name for audit logs.</li>
+                                        </ul>
+                                    </li>
+                                    <li><strong>Connect Apps Script Sync:</strong> Open your Google Sheet, click <strong>Extensions ➡️ Apps Script</strong>, paste the Apps Script webhook trigger, and set your target endpoint URL below!</li>
                                 </ol>
                                 <div style="margin-top: 12px; background: white; padding: 12px; border-radius: 6px; border: 1px solid #4e342e;">
                                     <label style="font-size: 11px; font-weight: bold; color: #4e342e; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
                                     <div class="webhook-input-group">
-                                        <input type="text" class="webhook-input" id="wiz-sot-google_sheets-instructions-box-input" readonly value="" data-suffix="/webhooks/billing?client_id={next_id}">
+                                        <input type="text" class="webhook-input" id="wiz-sot-google_sheets-instructions-box-input" readonly value="" data-suffix="/webhooks/crm?client_id={next_id}">
                                         <button type="button" onclick="copyText('wiz-sot-google_sheets-instructions-box-input', 'wiz-sot-google_sheets-instructions-box-btn')" id="wiz-sot-google_sheets-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
                                     </div>
                                 </div>
@@ -8159,7 +8175,7 @@ def add_client_page(request: Request):
                     if (zapierBox) zapierBox.style.display = 'none';
                     
                     if (['hubspot', 'salesforce', 'zoho', 'servicetitan', 'housecallpro', 'gohighlevel'].includes(sot)) {
-                        if (['hubspot', 'salesforce', 'zoho', 'gohighlevel'].includes(sot)) {
+                        if (['hubspot', 'salesforce', 'zoho', 'gohighlevel', 'google_sheets'].includes(sot)) {
                             if (dealBox) dealBox.style.display = 'block';
                         }
                         if (['servicetitan', 'housecallpro', 'gohighlevel'].includes(sot)) {
@@ -8182,9 +8198,7 @@ def add_client_page(request: Request):
                         else if (sot === 'zapier' && zapierBox) zapierBox.style.display = 'block';
                     } else if (sot === 'email' || sot === 'ai_rating') {
                         if (emailBox) emailBox.style.display = 'block';
-                        const leadGenEl = document.querySelector('input[name="lead_gen_method"]:checked');
-                        const leadGenVal = leadGenEl ? leadGenEl.value : 'both';
-                        if (sot === 'ai_rating' && voipBox && leadGenVal !== 'form') {
+                        if (sot === 'ai_rating' && voipBox) {
                             voipBox.style.display = 'block';
                             toggleVoipInstructions();
                         }
