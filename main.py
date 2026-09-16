@@ -5233,10 +5233,17 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         else if (sot === 'netsuite' && netsuiteBox) netsuiteBox.style.display = 'block';
                         else if (sot === 'sage' && sageBox) sageBox.style.display = 'block';
                         else if (sot === 'freshbooks' && freshbooksBox) freshbooksBox.style.display = 'block';
-                        else if (sot === 'google_sheets' && googleSheetsBox) googleSheetsBox.style.display = 'block';
+                        else if (sot === 'google_sheets' && googleSheetsBox) {{ googleSheetsBox.style.display = 'block'; if (dealBox) dealBox.style.display = 'block'; }}
                         else if (sot === 'zapier' && zapierBox) zapierBox.style.display = 'block';
                         
-                    }} else if (sot === 'email' || sot === 'ai_rating') {{
+                    }} else const origin = window.location.origin || '';
+                    document.querySelectorAll('.webhook-input').forEach(input => {{
+                        const suffix = input.getAttribute('data-suffix');
+                        if (suffix && (!input.value || input.value.trim() === '')) {{
+                            input.value = origin + suffix;
+                        }}
+                    }});
+                    if (sot === 'email' || sot === 'ai_rating') {{
                         if (emailBox) emailBox.style.display = 'block';
                         if (sot === 'email' && emailCard) emailCard.style.display = 'block';
                         if (sot === 'ai_rating' && voipBox) {{
@@ -7570,12 +7577,19 @@ def add_client_page(request: Request):
 
                 // Auto-populate the active hostname into wizard forwarding tooltips
                 window.addEventListener('DOMContentLoaded', () => {
+                    const origin = window.location.origin;
                     const host = window.location.host;
                     const emailDomain = host.includes('localhost') ? 'your-agency.com' : host.replace('www.', '').split(':')[0];
                     const wizardEmailLabel = document.querySelector('.wizard-forwarding-email');
                     if (wizardEmailLabel) {
                         wizardEmailLabel.innerText = `conversions-[id]@${emailDomain}`;
                     }
+                    document.querySelectorAll('.webhook-input').forEach(input => {
+                        const suffix = input.getAttribute('data-suffix');
+                        if (suffix) {
+                            input.value = origin + suffix;
+                        }
+                    });
                     toggleCallTrackingFields();
                 });
                 
@@ -8194,9 +8208,16 @@ def add_client_page(request: Request):
                         else if (sot === 'netsuite' && netsuiteBox) netsuiteBox.style.display = 'block';
                         else if (sot === 'sage' && sageBox) sageBox.style.display = 'block';
                         else if (sot === 'freshbooks' && freshbooksBox) freshbooksBox.style.display = 'block';
-                        else if (sot === 'google_sheets' && googleSheetsBox) googleSheetsBox.style.display = 'block';
+                        else if (sot === 'google_sheets' && googleSheetsBox) { googleSheetsBox.style.display = 'block'; if (dealBox) dealBox.style.display = 'block'; }
                         else if (sot === 'zapier' && zapierBox) zapierBox.style.display = 'block';
-                    } else if (sot === 'email' || sot === 'ai_rating') {
+                    } else const origin = window.location.origin || '';
+                    document.querySelectorAll('.webhook-input').forEach(input => {
+                        const suffix = input.getAttribute('data-suffix');
+                        if (suffix && (!input.value || input.value.trim() === '')) {
+                            input.value = origin + suffix;
+                        }
+                    });
+                    if (sot === 'email' || sot === 'ai_rating') {
                         if (emailBox) emailBox.style.display = 'block';
                         if (sot === 'ai_rating' && voipBox) {
                             voipBox.style.display = 'block';
