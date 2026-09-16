@@ -5262,18 +5262,13 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         else if (sot === 'freshbooks' && freshbooksBox) freshbooksBox.style.display = 'block';
                         else if (sot === 'google_sheets' && googleSheetsBox) {{ googleSheetsBox.style.display = 'block'; if (dealBox) dealBox.style.display = 'block'; }}
                         else if (sot === 'zapier' && zapierBox) zapierBox.style.display = 'block';
-                    }} else if (sot === 'email' || sot === 'ai_rating') {{
+                    }} else if (sot === 'email') {{
+                        if (monthlyEmailBox) monthlyEmailBox.style.display = 'block';
+                        if (dealBox) dealBox.style.display = 'block';
+                        if (emailCard) emailCard.style.display = 'block';
+                    }} else if (sot === 'ai_rating') {{
                         if (emailBox) emailBox.style.display = 'block';
-                        if (sot === 'email' && emailCard) emailCard.style.display = 'block';
-                        if (sot === 'ai_rating' && voipBox) {{
-                            voipBox.style.display = 'block';
-                            toggleVoipInstructions();
-                        }}
-                    }}
-                    if (sot === 'email' || sot === 'ai_rating') {{
-                        if (emailBox) emailBox.style.display = 'block';
-                        if (sot === 'email' && emailCard) emailCard.style.display = 'block';
-                        if (sot === 'ai_rating' && voipBox) {{
+                        if (voipBox) {{
                             voipBox.style.display = 'block';
                             toggleVoipInstructions();
                         }}
@@ -8264,16 +8259,12 @@ def add_client_page(request: Request):
                         else if (sot === 'freshbooks' && freshbooksBox) freshbooksBox.style.display = 'block';
                         else if (sot === 'google_sheets' && googleSheetsBox) { googleSheetsBox.style.display = 'block'; if (dealBox) dealBox.style.display = 'block'; }
                         else if (sot === 'zapier' && zapierBox) zapierBox.style.display = 'block';
-                    } else if (sot === 'email' || sot === 'ai_rating') {
+                    } else if (sot === 'email') {
+                        if (monthlyEmailBox) monthlyEmailBox.style.display = 'block';
+                        if (dealBox) dealBox.style.display = 'block';
+                    } else if (sot === 'ai_rating') {
                         if (emailBox) emailBox.style.display = 'block';
-                        if (sot === 'ai_rating' && voipBox) {
-                            voipBox.style.display = 'block';
-                            toggleVoipInstructions();
-                        }
-                    }
-                    if (sot === 'email' || sot === 'ai_rating') {
-                        if (emailBox) emailBox.style.display = 'block';
-                        if (sot === 'ai_rating' && voipBox) {
+                        if (voipBox) {
                             voipBox.style.display = 'block';
                             toggleVoipInstructions();
                         }
