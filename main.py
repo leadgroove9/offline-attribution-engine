@@ -3788,7 +3788,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             <!-- CONDITIONAL: AI Rating VoIP Provider Box -->
                                                         <div id="sot-voip-box" class="conditional-box" style="display: none; background-color: #f8f9fa; border: 1px dashed #1a237e; border-radius: 8px; padding: 20px; margin-top: 15px;">
                                 <div class="form-group" style="margin-bottom: 15px;">
-                                    <label for="voip_provider" style="font-weight: bold; color: #1a237e; font-size: 13px;">📞 Select Your Call Tracking or VoIP Provider</label>
+                                    <label for="voip_provider" style="font-weight: bold; color: #1a237e; font-size: 13px;">Select Your Current VOIP Provider (Optional)</label>
                                     <select id="voip_provider" onchange="toggleVoipInstructions()" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ced4da; font-size: 13px; font-weight: 600; cursor: pointer;">
                                         <option value="dialpad" selected>Dialpad (Ai Recap)</option>
                                         <option value="ringcentral">RingCentral</option>
@@ -5112,7 +5112,17 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     const cards = document.querySelectorAll('.voip-inst-card');
                     cards.forEach(card => {{ card.style.display = 'none'; }});
                     const activeCard = document.getElementById('voip-inst-' + voip);
-                    if (activeCard) {{ activeCard.style.display = 'block'; }}
+                    if (activeCard) {{ 
+                        activeCard.style.display = 'block'; 
+                        const origin = window.location.origin || '';
+                        const inputs = activeCard.querySelectorAll('.webhook-input');
+                        inputs.forEach(input => {{
+                            const suffix = input.getAttribute('data-suffix');
+                            if (suffix) {{
+                                input.value = origin + suffix;
+                            }}
+                        }});
+                    }}
                 }}
 
                 function toggleSOTFields() {{
@@ -6972,7 +6982,7 @@ def add_client_page(request: Request):
                             <!-- CONDITIONAL: AI Rating VoIP Provider Box -->
                                                         <div id="sot-voip-box" class="conditional-box" style="display: none; background-color: #f8f9fa; border: 1px dashed #1a237e; border-radius: 8px; padding: 20px; margin-top: 15px;">
                                 <div class="form-group" style="margin-bottom: 15px;">
-                                    <label for="voip_provider" style="font-weight: bold; color: #1a237e; font-size: 13px;">📞 Select Your Call Tracking or VoIP Provider</label>
+                                    <label for="voip_provider" style="font-weight: bold; color: #1a237e; font-size: 13px;">Select Your Current VOIP Provider (Optional)</label>
                                     <select id="voip_provider" onchange="toggleVoipInstructions()" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ced4da; font-size: 13px; font-weight: 600; cursor: pointer;">
                                         <option value="dialpad" selected>Dialpad (Ai Recap)</option>
                                         <option value="ringcentral">RingCentral</option>
@@ -8086,7 +8096,17 @@ def add_client_page(request: Request):
                     const cards = document.querySelectorAll('.voip-inst-card');
                     cards.forEach(card => { card.style.display = 'none'; });
                     const activeCard = document.getElementById('voip-inst-' + voip);
-                    if (activeCard) { activeCard.style.display = 'block'; }
+                    if (activeCard) { 
+                        activeCard.style.display = 'block'; 
+                        const origin = window.location.origin || '';
+                        const inputs = activeCard.querySelectorAll('.webhook-input');
+                        inputs.forEach(input => {
+                            const suffix = input.getAttribute('data-suffix');
+                            if (suffix) {
+                                input.value = origin + suffix;
+                            }
+                        });
+                    }
                 }
 
                 function toggleSOTFields() {
