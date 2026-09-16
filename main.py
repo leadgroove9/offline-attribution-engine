@@ -3830,7 +3830,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                     </div>
                                 </div>
                             </div>
-                        </div></div>
+                        </div>
                         <div id="sot-monthly-email-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #e8eaf6; border-left: 4px solid #1a237e; padding: 15px; border-radius: 4px; color: #1a237e; font-size: 13px; line-height: 1.6; margin-bottom: 0; text-align: left;">
                                 💡 <strong>Monthly Sales Spreadsheet Email Ingestion Setup Guide:</strong><br>
@@ -5307,7 +5307,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         else if (sot === 'sage' && sageBox) sageBox.style.display = 'block';
                         else if (sot === 'freshbooks' && freshbooksBox) freshbooksBox.style.display = 'block';
                         else if (sot === 'google_sheets' && googleSheetsBox) {{ googleSheetsBox.style.display = 'block'; if (dealBox) dealBox.style.display = 'block'; }}
-                        else if (sot === 'zapier' && zapierBox) zapierBox.style.display = 'block';
+                        else if (sot === 'zapier' && zapierBox) {{ zapierBox.style.display = 'block'; if (dealBox) dealBox.style.display = 'block'; }}
                     }} else if (sot === 'email') {{
                         if (monthlyEmailBox) monthlyEmailBox.style.display = 'block';
                         if (dealBox) dealBox.style.display = 'block';
@@ -7108,7 +7108,7 @@ def add_client_page(request: Request):
                                     </div>
                                 </div>
                             </div>
-                        </div></div>
+                        </div>
                         <div id="sot-monthly-email-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #e8eaf6; border-left: 4px solid #1a237e; padding: 15px; border-radius: 4px; color: #1a237e; font-size: 13px; line-height: 1.6; margin-bottom: 0; text-align: left;">
                                 💡 <strong>Monthly Sales Spreadsheet Email Ingestion Setup Guide:</strong><br>
@@ -8350,7 +8350,7 @@ def add_client_page(request: Request):
                         else if (sot === 'sage' && sageBox) sageBox.style.display = 'block';
                         else if (sot === 'freshbooks' && freshbooksBox) freshbooksBox.style.display = 'block';
                         else if (sot === 'google_sheets' && googleSheetsBox) { googleSheetsBox.style.display = 'block'; if (dealBox) dealBox.style.display = 'block'; }
-                        else if (sot === 'zapier' && zapierBox) zapierBox.style.display = 'block';
+                        else if (sot === 'zapier' && zapierBox) { zapierBox.style.display = 'block'; if (dealBox) dealBox.style.display = 'block'; }
                     } else if (sot === 'email') {
                         if (monthlyEmailBox) monthlyEmailBox.style.display = 'block';
                         if (dealBox) dealBox.style.display = 'block';
