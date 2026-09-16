@@ -2219,6 +2219,52 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
             upload_client_selector_html = f'<input type="hidden" id="upload_client_id" value="{selected_client_id}">'
 
         upload_box_html = f"""
+        <!-- Spreadsheet Formatting Instructions Card -->
+        <div style="background: #ffffff; border: 1px solid #e0e6ed; border-left: 4px solid #1a237e; border-radius: 8px; padding: 18px 20px; margin-bottom: 20px; text-align: left; box-shadow: 0 2px 6px rgba(0,0,0,0.03);">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+                <strong style="color: #1a237e; font-size: 14px; display: flex; align-items: center; gap: 6px;">
+                    📋 How to Format Your Sales Spreadsheet (CSV or Excel)
+                </strong>
+                <span style="font-size: 11px; background: #e8eaf6; color: #1a237e; padding: 3px 8px; border-radius: 4px; font-weight: bold;">
+                    Supported Formats: .CSV, .XLSX, .XLS
+                </span>
+            </div>
+            
+            <p style="font-size: 12px; color: #495057; margin: 0 0 12px 0; line-height: 1.5;">
+                Ensure <strong>Row 1</strong> of your sheet contains clear column headers so LeadGrove can automatically map caller phone numbers and purchase revenue to your ad campaigns:
+            </p>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin-bottom: 12px;">
+                <div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px; padding: 10px;">
+                    <span style="font-size: 11px; font-weight: bold; color: #1a237e; display: block; margin-bottom: 3px;">📞 Phone Column (Required)</span>
+                    <span style="font-size: 11px; color: #666; display: block;">Header: <code>Phone</code>, <code>Telephone</code>, <code>Mobile</code>, or <code>Contact</code></span>
+                    <small style="font-size: 10px; color: #888; display: block; margin-top: 3px;">Used for exact phone matching against CallRail call logs.</small>
+                </div>
+                
+                <div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px; padding: 10px;">
+                    <span style="font-size: 11px; font-weight: bold; color: #1a237e; display: block; margin-bottom: 3px;">✉️ Email Column (Optional/Alt)</span>
+                    <span style="font-size: 11px; color: #666; display: block;">Header: <code>Email</code>, <code>E-mail</code>, or <code>Mail</code></span>
+                    <small style="font-size: 10px; color: #888; display: block; margin-top: 3px;">Secondary contact identifier for lead matching.</small>
+                </div>
+                
+                <div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px; padding: 10px;">
+                    <span style="font-size: 11px; font-weight: bold; color: #2e7d32; display: block; margin-bottom: 3px;">💰 Sale Amount Column</span>
+                    <span style="font-size: 11px; color: #666; display: block;">Header: <code>Amount</code>, <code>Value</code>, <code>Revenue</code>, <code>Price</code>, or <code>Total</code></span>
+                    <small style="font-size: 10px; color: #888; display: block; margin-top: 3px;">Purchase dollar value uploaded to ad networks (e.g. <code>450.00</code>).</small>
+                </div>
+                
+                <div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px; padding: 10px;">
+                    <span style="font-size: 11px; font-weight: bold; color: #495057; display: block; margin-bottom: 3px;">👤 Name & Company (Optional)</span>
+                    <span style="font-size: 11px; color: #666; display: block;">Header: <code>Name</code>, <code>Customer</code>, <code>Company</code></span>
+                    <small style="font-size: 10px; color: #888; display: block; margin-top: 3px;">Used for dashboard logs and smart fuzzy matching.</small>
+                </div>
+            </div>
+            
+            <div style="font-size: 11px; color: #495057; background: #e8eaf6; padding: 8px 12px; border-radius: 4px; border: 1px dashed #3f51b5;">
+                💡 <strong>Formatting Tip:</strong> Phone numbers can include dashes or parentheses (LeadGrove normalizes them automatically), and currency values can include <code>$</code> symbols or commas.
+            </div>
+        </div>
+
         <!-- Drag & Drop Ingestion Box -->
         <div id="drop-zone" style="background: #f8f9fc; border: 2px dashed #1a237e; border-radius: 8px; padding: 25px; text-align: center; margin-bottom: 30px; cursor: pointer; transition: all 0.2s; position: relative;">
             <div id="drop-zone-content">
