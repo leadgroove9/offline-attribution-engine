@@ -8259,19 +8259,8 @@ def create_client(request: Request, client: ClientCreate):
     if user_role != "full" or user_client_id is not None:
         raise HTTPException(status_code=403, detail="Unauthorized: Client onboarding is restricted to Agency Administrators.")
     """Endpoint to handle questionnaire form submission."""
-    has_ad_platform = any([
-        client.google_ads_customer_id,
-        client.facebook_ads_id,
-        client.linkedin_ads_id,
-        client.microsoft_ads_id,
-        client.tiktok_ads_id,
-        client.twitter_ads_id,
-        client.pinterest_ads_id,
-        client.snapchat_ads_id,
-        client.chatgpt_ads_id,
-    ])
-    if not has_ad_platform:
-        raise HTTPException(status_code=400, detail="At least one Ad Platform ID must be provided (e.g. Google Ads, Facebook, LinkedIn, Microsoft, TikTok, X, Pinterest, Snapchat, or ChatGPT Ads).")
+    if not client.name or not client.name.strip():
+        raise HTTPException(status_code=400, detail="Client Business Name is required.")
     try:
         conn = db_router.connect()
         cursor = conn.cursor()
@@ -8300,28 +8289,38 @@ def create_client(request: Request, client: ClientCreate):
         cursor.execute("""
             INSERT INTO clients (
                 name, callrail_account_id, callrail_company_id, google_ads_customer_id, facebook_ads_id, linkedin_ads_id, microsoft_ads_id,
-                lead_gen_method, qualification_criteria, source_of_truth, email_provider, email_account,
+                lead_gen_method, qualification_criteria, source_of_truth, email_provider, email_account, email_app_password,
+                email_account_2, email_app_password_2, email_account_3, email_app_password_3, email_account_4, email_app_password_4, email_account_5, email_app_password_5,
                 crm_deal_tags, crm_won_deal_tags, crm_lead_tags, lead_count_rule, exclude_past_customers,
                 call_tracking_provider, ctm_account_id, ctm_profile_id, wc_account_id, wc_profile_id,
-                tiktok_ads_id, twitter_ads_id, pinterest_ads_id, snapchat_ads_id, chatgpt_ads_id
+                tiktok_ads_id, twitter_ads_id, pinterest_ads_id, snapchat_ads_id, chatgpt_ads_id, reddit_ads_id
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             client.name, 
             client.callrail_account_id or None,
             client.callrail_company_id or None, 
-            client.google_ads_customer_id, 
-            client.facebook_ads_id,
-            client.linkedin_ads_id,
-            client.microsoft_ads_id,
+            client.google_ads_customer_id or "", 
+            client.facebook_ads_id or "",
+            client.linkedin_ads_id or "",
+            client.microsoft_ads_id or "",
             client.lead_gen_method,
             client.qualification_criteria,
             client.source_of_truth,
-            client.email_provider,
-            client.email_account,
-            client.crm_deal_tags,
-            client.crm_won_deal_tags,
-            client.crm_lead_tags,
+            client.email_provider or "",
+            client.email_account or "",
+            client.email_app_password or "",
+            client.email_account_2 or "",
+            client.email_app_password_2 or "",
+            client.email_account_3 or "",
+            client.email_app_password_3 or "",
+            client.email_account_4 or "",
+            client.email_app_password_4 or "",
+            client.email_account_5 or "",
+            client.email_app_password_5 or "",
+            client.crm_deal_tags or "",
+            client.crm_won_deal_tags or "",
+            client.crm_lead_tags or "",
             client.lead_count_rule,
             client.exclude_past_customers,
             client.call_tracking_provider or "callrail",
@@ -8333,7 +8332,8 @@ def create_client(request: Request, client: ClientCreate):
             client.twitter_ads_id or "",
             client.pinterest_ads_id or "",
             client.snapchat_ads_id or "",
-            client.chatgpt_ads_id or ""
+            client.chatgpt_ads_id or "",
+            client.reddit_ads_id or ""
         ))
         
         client_id = cursor.lastrowid
