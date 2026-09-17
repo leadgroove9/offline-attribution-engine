@@ -1719,22 +1719,23 @@ def export_filtered_leads(
         
     if selected_client_id:
         cursor.execute("""
-            SELECT id, client_id, phone, name, source, qualified, sale_closed, value, reason, model_used, created_at, gclid, fbclid, msclkid, li_fat_id, ttclid, twclid, pin_clid, gptclid, rdt_cid
-            FROM sessions
-            WHERE client_id = ?
-            ORDER BY created_at DESC
+            SELECT s.id, s.phone, s.email, s.name, s.company, s.gclid, s.source, s.qualified, s.sale_closed, s.value, s.reason, s.created_at, s.model_used, s.fbclid, s.msclkid, s.li_fat_id, s.certainty_score, s.match_fuzzy, s.ttclid, s.twclid, s.pin_clid, s.scclid, s.gptclid, s.adjusted, s.adjusted_value, s.adjustment_type, s.adjusted_at, s.rdt_cid, s.client_id
+            FROM sessions s
+            WHERE s.client_id = ?
+            ORDER BY s.created_at DESC
         """, (selected_client_id,))
     else:
         cursor.execute("""
-            SELECT id, client_id, phone, name, source, qualified, sale_closed, value, reason, model_used, created_at, gclid, fbclid, msclkid, li_fat_id, ttclid, twclid, pin_clid, gptclid, rdt_cid
-            FROM sessions
-            ORDER BY created_at DESC
+            SELECT s.id, s.phone, s.email, s.name, s.company, s.gclid, s.source, s.qualified, s.sale_closed, s.value, s.reason, s.created_at, s.model_used, s.fbclid, s.msclkid, s.li_fat_id, s.certainty_score, s.match_fuzzy, s.ttclid, s.twclid, s.pin_clid, s.scclid, s.gptclid, s.adjusted, s.adjusted_value, s.adjustment_type, s.adjusted_at, s.rdt_cid, s.client_id
+            FROM sessions s
+            ORDER BY s.created_at DESC
         """)
         
     raw_sessions = cursor.fetchall()
     conn.close()
     
-    filtered_sessions = [s for s in raw_sessions if is_in_date_range(s[10], date_range, start_date, end_date)]
+    # Filter by date range
+    filtered_sessions = [s for s in raw_sessions if is_in_date_range(s[11], date_range, start_date, end_date)]
     
     import io
     import csv
@@ -1742,71 +1743,39 @@ def export_filtered_leads(
     writer = csv.writer(output)
     
     writer.writerow([
-        "Session ID",
-        "Client ID",
-        "Date & Time",
-        "Lead Name / Phone",
-        "Source Channel",
-        "AI Qualified",
-        "Sale Closed",
-        "Sales Value ($)",
-        "Audit Reason / Summary",
-        "Model Used",
-        "GCLID",
-        "FBCLID",
-        "MSCLKID",
-        "LI_FAT_ID",
-        "TTCLID",
-        "TWCLID",
-        "PIN_CLID",
-        "GPTCLID",
-        "RDT_CID"
+        "Session ID", "Client ID", "Date & Time", "Lead Name / Phone", "Source Channel",
+        "AI Qualified", "Sale Closed", "Sales Value ($)", "Audit Reason / Summary", "Model Used",
+        "GCLID", "FBCLID", "MSCLKID", "LI_FAT_ID", "TTCLID", "TWCLID", "PIN_CLID", "GPTCLID", "RDT_CID"
     ])
     
     for s in filtered_sessions:
         s_id = s[0]
-        c_id = s[1]
-        phone = s[2] or ""
+        c_id = s[28] if len(s) > 28 else selected_client_id
+        phone = s[1] or ""
         name = s[3] or ""
-        source = s[4] or ""
-        qualified = s[5] or "NO"
-        sale_closed = s[6] or "NO"
-        val = float(s[7] or 0.0)
-        reason = s[8] or ""
-        model_used = s[9] or ""
-        created_at = s[10] or ""
-        gclid = s[11] or ""
-        fbclid = s[12] or ""
-        msclkid = s[13] or ""
-        li_fat_id = s[14] or ""
-        ttclid = s[15] or ""
-        twclid = s[16] or ""
-        pin_clid = s[17] or ""
-        gptclid = s[18] or ""
-        rdt_cid = s[19] or ""
+        source = s[6] or ""
+        qualified = s[7] or "NO"
+        sale_closed = s[8] or "NO"
+        val = float(s[9] or 0.0)
+        reason = s[10] or ""
+        created_at = s[11] or ""
+        model_used = s[12] or ""
+        gclid = s[5] or ""
+        fbclid = s[13] or ""
+        msclkid = s[14] or ""
+        li_fat_id = s[15] or ""
+        ttclid = s[18] or ""
+        twclid = s[19] or ""
+        pin_clid = s[20] or ""
+        gptclid = s[22] or ""
+        rdt_cid = s[27] if len(s) > 27 else ""
         
         display_contact = f"{name} ({phone})" if name and name != "Unknown Caller" else phone
         
         writer.writerow([
-            s_id,
-            c_id,
-            created_at,
-            display_contact,
-            source,
-            qualified,
-            sale_closed,
-            f"{val:.2f}",
-            reason,
-            model_used,
-            gclid,
-            fbclid,
-            msclkid,
-            li_fat_id,
-            ttclid,
-            twclid,
-            pin_clid,
-            gptclid,
-            rdt_cid
+            s_id, c_id, created_at, display_contact, source, qualified, sale_closed,
+            f"{val:.2f}", reason, model_used, gclid, fbclid, msclkid, li_fat_id,
+            ttclid, twclid, pin_clid, gptclid, rdt_cid
         ])
         
     output.seek(0)
@@ -1822,7 +1791,7 @@ def export_filtered_leads(
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
-def view_dashboard(request: Request, client_id: Optional[int] = None):
+def view_dashboard(request: Request, client_id: Optional[int] = None, date_range: Optional[str] = "all", start_date: Optional[str] = "", end_date: Optional[str] = ""):
     email = is_authenticated(request)
     if not email:
         return RedirectResponse(url="/login", status_code=303)
@@ -1845,6 +1814,35 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
         selected_client_id = client_id if client_id is not None else 0 # 0 signifies "All Clients" (Agency Overview)
         if user_client_id is not None:
             selected_client_id = user_client_id
+            
+        opt_all = "selected" if date_range in [None, "all", ""] else ""
+        opt_1d = "selected" if date_range in ["1d", "today"] else ""
+        opt_7d = "selected" if date_range == "7d" else ""
+        opt_30d = "selected" if date_range == "30d" else ""
+        opt_90d = "selected" if date_range == "90d" else ""
+        opt_custom = "selected" if date_range == "custom" else ""
+        
+        start_date_val = start_date or ""
+        end_date_val = end_date or ""
+        
+        active_client_name = "All Clients"
+        for c_id, c_name, *rest in clients:
+            if c_id == selected_client_id:
+                active_client_name = c_name
+                break
+                
+        if date_range in ["1d", "today"]:
+            date_range_label = "1 Day (Today)"
+        elif date_range == "7d":
+            date_range_label = "Last 7 Days"
+        elif date_range == "30d":
+            date_range_label = "Last 30 Days"
+        elif date_range == "90d":
+            date_range_label = "Last 90 Days"
+        elif date_range == "custom":
+            date_range_label = f"Custom: {start_date_val or 'Start'} to {end_date_val or 'Present'}"
+        else:
+            date_range_label = "All Time" 
         
         # Build Settings Button HTML
         if selected_client_id == 0:
@@ -1864,7 +1862,8 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                 LEFT JOIN clients c ON s.client_id = c.id
                 ORDER BY s.created_at DESC
             """)
-            rows = cursor.fetchall()
+            raw_rows = cursor.fetchall()
+            rows = [r for r in raw_rows if is_in_date_range(r[11], date_range, start_date, end_date)]
             client_name_header = "All Agency Accounts"
             client_ads_id = "Multiple Accounts"
         else:
@@ -1876,7 +1875,8 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                 WHERE s.client_id = ?
                 ORDER BY s.created_at DESC
             """, (selected_client_id,))
-            rows = cursor.fetchall()
+            raw_rows = cursor.fetchall()
+            rows = [r for r in raw_rows if is_in_date_range(r[11], date_range, start_date, end_date)]
             
             # Fetch current client profile details
             cursor.execute("SELECT name, google_ads_customer_id FROM clients WHERE id = ?", (selected_client_id,))
@@ -2169,7 +2169,75 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
 
     global_modals_script_html = """
         <script>
-            function openAdjustmentModal(sessionId, customerName, originalValue) {
+        function toggleCustomDateInputs() {
+            const rangeSelect = document.getElementById('date_range_select');
+            const customContainer = document.getElementById('custom_date_container');
+            if (rangeSelect && customContainer) {
+                if (rangeSelect.value === 'custom') {
+                    customContainer.style.display = 'flex';
+                } else {
+                    customContainer.style.display = 'none';
+                }
+            }
+        }
+
+        function setQuickDate(rangeVal) {
+            const rangeSelect = document.getElementById('date_range_select');
+            if (rangeSelect) {
+                rangeSelect.value = rangeVal;
+                toggleCustomDateInputs();
+                filterDashboard();
+            }
+        }
+
+        function exportFilteredLeads(e) {
+            if (e) e.preventDefault();
+            const clientSelect = document.getElementById('dashboard_client_select');
+            const rangeSelect = document.getElementById('date_range_select');
+            const startInput = document.getElementById('start_date_input');
+            const endInput = document.getElementById('end_date_input');
+            
+            const clientId = clientSelect ? clientSelect.value : '';
+            const dateRange = rangeSelect ? rangeSelect.value : 'all';
+            
+            let url = `/dashboard/export/leads?client_id=${clientId}&date_range=${dateRange}`;
+            
+            if (dateRange === 'custom') {
+                if (startInput && startInput.value) {
+                    url += `&start_date=${encodeURIComponent(startInput.value)}`;
+                }
+                if (endInput && endInput.value) {
+                    url += `&end_date=${encodeURIComponent(endInput.value)}`;
+                }
+            }
+            
+            window.location.href = url;
+        }
+
+        function filterDashboard() {
+            const clientSelect = document.getElementById('dashboard_client_select');
+            const rangeSelect = document.getElementById('date_range_select');
+            const startInput = document.getElementById('start_date_input');
+            const endInput = document.getElementById('end_date_input');
+            
+            const clientId = clientSelect ? clientSelect.value : '';
+            const dateRange = rangeSelect ? rangeSelect.value : 'all';
+            
+            let url = `/dashboard?client_id=${clientId}&date_range=${dateRange}`;
+            
+            if (dateRange === 'custom') {
+                if (startInput && startInput.value) {
+                    url += `&start_date=${encodeURIComponent(startInput.value)}`;
+                }
+                if (endInput && endInput.value) {
+                    url += `&end_date=${encodeURIComponent(endInput.value)}`;
+                }
+            }
+            
+            window.location.href = url;
+        }
+
+        function openAdjustmentModal(sessionId, customerName, originalValue) {
                 document.getElementById('adj_session_id').value = sessionId;
                 document.getElementById('adj_customer_name').innerText = customerName;
                 document.getElementById('adj_original_value').innerText = `$$${originalValue.toFixed(2)}`;
@@ -2395,7 +2463,8 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                 <select id="upload_client_id" style="padding: 6px 12px; font-size: 13px; border-radius: 4px; border: 1px solid #9fa8da; font-weight: 600; outline: none; cursor: pointer; color: #1a237e; background: white;">
             """
             for c_id, c_name, *rest in clients:
-                upload_client_selector_html += f'<option value="{c_id}">👤 {c_name}</option>'
+                sel_up = 'selected' if c_id == selected_client_id else ''
+                upload_client_selector_html += f'<option value="{c_id}" {sel_up}>👤 {c_name}</option>'
             upload_client_selector_html += """
                 </select>
             </div>
@@ -2668,12 +2737,49 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                     </div>
                     
                     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                        <div class="client-selector-container">
-                            <span class="client-label">Viewing Account:</span>
-                            <select class="client-select" onchange="window.location.href='/dashboard?client_id='+this.value">
-                                {dropdown_options}
-                            </select>
-                        </div>
+        <div style="background: white; padding: 18px 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 25px; border-left: 4px solid #1a237e; width: 100%;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                
+                <!-- Client Selection Dropdown -->
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <label for="dashboard_client_select" style="font-weight: bold; color: #1a237e; font-size: 13px;">🏢 Active Client Profile:</label>
+                    <select id="dashboard_client_select" class="client-select" onchange="filterDashboard()" style="padding: 8px 14px; border-radius: 6px; border: 1px solid #1a237e; font-weight: bold; font-size: 13px; cursor: pointer; background: #f8f9fc; color: #1a237e;">
+                        {dropdown_options}
+                    </select>
+                </div>
+
+                <!-- Date Range Filters -->
+                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                    <label for="date_range_select" style="font-weight: bold; color: #1a237e; font-size: 13px;">📅 Date Filter:</label>
+                    <select id="date_range_select" onchange="toggleCustomDateInputs(); filterDashboard();" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #ced4da; font-weight: bold; font-size: 13px; cursor: pointer; background: #fff;">
+                        <option value="all" {opt_all}>All Time</option>
+                        <option value="1d" {opt_1d}>1 Day (Today)</option>
+                        <option value="7d" {opt_7d}>Last 7 Days</option>
+                        <option value="30d" {opt_30d}>Last 30 Days</option>
+                        <option value="90d" {opt_90d}>Last 90 Days</option>
+                        <option value="custom" {opt_custom}>📅 Custom Range...</option>
+                    </select>
+
+                    <!-- Custom Calendar Pickers -->
+                    <div id="custom_date_container" style="display: {'flex' if date_range == 'custom' else 'none'}; align-items: center; gap: 8px;">
+                        <input type="date" id="start_date_input" value="{start_date_val}" onchange="filterDashboard()" style="padding: 6px 10px; border-radius: 6px; border: 1px solid #ced4da; font-size: 12px;">
+                        <span style="color: #666; font-size: 12px; font-weight: bold;">to</span>
+                        <input type="date" id="end_date_input" value="{end_date_val}" onchange="filterDashboard()" style="padding: 6px 10px; border-radius: 6px; border: 1px solid #ced4da; font-size: 12px;">
+                    </div>
+                    
+                    <!-- Quick Preset Pill Buttons -->
+                    <div style="display: flex; gap: 4px; margin-left: 5px;">
+                        <button type="button" onclick="setQuickDate('1d')" class="btn-copy" style="padding: 6px 10px; font-size: 11px; background: {'#1a237e' if date_range == '1d' else '#e8eaf6'}; color: {'#fff' if date_range == '1d' else '#1a237e'}; border: none; cursor: pointer;">1D</button>
+                        <button type="button" onclick="setQuickDate('7d')" class="btn-copy" style="padding: 6px 10px; font-size: 11px; background: {'#1a237e' if date_range == '7d' else '#e8eaf6'}; color: {'#fff' if date_range == '7d' else '#1a237e'}; border: none; cursor: pointer;">7D</button>
+                        <button type="button" onclick="setQuickDate('30d')" class="btn-copy" style="padding: 6px 10px; font-size: 11px; background: {'#1a237e' if date_range == '30d' else '#e8eaf6'}; color: {'#fff' if date_range == '30d' else '#1a237e'}; border: none; cursor: pointer;">30D</button>
+                        <button type="button" onclick="setQuickDate('90d')" class="btn-copy" style="padding: 6px 10px; font-size: 11px; background: {'#1a237e' if date_range == '90d' else '#e8eaf6'}; color: {'#fff' if date_range == '90d' else '#1a237e'}; border: none; cursor: pointer;">90D</button>
+                        <button type="button" onclick="setQuickDate('all')" class="btn-copy" style="padding: 6px 10px; font-size: 11px; background: {'#1a237e' if date_range in [None, 'all', ''] else '#e8eaf6'}; color: {'#fff' if date_range in [None, 'all', ''] else '#1a237e'}; border: none; cursor: pointer;">All</button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+                        <a href="/dashboard/reports?client_id={selected_client_id}" class="btn-copy" style="background-color: #1a237e; text-decoration: none; padding: 10px 16px; font-size: 13px; font-weight: bold; color: white;">📈 Reports & Analytics</a>
                         {settings_btn_html}
                         {onboard_btn_html}
                     </div>
@@ -2861,7 +2967,20 @@ def view_dashboard(request: Request, client_id: Optional[int] = None):
                 {global_modals_html}
 
                 <!-- Table -->
-                <h3 style="margin: 0 0 15px 0; color: #1a237e;">Lead Activity Log</h3>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+            <h3 style="margin: 0; color: #1a237e; display: flex; align-items: center; gap: 8px;">
+                📊 Lead Activity Log
+                <span style="font-size: 12px; font-weight: normal; background: #e8eaf6; color: #1a237e; padding: 3px 10px; border-radius: 12px;">Showing {len(rows)} entries ({date_range_label})</span>
+            </h3>
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <a href="#" onclick="exportFilteredLeads(event)" class="btn-copy" style="background-color: #2e7d32; text-decoration: none; padding: 8px 14px; font-size: 12px; font-weight: bold; color: white; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                    📥 Export Filtered Leads CSV ({len(rows)})
+                </a>
+                <div style="font-size: 12px; color: #666; font-style: italic;">
+                    Active: <strong>{active_client_name}</strong> | <strong>{date_range_label}</strong>
+                </div>
+            </div>
+        </div>
                 <div class="table-responsive">
                     <table>
                         <thead>
