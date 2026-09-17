@@ -3125,6 +3125,28 @@ def view_settings(request: Request, client_id: Optional[int] = None):
             raise HTTPException(status_code=404, detail="Client not found")
             
         client_data = dict(zip(cols, client_row))
+        client_name = client_data.get("name", "Client Profile")
+        
+        # Prepare dynamic visual sales funnel overlay labels
+        prompt_raw = str(client_data.get("prompt", "") or "").strip()
+        if not prompt_raw:
+            prompt_text = "Standard Criteria: Inquiring about core services, requesting a quote, or scheduling an appointment"
+        elif len(prompt_raw) > 90:
+            prompt_text = prompt_raw[:87] + "..."
+        else:
+            prompt_text = prompt_raw
+
+        prov = str(client_data.get("call_tracking_provider", "callrail") or "callrail").lower()
+        if prov in ["ctm", "calltrackingmetrics"]:
+            provider_display = "CallTrackingMetrics"
+        elif prov in ["wc", "whatconverts"]:
+            provider_display = "WhatConverts"
+        else:
+            provider_display = "CallRail"
+            
+        qual_overlay_heading = f"Qualified Leads ({provider_display} Transcripts & Forms)"
+        won_overlay_heading = f"Won Deals & Closed Revenue ({client_name} Sales Log)"
+
         
         active_provider = client_data.get("call_tracking_provider", "callrail") or "callrail"
         sel_cr = 'selected' if active_provider == 'callrail' else ''
@@ -3625,6 +3647,73 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     <span style="background: rgba(255,255,255,0.15); color: #fff; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; border: 1px solid rgba(255,255,255,0.25);">
                         ⚡ Active Pipeline Sync
                     </span>
+                </div>
+
+                <!-- VISUAL SALES FUNNEL DIAGRAM GRAPHIC -->
+                <div style="background: rgba(0, 0, 0, 0.25); border-radius: 10px; padding: 22px 20px; margin-bottom: 25px; border: 1px solid rgba(255,255,255,0.15); box-shadow: inset 0 2px 10px rgba(0,0,0,0.2);">
+                    <div style="text-align: center; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #90caf9; margin-bottom: 15px;">
+                        📐 Active Client Sales Funnel Graphic & Tracking Overlays
+                    </div>
+
+                    <div style="max-width: 780px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 6px;">
+                        
+                        <!-- Funnel Tier 1: All Inbound Clicks & Leads -->
+                        <div style="width: 100%; background: linear-gradient(90deg, #1565c0 0%, #1e88e5 100%); padding: 12px 16px; border-radius: 8px 8px 3px 3px; text-align: center; box-shadow: 0 3px 6px rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.2); position: relative;">
+                            <div style="font-size: 12px; font-weight: bold; color: #ffffff; display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap;">
+                                <span>🌐 1. Inbound Leads & Traffic Capture</span>
+                                <span style="font-size: 10px; background: rgba(0,0,0,0.25); padding: 2px 8px; border-radius: 10px; color: #e3f2fd;">GCLID / FBCLID / MSCLKID</span>
+                            </div>
+                            <div style="font-size: 11px; color: #e3f2fd; margin-top: 3px;">
+                                Source: <strong>{provider_display} Call Tracking</strong> + <strong>Website Webhook Forms</strong>
+                            </div>
+                        </div>
+
+                        <!-- Funnel Arrow 1 -->
+                        <div style="color: #90caf9; font-size: 11px; margin: -2px 0;">▼</div>
+
+                        <!-- Funnel Tier 2: Qualified Leads (Overlay Label A) -->
+                        <div style="width: 82%; background: linear-gradient(90deg, #00838f 0%, #00acc1 100%); padding: 12px 18px; border-radius: 4px; text-align: center; box-shadow: 0 3px 8px rgba(0,0,0,0.25); border: 1.5px solid #80deea; position: relative;">
+                            <div style="position: absolute; top: -10px; left: 15px; background: #004d40; color: #80deea; font-size: 9px; font-weight: 800; padding: 2px 8px; border-radius: 10px; border: 1px solid #80deea; text-transform: uppercase; letter-spacing: 0.5px;">
+                                a) QUALIFIED LEADS TRACKING
+                            </div>
+                            <div style="font-size: 13px; font-weight: bold; color: #ffffff; margin-top: 2px;">
+                                🎯 {qual_overlay_heading}
+                            </div>
+                            <div style="font-size: 11px; color: #e0f7fa; font-style: italic; margin-top: 4px; background: rgba(0,0,0,0.22); padding: 5px 10px; border-radius: 4px; border-left: 3px solid #80deea;">
+                                Configured AI Audit Rule: <strong>"{prompt_text}"</strong>
+                            </div>
+                        </div>
+
+                        <!-- Funnel Arrow 2 -->
+                        <div style="color: #80deea; font-size: 11px; margin: -2px 0;">▼</div>
+
+                        <!-- Funnel Tier 3: Won Deals & Sales (Overlay Label B) -->
+                        <div style="width: 64%; background: linear-gradient(90deg, #2e7d32 0%, #43a047 100%); padding: 12px 18px; border-radius: 4px; text-align: center; box-shadow: 0 3px 8px rgba(0,0,0,0.25); border: 1.5px solid #a5d6a7; position: relative;">
+                            <div style="position: absolute; top: -10px; left: 15px; background: #1b5e20; color: #a5d6a7; font-size: 9px; font-weight: 800; padding: 2px 8px; border-radius: 10px; border: 1px solid #a5d6a7; text-transform: uppercase; letter-spacing: 0.5px;">
+                                b) WON DEALS & REVENUE TRACKING
+                            </div>
+                            <div style="font-size: 13px; font-weight: bold; color: #ffffff; margin-top: 2px;">
+                                💰 {won_overlay_heading}
+                            </div>
+                            <div style="font-size: 11px; color: #e8f5e9; font-style: italic; margin-top: 4px; background: rgba(0,0,0,0.22); padding: 5px 10px; border-radius: 4px; border-left: 3px solid #a5d6a7;">
+                                Source: <strong>CRM Webhooks / Email Ingestion</strong> → Match Method: <strong>Phone & Email Session Pair</strong>
+                            </div>
+                        </div>
+
+                        <!-- Funnel Arrow 3 -->
+                        <div style="color: #a5d6a7; font-size: 11px; margin: -2px 0;">▼</div>
+
+                        <!-- Funnel Spout: Ad Network Offline Sync -->
+                        <div style="width: 44%; background: linear-gradient(90deg, #f57f17 0%, #fbc02d 100%); padding: 8px 12px; border-radius: 3px 3px 8px 8px; text-align: center; box-shadow: 0 3px 8px rgba(0,0,0,0.3); border: 1.5px solid #ffe082; color: #000;">
+                            <div style="font-size: 11px; font-weight: 900; color: #212121; text-transform: uppercase; letter-spacing: 0.5px;">
+                                🚀 Smart Bidding Feedback Loop
+                            </div>
+                            <div style="font-size: 10px; color: #37474f; font-weight: bold;">
+                                Google Ads, Meta CAPI & Bing Conversion Uploads
+                            </div>
+                        </div>
+
+                    </div>
                 </div>
 
                 <!-- Funnel Pipeline Steps Grid -->
