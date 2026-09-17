@@ -10,7 +10,10 @@ from fastapi import FastAPI, Request, HTTPException, File, UploadFile, Form
 from fastapi.responses import HTMLResponse, StreamingResponse, Response, RedirectResponse
 from pydantic import BaseModel
 from typing import Optional
-from anthropic import Anthropic
+try:
+    from anthropic import Anthropic
+except ImportError:
+    Anthropic = None
 
 # Initialize FastAPI App
 
@@ -3145,6 +3148,18 @@ def view_settings(request: Request, client_id: Optional[int] = None):
         else:
             prompt_text = prompt_raw
 
+        # Extract variables for dynamic stage cards & funnel overlays
+        lg_method = str(client_data.get("lead_gen_method", "both") or "both").lower()
+        prov = str(client_data.get("call_tracking_provider", "callrail") or "callrail").lower()
+        if prov in ["ctm", "calltrackingmetrics"]:
+            provider_display = "CallTrackingMetrics"
+        elif prov in ["wc", "whatconverts"]:
+            provider_display = "WhatConverts"
+        else:
+            provider_display = "CallRail"
+            
+        sot = str(client_data.get("source_of_truth", "manual") or "manual").lower()
+
         # Detect active connected ad network platforms for funnel spout
         active_ad_platforms = []
         if str(client_data.get("google_ads_customer_id", "") or "").strip():
@@ -3177,6 +3192,21 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                 ad_platforms_display = ", ".join(active_ad_platforms[:-1]) + f" & {active_ad_platforms[-1]} Conversion Uploads"
         else:
             ad_platforms_display = "Google Ads, Meta CAPI & Bing Conversion Uploads"
+
+        # Stage 1-4 Card dynamic variables
+        stage1_trigger_display = "Call Completed / Form POST"
+        if lg_method == "phone":
+            stage1_trigger_display = "Call Completed Webhook"
+        elif lg_method == "form":
+            stage1_trigger_display = "Form POST Webhook"
+
+        sot_display_card = "Manual CSV / Spreadsheet Upload"
+        if sot in ["hubspot", "salesforce", "zoho", "servicetitan", "housecallpro", "gohighlevel", "pipedrive"]:
+            sot_display_card = f"{sot.upper()} CRM Webhook Pipeline"
+        elif sot == "email":
+            sot_display_card = "Automated Email Sales Scanner"
+        elif sot in ["quickbooks", "xero", "zoho_books", "netsuite", "sage", "freshbooks"]:
+            sot_display_card = f"{sot.capitalize()} Integration Webhook"
 
         lg_method = str(client_data.get("lead_gen_method", "both") or "both").lower()
         prov = str(client_data.get("call_tracking_provider", "callrail") or "callrail").lower()
@@ -3810,12 +3840,12 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             <span style="font-size: 18px;">📞</span>
                         </div>
                         <h3 style="margin: 0 0 6px 0; font-size: 13px; font-weight: bold; color: #ffffff;">1. Lead Capture & Click IDs</h3>
-                        <p style="margin: 0; font-size: 11px; color: #c5cae9; line-height: 1.4;">
-                            Tracks inbound calls &amp; forms. Captures <strong>GCLID</strong>, <strong>FBCLID</strong>, <strong>MSCLKID</strong>, and contact information.
+                        <p id="stage1-card-desc" style="margin: 0; font-size: 11px; color: #c5cae9; line-height: 1.4;">
+                            Tracks inbound leads for <strong>{provider_display}</strong>. Captures <strong>GCLID</strong>, <strong>FBCLID</strong>, <strong>MSCLKID</strong>, and caller contact data.
                         </p>
                         <div style="margin-top: 12px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: space-between; font-size: 10px; color: #bbdefb;">
                             <span>Webhook Trigger:</span>
-                            <strong style="color: #fff;">Call Completed / Form POST</strong>
+                            <strong id="stage1-card-trigger" style="color: #fff;">{stage1_trigger_display}</strong>
                         </div>
                     </div>
 
@@ -3826,8 +3856,8 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             <span style="font-size: 18px;">🤖</span>
                         </div>
                         <h3 style="margin: 0 0 6px 0; font-size: 13px; font-weight: bold; color: #ffffff;">2. AI Qualification Audit</h3>
-                        <p style="margin: 0; font-size: 11px; color: #c5cae9; line-height: 1.4;">
-                            Claude 4.5 Haiku evaluates call transcripts &amp; responses against custom prompt rules to identify qualified leads.
+                        <p id="stage2-card-desc" style="margin: 0; font-size: 11px; color: #c5cae9; line-height: 1.4;">
+                            Claude 4.5 Haiku evaluates call transcripts &amp; responses against rule: <strong>"{prompt_text}"</strong> to identify qualified leads.
                         </p>
                         <div style="margin-top: 12px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: space-between; font-size: 10px; color: #b2ebf2;">
                             <span>Signal Action:</span>
@@ -3842,8 +3872,8 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             <span style="font-size: 18px;">💳</span>
                         </div>
                         <h3 style="margin: 0 0 6px 0; font-size: 13px; font-weight: bold; color: #ffffff;">3. Closed Sale & Revenue Match</h3>
-                        <p style="margin: 0; font-size: 11px; color: #c5cae9; line-height: 1.4;">
-                            Matches deals &amp; invoice amounts from CRM/Spreadsheet via phone &amp; email fuzzy logic back to click session records.
+                        <p id="stage3-card-desc" style="margin: 0; font-size: 11px; color: #c5cae9; line-height: 1.4;">
+                            Matches closed deals &amp; invoice amounts from <strong id="stage3-card-sot">{sot_display_card}</strong> via phone &amp; email fuzzy logic back to click session records.
                         </p>
                         <div style="margin-top: 12px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: space-between; font-size: 10px; color: #c8e6c9;">
                             <span>Matching Method:</span>
@@ -3858,12 +3888,12 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             <span style="font-size: 18px;">🚀</span>
                         </div>
                         <h3 style="margin: 0 0 6px 0; font-size: 13px; font-weight: bold; color: #ffffff;">4. Conversion Upload & Bidding</h3>
-                        <p style="margin: 0; font-size: 11px; color: #c5cae9; line-height: 1.4;">
-                            Pushes audited conversion events &amp; exact revenue values to Google Ads, Meta CAPI, and Bing to optimize Smart Bidding ROAS.
+                        <p id="stage4-card-desc" style="margin: 0; font-size: 11px; color: #c5cae9; line-height: 1.4;">
+                            Pushes audited conversion events &amp; exact revenue values to <strong id="stage4-card-platforms">{ad_platforms_display}</strong> to optimize Smart Bidding ROAS.
                         </p>
                         <div style="margin-top: 12px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: space-between; font-size: 10px; color: #ffecb3;">
                             <span>Destination:</span>
-                            <strong style="color: #fff;">Google Ads Conversion Menu</strong>
+                            <strong style="color: #fff;">Active Ad Conversion Uploads</strong>
                         </div>
                     </div>
 
@@ -5357,16 +5387,22 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     const rdt = document.getElementById('reddit_ads_id');
                     if (rdt && rdt.value.trim()) platforms.push("Reddit Ads");
                     
+                    let platText = "Google Ads, Meta CAPI & Bing Conversion Uploads";
                     if (platforms.length > 0) {{
                         if (platforms.length === 1) {{
-                            spoutEl.innerText = platforms[0] + " Conversion Uploads";
+                            platText = platforms[0] + " Conversion Uploads";
                         }} else if (platforms.length === 2) {{
-                            spoutEl.innerText = platforms[0] + " & " + platforms[1] + " Conversion Uploads";
+                            platText = platforms[0] + " & " + platforms[1] + " Conversion Uploads";
                         }} else {{
-                            spoutEl.innerText = platforms.slice(0, -1).join(", ") + " & " + platforms[platforms.length - 1] + " Conversion Uploads";
+                            platText = platforms.slice(0, -1).join(", ") + " & " + platforms[platforms.length - 1] + " Conversion Uploads";
                         }}
-                    }} else {{
-                        spoutEl.innerText = "Google Ads, Meta CAPI & Bing Conversion Uploads";
+                    }}
+                    spoutEl.innerText = platText;
+
+                    // Update Stage 4 Card
+                    const stage4Desc = document.getElementById('stage4-card-platforms');
+                    if (stage4Desc) {{
+                        stage4Desc.innerText = platText;
                     }}
                 }}
 
@@ -5389,12 +5425,26 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     const lgRadio = document.querySelector('input[name="lead_gen_method"]:checked');
                     const lgVal = lgRadio ? lgRadio.value : 'both';
                     
+                    let trigText = 'Call Completed / Form POST';
                     if (lgVal === 'phone') {{
                         tier1El.innerHTML = 'Source: <strong id="funnel-tier1-provider">' + providerName + ' Call Tracking Only</strong>';
+                        trigText = 'Call Completed Webhook';
                     }} else if (lgVal === 'form') {{
                         tier1El.innerHTML = 'Source: <strong id="funnel-tier1-provider">' + providerName + ' Webhook Forms Only</strong>';
+                        trigText = 'Form POST Webhook';
                     }} else {{
                         tier1El.innerHTML = 'Source: <strong id="funnel-tier1-provider">' + providerName + ' Call Tracking</strong> + <strong>' + providerName + ' Webhook Forms</strong>';
+                        trigText = 'Call Completed / Form POST';
+                    }}
+
+                    // Update Stage 1 Card
+                    const stage1Desc = document.getElementById('stage1-card-desc');
+                    const stage1Trig = document.getElementById('stage1-card-trigger');
+                    if (stage1Desc) {{
+                        stage1Desc.innerHTML = 'Tracks inbound leads for <strong>' + providerName + '</strong>. Captures <strong>GCLID</strong>, <strong>FBCLID</strong>, <strong>MSCLKID</strong>, and caller contact data.';
+                    }}
+                    if (stage1Trig) {{
+                        stage1Trig.innerText = trigText;
                     }}
                 }}
 
@@ -5465,7 +5515,20 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     if (name === 'sales_source') {{
                         const funnelWonHeading = document.getElementById('funnel-won-heading');
                         const funnelWonSource = document.getElementById('funnel-won-source');
-                        if (funnelWonHeading && funnelWonSource) {{
+                        const stage3SotEl = document.getElementById('stage3-card-sot');
+                    if (stage3SotEl) {{
+                        if (['hubspot', 'salesforce', 'zoho', 'servicetitan', 'housecallpro', 'gohighlevel', 'pipedrive'].includes(sot)) {{
+                            stage3SotEl.innerText = selectedText + " CRM Webhook Pipeline";
+                        }} else if (sot === 'email') {{
+                            stage3SotEl.innerText = "Automated Email Sales Scanner";
+                        }} else if (['quickbooks', 'xero', 'zoho_books', 'netsuite', 'sage', 'freshbooks'].includes(sot)) {{
+                            stage3SotEl.innerText = selectedText + " Integration Webhook";
+                        }} else {{
+                            stage3SotEl.innerText = "Manual CSV / Spreadsheet Upload";
+                        }}
+                    }}
+
+                    if (funnelWonHeading && funnelWonSource) {{
                             if (value === 'crm') {{
                                 funnelWonHeading.innerHTML = '💰 Won Deals & Closed Revenue (Live CRM Webhook Pipeline)';
                                 funnelWonSource.innerHTML = 'Source: <strong>Live CRM Webhooks (HubSpot / Salesforce / Zoho / ServiceTitan)</strong> → Match Method: <strong>Phone & Email Session Pair</strong>';
@@ -5967,6 +6030,19 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     // Update Visual Sales Funnel Layer b) Won Deals Live
                     const funnelWonHeading = document.getElementById('funnel-won-heading');
                     const funnelWonSource = document.getElementById('funnel-won-source');
+                    const stage3SotEl = document.getElementById('stage3-card-sot');
+                    if (stage3SotEl) {{
+                        if (['hubspot', 'salesforce', 'zoho', 'servicetitan', 'housecallpro', 'gohighlevel', 'pipedrive'].includes(sot)) {{
+                            stage3SotEl.innerText = selectedText + " CRM Webhook Pipeline";
+                        }} else if (sot === 'email') {{
+                            stage3SotEl.innerText = "Automated Email Sales Scanner";
+                        }} else if (['quickbooks', 'xero', 'zoho_books', 'netsuite', 'sage', 'freshbooks'].includes(sot)) {{
+                            stage3SotEl.innerText = selectedText + " Integration Webhook";
+                        }} else {{
+                            stage3SotEl.innerText = "Manual CSV / Spreadsheet Upload";
+                        }}
+                    }}
+
                     if (funnelWonHeading && funnelWonSource) {{
                         if (['hubspot', 'salesforce', 'zoho', 'servicetitan', 'housecallpro', 'gohighlevel', 'pipedrive'].includes(sot)) {{
                             funnelWonHeading.innerHTML = '💰 Won Deals & Closed Revenue (' + selectedText + ' Webhook Pipeline)';
