@@ -3148,6 +3148,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
         else:
             prompt_text = prompt_raw
 
+        lg_method = str(client_data.get("lead_gen_method", "both") or "both").lower()
         prov = str(client_data.get("call_tracking_provider", "callrail") or "callrail").lower()
         if prov in ["ctm", "calltrackingmetrics"]:
             provider_display = "CallTrackingMetrics"
@@ -3155,6 +3156,13 @@ def view_settings(request: Request, client_id: Optional[int] = None):
             provider_display = "WhatConverts"
         else:
             provider_display = "CallRail"
+
+        if lg_method == "phone":
+            tier1_source_text = f'Source: <strong id="funnel-tier1-provider">{provider_display} Call Tracking Only</strong>'
+        elif lg_method == "form":
+            tier1_source_text = 'Source: <strong id="funnel-tier1-provider">Website Webhook Forms Only</strong>'
+        else:
+            tier1_source_text = f'Source: <strong id="funnel-tier1-provider">{provider_display} Call Tracking</strong> + <strong>Website Webhook Forms</strong>'
             
         sot = str(client_data.get("source_of_truth", "manual") or "manual").lower()
         
@@ -3709,8 +3717,8 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                 <span>🌐 1. Inbound Leads & Traffic Capture</span>
                                 <span style="font-size: 10px; background: rgba(0,0,0,0.25); padding: 2px 8px; border-radius: 10px; color: #e3f2fd;">GCLID / FBCLID / MSCLKID</span>
                             </div>
-                            <div style="font-size: 11px; color: #e3f2fd; margin-top: 3px;">
-                                Source: <strong>{provider_display} Call Tracking</strong> + <strong>Website Webhook Forms</strong>
+                            <div id="funnel-tier1-source" style="font-size: 11px; color: #e3f2fd; margin-top: 3px;">
+                                {tier1_source_text}
                             </div>
                         </div>
 
@@ -5283,6 +5291,32 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                 }});
 
                 
+                function updateFunnelTier1Source() {{
+                    const tier1El = document.getElementById('funnel-tier1-source');
+                    if (!tier1El) return;
+                    
+                    const providerSelect = document.getElementById('call_tracking_provider');
+                    const providerVal = providerSelect ? providerSelect.value : 'callrail';
+                    
+                    let providerName = "CallRail";
+                    if (providerVal === 'calltrackingmetrics') {{
+                        providerName = "CallTrackingMetrics";
+                    }} else if (providerVal === 'whatconverts') {{
+                        providerName = "WhatConverts";
+                    }}
+                    
+                    const lgRadio = document.querySelector('input[name="lead_gen_method"]:checked');
+                    const lgVal = lgRadio ? lgRadio.value : 'both';
+                    
+                    if (lgVal === 'phone') {{
+                        tier1El.innerHTML = 'Source: <strong id="funnel-tier1-provider">' + providerName + ' Call Tracking Only</strong>';
+                    }} else if (lgVal === 'form') {{
+                        tier1El.innerHTML = 'Source: <strong id="funnel-tier1-provider">Website Webhook Forms Only</strong>';
+                    }} else {{
+                        tier1El.innerHTML = 'Source: <strong id="funnel-tier1-provider">' + providerName + ' Call Tracking</strong> + <strong>Website Webhook Forms</strong>';
+                    }}
+                }}
+
                 function toggleSettingsCallTrackingFields() {{
                     const provider = document.getElementById('call_tracking_provider').value;
                     const crBox = document.getElementById('settings_call_tracking_callrail_box');
@@ -5321,6 +5355,23 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         inputEl.setAttribute('data-suffix', ctSuffix);
                         inputEl.value = origin + ctSuffix;
                     }}
+                    
+                    // Live update Visual Sales Funnel Tier 1 Provider Name
+                    const tier1ProviderEl = document.getElementById('funnel-tier1-provider');
+                    const qualHeadingEl = document.getElementById('funnel-qual-heading');
+                    let providerName = "CallRail";
+                    if (provider === 'calltrackingmetrics') {{
+                        providerName = "CallTrackingMetrics";
+                    }} else if (provider === 'whatconverts') {{
+                        providerName = "WhatConverts";
+                    }}
+                    
+                    updateFunnelTier1Source();
+                    const sotSelect = document.getElementById('source_of_truth');
+                    const sotVal = sotSelect ? sotSelect.value : '';
+                    if (qualHeadingEl && (sotVal === 'ai_rating' || !sotVal)) {{
+                        qualHeadingEl.innerHTML = "🎯 Qualified Leads (" + providerName + " Transcripts & Forms)";
+                    }}
                 }}
                 
                 function selectCardRadio(name, value, element) {{
@@ -5351,6 +5402,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     }}
                     
                     if (name === 'lead_gen_method') {{
+                        updateFunnelTier1Source();
                         toggleSOTFields();
                     }}
                     
