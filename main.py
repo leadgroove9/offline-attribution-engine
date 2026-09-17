@@ -534,6 +534,7 @@ def init_db():
         ("email_app_password", "TEXT"),
         ("crm_deal_tags", "TEXT"),
         ("crm_won_deal_tags", "TEXT"),
+        ("crm_value_field", "TEXT"),
         ("crm_lead_tags", "TEXT"),
         ("lead_count_rule", "TEXT"),
         ("exclude_past_customers", "TEXT"),
@@ -986,6 +987,7 @@ class ClientCreate(BaseModel):
     email_app_password_5: Optional[str] = ""
     crm_deal_tags: Optional[str] = ""
     crm_won_deal_tags: Optional[str] = ""
+    crm_value_field: Optional[str] = ""
     crm_lead_tags: Optional[str] = ""
     lead_count_rule: str
     exclude_past_customers: str
@@ -3142,6 +3144,7 @@ class ClientUpdate(BaseModel):
     email_app_password_5: Optional[str] = ""
     crm_deal_tags: Optional[str] = ""
     crm_won_deal_tags: Optional[str] = ""
+    crm_value_field: Optional[str] = ""
     crm_lead_tags: Optional[str] = ""
     lead_count_rule: str
     exclude_past_customers: str
@@ -3304,6 +3307,20 @@ def view_settings(request: Request, client_id: Optional[int] = None):
             qual_rule_text = f"Configured AI Audit Rule: <strong>\"{prompt_text}\"</strong>"
             
         # Dynamic Layer b) Won Deals overlay based on selected Single Source of Truth
+        # Dynamic SOT Labels and Value Field
+        if sot == "google_sheets":
+            deal_tags_label_text = "Which tags/statuses on Google sheet signify a qualified conversion?"
+            won_tags_label_text = "Which tags/statuses on Google sheet signify a won deal conversion?"
+            value_box_display_style = "block"
+        elif sot in ["quickbooks", "xero", "zoho_books", "netsuite", "sage", "freshbooks", "zapier"]:
+            deal_tags_label_text = "Which invoice/payment statuses signify a qualified conversion?"
+            won_tags_label_text = "Which invoice/payment statuses signify a won deal conversion?"
+            value_box_display_style = "none"
+        else:
+            deal_tags_label_text = "Which tags/statuses under Deals signify a qualified conversion?"
+            won_tags_label_text = "Which tags/statuses under Deals signify a won deal conversion?"
+            value_box_display_style = "none"
+
         sales_source = client_data.get("sales_source", "manual") or "manual"
         if sales_source == "crm" or sot in ["hubspot", "salesforce", "zoho", "servicetitan", "housecallpro", "gohighlevel", "pipedrive"]:
             won_overlay_heading = "Won Deals & Closed Revenue (Live CRM Webhook Pipeline)"
@@ -4218,12 +4235,16 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             <!-- CONDITIONAL: CRM Deal status tags -->
                             <div id="sot-deal-tags-box" class="conditional-box">
                                 <div style="margin-bottom: 15px;">
-                                    <label for="crm_deal_tags">Which tags/statuses under <strong>Deals</strong> signify a qualified conversion?</label>
+                                    <label id="sot-deal-tags-label" for="crm_deal_tags">{deal_tags_label_text}</label>
                                     <input type="text" id="crm_deal_tags" value="{client_data.get("crm_deal_tags", "") or ""}" placeholder="e.g. appointment-booked, estimate-approved">
                                 </div>
-                                <div>
-                                    <label for="crm_won_deal_tags">Which tags/statuses under <strong>Deals</strong> signify a won deal conversion?</label>
+                                <div style="margin-bottom: 15px;">
+                                    <label id="sot-won-deal-tags-label" for="crm_won_deal_tags">{won_tags_label_text}</label>
                                     <input type="text" id="crm_won_deal_tags" value="{client_data.get("crm_won_deal_tags", "") or ""}" placeholder="e.g. closed-won, job-completed">
+                                </div>
+                                <div id="sot-value-tags-group" style="display: {value_box_display_style};">
+                                    <label id="sot-value-tags-label" for="crm_value_field">Which tags/statuses on Google sheet signify the won deal transaction value?</label>
+                                    <input type="text" id="crm_value_field" value="{client_data.get("crm_value_field", "") or ""}" placeholder="e.g. Total Amount, Sale Price, Invoice Total, Column E">
                                 </div>
                             </div>
                             
@@ -6153,6 +6174,8 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     
                     // 1. Reset / Hide all SOT fields and instruction boxes
                     if (dealBox) dealBox.style.display = 'none';
+                    const valGroup = document.getElementById('sot-value-tags-group');
+                    if (valGroup) valGroup.style.display = 'none';
                     if (leadBox) leadBox.style.display = 'none';
                     if (emailBox) emailBox.style.display = 'none';
                     if (voipBox) voipBox.style.display = 'none';
@@ -6188,6 +6211,10 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         
                         if (['hubspot', 'salesforce', 'zoho', 'gohighlevel', 'google_sheets', 'email', 'zapier'].includes(sot)) {{
                             if (dealBox) dealBox.style.display = 'block';
+                            const dLabel = document.getElementById('sot-deal-tags-label');
+                            const wLabel = document.getElementById('sot-won-deal-tags-label');
+                            if (dLabel && sot !== 'google_sheets') dLabel.innerText = 'Which tags/statuses under Deals signify a qualified conversion?';
+                            if (wLabel && sot !== 'google_sheets') wLabel.innerText = 'Which tags/statuses under Deals signify a won deal conversion?';
                         }}
                         if (['servicetitan', 'housecallpro', 'gohighlevel'].includes(sot)) {{
                             if (leadBox) leadBox.style.display = 'block';
@@ -6209,7 +6236,16 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         else if (sot === 'netsuite' && netsuiteBox) netsuiteBox.style.display = 'block';
                         else if (sot === 'sage' && sageBox) sageBox.style.display = 'block';
                         else if (sot === 'freshbooks' && freshbooksBox) freshbooksBox.style.display = 'block';
-                        else if (sot === 'google_sheets' && googleSheetsBox) {{ googleSheetsBox.style.display = 'block'; if (dealBox) dealBox.style.display = 'block'; }}
+                        else if (sot === 'google_sheets' && googleSheetsBox) {{ 
+                            googleSheetsBox.style.display = 'block'; 
+                            if (dealBox) dealBox.style.display = 'block';
+                            const valGroup = document.getElementById('sot-value-tags-group');
+                            if (valGroup) valGroup.style.display = 'block';
+                            const dLabel = document.getElementById('sot-deal-tags-label');
+                            const wLabel = document.getElementById('sot-won-deal-tags-label');
+                            if (dLabel) dLabel.innerText = 'Which tags/statuses on Google sheet signify a qualified conversion?';
+                            if (wLabel) wLabel.innerText = 'Which tags/statuses on Google sheet signify a won deal conversion?';
+                        }}
                         else if (sot === 'zapier' && zapierBox) {{ zapierBox.style.display = 'block'; if (dealBox) dealBox.style.display = 'block'; }}
                     }} else if (sot === 'email') {{
                         if (monthlyEmailBox) monthlyEmailBox.style.display = 'block';
@@ -6574,6 +6610,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         email_app_password_5: document.getElementById('email_app_password_5') ? document.getElementById('email_app_password_5').value.trim() : '',
                         crm_deal_tags: document.getElementById('crm_deal_tags').value.trim(),
                         crm_won_deal_tags: document.getElementById('crm_won_deal_tags').value.trim(),
+                        crm_value_field: document.getElementById('crm_value_field') ? document.getElementById('crm_value_field').value.trim() : '',
                         crm_lead_tags: document.getElementById('crm_lead_tags').value.trim(),
                         lead_count_rule: document.querySelector('input[name="lead_count_rule"]:checked').value,
                         exclude_past_customers: document.querySelector('input[name="exclude_past_customers"]:checked').value,
@@ -7057,6 +7094,7 @@ def update_client_settings(request: Request, client: ClientUpdate):
             "email_app_password_5": "Email Integration App Password #5",
             "crm_deal_tags": "CRM Deal Tags",
             "crm_won_deal_tags": "CRM Won Deal Tags",
+            "crm_value_field": "Google Sheet Transaction Value Column",
             "crm_lead_tags": "CRM Lead Qualification Tags",
             "lead_count_rule": "Lead Count Optimization Rule",
             "exclude_past_customers": "Exclude Past Customers Setting"
@@ -7097,6 +7135,7 @@ def update_client_settings(request: Request, client: ClientUpdate):
             "email_app_password_5": client.email_app_password_5 or "",
             "crm_deal_tags": client.crm_deal_tags or "",
             "crm_won_deal_tags": client.crm_won_deal_tags or "",
+            "crm_value_field": getattr(client, 'crm_value_field', '') or "",
             "crm_lead_tags": client.crm_lead_tags or "",
             "lead_count_rule": client.lead_count_rule,
             "exclude_past_customers": client.exclude_past_customers
@@ -7144,6 +7183,7 @@ def update_client_settings(request: Request, client: ClientUpdate):
                 email_app_password_5 = ?,
                 crm_deal_tags = ?,
                 crm_won_deal_tags = ?,
+                crm_value_field = ?,
                 crm_lead_tags = ?,
                 lead_count_rule = ?,
                 exclude_past_customers = ?,
@@ -7183,6 +7223,7 @@ def update_client_settings(request: Request, client: ClientUpdate):
             str(client.email_app_password_5 or ""),
             str(client.crm_deal_tags or ""),
             str(client.crm_won_deal_tags or ""),
+            str(getattr(client, 'crm_value_field', '') or ""),
             str(client.crm_lead_tags or ""),
             str(client.lead_count_rule or "all"),
             str(client.exclude_past_customers or "NO"),
@@ -9207,6 +9248,8 @@ def add_client_page(request: Request):
                     const monthlyEmailBox = document.getElementById('sot-monthly-email-instructions-box');
                     
                     if (dealBox) dealBox.style.display = 'none';
+                    const valGroup = document.getElementById('sot-value-tags-group');
+                    if (valGroup) valGroup.style.display = 'none';
                     if (leadBox) leadBox.style.display = 'none';
                     if (emailBox) emailBox.style.display = 'none';
                     if (voipBox) voipBox.style.display = 'none';
@@ -9329,6 +9372,7 @@ def add_client_page(request: Request):
                         email_app_password_5: document.getElementById('email_app_password_5') ? document.getElementById('email_app_password_5').value.trim() : '',
                         crm_deal_tags: document.getElementById('crm_deal_tags').value.trim(),
                         crm_won_deal_tags: document.getElementById('crm_won_deal_tags').value.trim(),
+                        crm_value_field: document.getElementById('crm_value_field') ? document.getElementById('crm_value_field').value.trim() : '',
                         crm_lead_tags: document.getElementById('crm_lead_tags').value.trim(),
                         lead_count_rule: document.querySelector('input[name="lead_count_rule"]:checked').value,
                         exclude_past_customers: document.querySelector('input[name="exclude_past_customers"]:checked').value
