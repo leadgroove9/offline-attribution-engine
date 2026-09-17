@@ -3160,9 +3160,9 @@ def view_settings(request: Request, client_id: Optional[int] = None):
         if lg_method == "phone":
             tier1_source_text = f'Source: <strong id="funnel-tier1-provider">{provider_display} Call Tracking Only</strong>'
         elif lg_method == "form":
-            tier1_source_text = 'Source: <strong id="funnel-tier1-provider">Website Webhook Forms Only</strong>'
+            tier1_source_text = f'Source: <strong id="funnel-tier1-provider">{provider_display} Webhook Forms Only</strong>'
         else:
-            tier1_source_text = f'Source: <strong id="funnel-tier1-provider">{provider_display} Call Tracking</strong> + <strong>Website Webhook Forms</strong>'
+            tier1_source_text = f'Source: <strong id="funnel-tier1-provider">{provider_display} Call Tracking</strong> + <strong>{provider_display} Webhook Forms</strong>'
             
         sot = str(client_data.get("source_of_truth", "manual") or "manual").lower()
         
@@ -5311,9 +5311,9 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     if (lgVal === 'phone') {{
                         tier1El.innerHTML = 'Source: <strong id="funnel-tier1-provider">' + providerName + ' Call Tracking Only</strong>';
                     }} else if (lgVal === 'form') {{
-                        tier1El.innerHTML = 'Source: <strong id="funnel-tier1-provider">Website Webhook Forms Only</strong>';
+                        tier1El.innerHTML = 'Source: <strong id="funnel-tier1-provider">' + providerName + ' Webhook Forms Only</strong>';
                     }} else {{
-                        tier1El.innerHTML = 'Source: <strong id="funnel-tier1-provider">' + providerName + ' Call Tracking</strong> + <strong>Website Webhook Forms</strong>';
+                        tier1El.innerHTML = 'Source: <strong id="funnel-tier1-provider">' + providerName + ' Call Tracking</strong> + <strong>' + providerName + ' Webhook Forms</strong>';
                     }}
                 }}
 
