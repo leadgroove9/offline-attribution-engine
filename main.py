@@ -1653,7 +1653,7 @@ def is_in_date_range(created_at_val, date_range: str, start_date_str: str, end_d
             s_clean = str(created_at_val).strip()
             if "T" in s_clean:
                 s_clean = s_clean.replace("T", " ")
-            s_clean = s_clean.split(".")
+            s_clean = s_clean.split(".")[0]
             try:
                 dt = datetime.strptime(s_clean, "%Y-%m-%d %H:%M:%S")
             except ValueError:
@@ -2965,6 +2965,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
 
                 {upload_box_html}
                 {global_modals_html}
+                {global_modals_script_html}
 
                 <!-- Table -->
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
