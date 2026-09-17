@@ -3145,7 +3145,21 @@ def view_settings(request: Request, client_id: Optional[int] = None):
             provider_display = "CallRail"
             
         qual_overlay_heading = f"Qualified Leads ({provider_display} Transcripts & Forms)"
-        won_overlay_heading = f"Won Deals & Closed Revenue ({client_name} Sales Log)"
+        
+        # Dynamic Won Deals overlay based on selected Single Source of Truth
+        sales_source = client_data.get("sales_source", "manual") or "manual"
+        if sales_source == "crm":
+            won_overlay_heading = "Won Deals & Closed Revenue (Live CRM Webhook Pipeline)"
+            won_source_text = "Source: <strong>Live CRM Webhooks (HubSpot / Salesforce / Zoho / ServiceTitan)</strong> → Match Method: <strong>Phone & Email Session Pair</strong>"
+        elif sales_source == "email":
+            won_overlay_heading = "Won Deals & Closed Revenue (Automated Email Sales Log Scanner)"
+            won_source_text = "Source: <strong>Email Sales Scanner / Order Confirmations</strong> → Match Method: <strong>Phone & Email Session Pair</strong>"
+        elif sales_source == "accounting":
+            won_overlay_heading = "Won Deals & Closed Revenue (QuickBooks / Xero Invoices)"
+            won_source_text = "Source: <strong>Accounting Webhooks (QuickBooks / Xero Paid Invoices)</strong> → Match Method: <strong>Phone & Email Session Pair</strong>"
+        else:
+            won_overlay_heading = "Won Deals & Closed Revenue (Manual CSV / Spreadsheet Upload)"
+            won_source_text = "Source: <strong>Manual CSV / Spreadsheet Sales Log Upload</strong> → Match Method: <strong>Phone & Email Session Pair</strong>"
 
         
         active_provider = client_data.get("call_tracking_provider", "callrail") or "callrail"
@@ -3692,11 +3706,11 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             <div style="position: absolute; top: -10px; left: 15px; background: #1b5e20; color: #a5d6a7; font-size: 9px; font-weight: 800; padding: 2px 8px; border-radius: 10px; border: 1px solid #a5d6a7; text-transform: uppercase; letter-spacing: 0.5px;">
                                 b) WON DEALS & REVENUE TRACKING
                             </div>
-                            <div style="font-size: 13px; font-weight: bold; color: #ffffff; margin-top: 2px;">
+                            <div id="funnel-won-heading" style="font-size: 13px; font-weight: bold; color: #ffffff; margin-top: 2px;">
                                 💰 {won_overlay_heading}
                             </div>
-                            <div style="font-size: 11px; color: #e8f5e9; font-style: italic; margin-top: 4px; background: rgba(0,0,0,0.22); padding: 5px 10px; border-radius: 4px; border-left: 3px solid #a5d6a7;">
-                                Source: <strong>CRM Webhooks / Email Ingestion</strong> → Match Method: <strong>Phone & Email Session Pair</strong>
+                            <div id="funnel-won-source" style="font-size: 11px; color: #e8f5e9; font-style: italic; margin-top: 4px; background: rgba(0,0,0,0.22); padding: 5px 10px; border-radius: 4px; border-left: 3px solid #a5d6a7;">
+                                {won_source_text}
                             </div>
                         </div>
 
@@ -5283,6 +5297,26 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     }});
                     element.classList.add('selected');
                     element.querySelector('input[type="radio"]').checked = true;
+                    
+                    if (name === 'sales_source') {{
+                        const funnelWonHeading = document.getElementById('funnel-won-heading');
+                        const funnelWonSource = document.getElementById('funnel-won-source');
+                        if (funnelWonHeading && funnelWonSource) {{
+                            if (value === 'crm') {{
+                                funnelWonHeading.innerHTML = '💰 Won Deals & Closed Revenue (Live CRM Webhook Pipeline)';
+                                funnelWonSource.innerHTML = 'Source: <strong>Live CRM Webhooks (HubSpot / Salesforce / Zoho / ServiceTitan)</strong> → Match Method: <strong>Phone & Email Session Pair</strong>';
+                            }} else if (value === 'email') {{
+                                funnelWonHeading.innerHTML = '💰 Won Deals & Closed Revenue (Automated Email Sales Log Scanner)';
+                                funnelWonSource.innerHTML = 'Source: <strong>Email Sales Scanner / Order Confirmations</strong> → Match Method: <strong>Phone & Email Session Pair</strong>';
+                            }} else if (value === 'accounting') {{
+                                funnelWonHeading.innerHTML = '💰 Won Deals & Closed Revenue (QuickBooks / Xero Invoices)';
+                                funnelWonSource.innerHTML = 'Source: <strong>Accounting Webhooks (QuickBooks / Xero Paid Invoices)</strong> → Match Method: <strong>Phone & Email Session Pair</strong>';
+                            }} else {{
+                                funnelWonHeading.innerHTML = '💰 Won Deals & Closed Revenue (Manual CSV / Spreadsheet Upload)';
+                                funnelWonSource.innerHTML = 'Source: <strong>Manual CSV / Spreadsheet Sales Log Upload</strong> → Match Method: <strong>Phone & Email Session Pair</strong>';
+                            }}
+                        }}
+                    }}
                     
                     if (name === 'lead_gen_method') {{
                         toggleSOTFields();
