@@ -10,10 +10,7 @@ from fastapi import FastAPI, Request, HTTPException, File, UploadFile, Form
 from fastapi.responses import HTMLResponse, StreamingResponse, Response, RedirectResponse
 from pydantic import BaseModel
 from typing import Optional
-try:
-    from anthropic import Anthropic
-except ImportError:
-    Anthropic = None
+from anthropic import Anthropic
 
 # Initialize FastAPI App
 
@@ -3148,6 +3145,39 @@ def view_settings(request: Request, client_id: Optional[int] = None):
         else:
             prompt_text = prompt_raw
 
+        # Detect active connected ad network platforms for funnel spout
+        active_ad_platforms = []
+        if str(client_data.get("google_ads_customer_id", "") or "").strip():
+            active_ad_platforms.append("Google Ads")
+        if str(client_data.get("facebook_ads_id", "") or "").strip():
+            active_ad_platforms.append("Meta CAPI")
+        if str(client_data.get("microsoft_ads_id", "") or "").strip():
+            active_ad_platforms.append("Bing Ads")
+        if str(client_data.get("linkedin_ads_id", "") or "").strip():
+            active_ad_platforms.append("LinkedIn Ads")
+        if str(client_data.get("tiktok_ads_id", "") or "").strip():
+            active_ad_platforms.append("TikTok Ads")
+        if str(client_data.get("twitter_ads_id", "") or "").strip():
+            active_ad_platforms.append("X (Twitter) Ads")
+        if str(client_data.get("pinterest_ads_id", "") or "").strip():
+            active_ad_platforms.append("Pinterest Ads")
+        if str(client_data.get("snapchat_ads_id", "") or "").strip():
+            active_ad_platforms.append("Snapchat Ads")
+        if str(client_data.get("chatgpt_ads_id", "") or "").strip():
+            active_ad_platforms.append("ChatGPT Ads")
+        if str(client_data.get("reddit_ads_id", "") or "").strip():
+            active_ad_platforms.append("Reddit Ads")
+
+        if active_ad_platforms:
+            if len(active_ad_platforms) == 1:
+                ad_platforms_display = f"{active_ad_platforms[0]} Conversion Uploads"
+            elif len(active_ad_platforms) == 2:
+                ad_platforms_display = f"{active_ad_platforms[0]} & {active_ad_platforms[1]} Conversion Uploads"
+            else:
+                ad_platforms_display = ", ".join(active_ad_platforms[:-1]) + f" & {active_ad_platforms[-1]} Conversion Uploads"
+        else:
+            ad_platforms_display = "Google Ads, Meta CAPI & Bing Conversion Uploads"
+
         lg_method = str(client_data.get("lead_gen_method", "both") or "both").lower()
         prov = str(client_data.get("call_tracking_provider", "callrail") or "callrail").lower()
         if prov in ["ctm", "calltrackingmetrics"]:
@@ -3758,12 +3788,12 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         <div style="color: #a5d6a7; font-size: 11px; margin: -2px 0;">▼</div>
 
                         <!-- Funnel Spout: Ad Network Offline Sync -->
-                        <div style="width: 44%; background: linear-gradient(90deg, #f57f17 0%, #fbc02d 100%); padding: 8px 12px; border-radius: 3px 3px 8px 8px; text-align: center; box-shadow: 0 3px 8px rgba(0,0,0,0.3); border: 1.5px solid #ffe082; color: #000;">
+                        <div style="width: 48%; min-width: 260px; background: linear-gradient(90deg, #f57f17 0%, #fbc02d 100%); padding: 8px 12px; border-radius: 3px 3px 8px 8px; text-align: center; box-shadow: 0 3px 8px rgba(0,0,0,0.3); border: 1.5px solid #ffe082; color: #000;">
                             <div style="font-size: 11px; font-weight: 900; color: #212121; text-transform: uppercase; letter-spacing: 0.5px;">
                                 🚀 Smart Bidding Feedback Loop
                             </div>
-                            <div style="font-size: 10px; color: #37474f; font-weight: bold;">
-                                Google Ads, Meta CAPI & Bing Conversion Uploads
+                            <div id="funnel-ad-platforms-spout" style="font-size: 10px; color: #37474f; font-weight: bold;">
+                                {ad_platforms_display}
                             </div>
                         </div>
 
@@ -5288,7 +5318,58 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     
                     toggleSOTFields();
                     toggleSettingsCallTrackingFields();
+                    updateFunnelAdPlatforms();
                 }});
+
+                function updateFunnelAdPlatforms() {{
+                    const spoutEl = document.getElementById('funnel-ad-platforms-spout');
+                    if (!spoutEl) return;
+                    
+                    const platforms = [];
+                    
+                    const gads = document.getElementById('google_ads_customer_id');
+                    if (gads && gads.value.trim()) platforms.push("Google Ads");
+                    
+                    const fb = document.getElementById('facebook_ads_id');
+                    if (fb && fb.value.trim()) platforms.push("Meta CAPI");
+                    
+                    const ms = document.getElementById('microsoft_ads_id');
+                    if (ms && ms.value.trim()) platforms.push("Bing Ads");
+                    
+                    const li = document.getElementById('linkedin_ads_id');
+                    if (li && li.value.trim()) platforms.push("LinkedIn Ads");
+                    
+                    const tt = document.getElementById('tiktok_ads_id');
+                    if (tt && tt.value.trim()) platforms.push("TikTok Ads");
+                    
+                    const tw = document.getElementById('twitter_ads_id');
+                    if (tw && tw.value.trim()) platforms.push("X (Twitter) Ads");
+                    
+                    const pin = document.getElementById('pinterest_ads_id');
+                    if (pin && pin.value.trim()) platforms.push("Pinterest Ads");
+                    
+                    const sc = document.getElementById('snapchat_ads_id');
+                    if (sc && sc.value.trim()) platforms.push("Snapchat Ads");
+                    
+                    const gpt = document.getElementById('chatgpt_ads_id');
+                    if (gpt && gpt.value.trim()) platforms.push("ChatGPT Ads");
+                    
+                    const rdt = document.getElementById('reddit_ads_id');
+                    if (rdt && rdt.value.trim()) platforms.push("Reddit Ads");
+                    
+                    if (platforms.length > 0) {{
+                        if (platforms.length === 1) {{
+                            spoutEl.innerText = platforms[0] + " Conversion Uploads";
+                        }} else if (platforms.length === 2) {{
+                            spoutEl.innerText = platforms[0] + " & " + platforms[1] + " Conversion Uploads";
+                        }} else {{
+                            spoutEl.innerText = platforms.slice(0, -1).join(", ") + " & " + platforms[platforms.length - 1] + " Conversion Uploads";
+                        }}
+                    }} else {{
+                        spoutEl.innerText = "Google Ads, Meta CAPI & Bing Conversion Uploads";
+                    }}
+                }}
+
 
                 
                 function updateFunnelTier1Source() {{
