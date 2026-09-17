@@ -3309,7 +3309,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
         # Dynamic Layer b) Won Deals overlay based on selected Single Source of Truth
         # Dynamic SOT Labels and Value Field
         if sot == "google_sheets":
-            deal_tags_label_text = "Which tags/statuses on Google sheet signify a qualified conversion?"
+            deal_tags_label_text = "Which tags/statuses on Google sheet signify a qualified lead conversion?"
             won_tags_label_text = "Which tags/statuses on Google sheet signify a won deal conversion?"
             value_box_display_style = "block"
         elif sot in ["quickbooks", "xero", "zoho_books", "netsuite", "sage", "freshbooks", "zapier"]:
@@ -4241,10 +4241,6 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                 <div style="margin-bottom: 15px;">
                                     <label id="sot-won-deal-tags-label" for="crm_won_deal_tags">{won_tags_label_text}</label>
                                     <input type="text" id="crm_won_deal_tags" value="{client_data.get("crm_won_deal_tags", "") or ""}" placeholder="e.g. closed-won, job-completed">
-                                </div>
-                                <div id="sot-value-tags-group" style="display: {value_box_display_style};">
-                                    <label id="sot-value-tags-label" for="crm_value_field">Which tags/statuses on Google sheet signify the won deal transaction value?</label>
-                                    <input type="text" id="crm_value_field" value="{client_data.get("crm_value_field", "") or ""}" placeholder="e.g. Total Amount, Sale Price, Invoice Total, Column E">
                                 </div>
                             </div>
                             
@@ -6243,7 +6239,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             if (valGroup) valGroup.style.display = 'block';
                             const dLabel = document.getElementById('sot-deal-tags-label');
                             const wLabel = document.getElementById('sot-won-deal-tags-label');
-                            if (dLabel) dLabel.innerText = 'Which tags/statuses on Google sheet signify a qualified conversion?';
+                            if (dLabel) dLabel.innerText = 'Which tags/statuses on Google sheet signify a qualified lead conversion?';
                             if (wLabel) wLabel.innerText = 'Which tags/statuses on Google sheet signify a won deal conversion?';
                         }}
                         else if (sot === 'zapier' && zapierBox) {{ zapierBox.style.display = 'block'; if (dealBox) dealBox.style.display = 'block'; }}
