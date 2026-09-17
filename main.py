@@ -10,7 +10,7 @@ from fastapi import FastAPI, Request, HTTPException, File, UploadFile, Form
 from fastapi.responses import HTMLResponse, StreamingResponse, Response, RedirectResponse
 from pydantic import BaseModel
 from typing import Optional
-from anthropic import Anthropic
+# from anthropic import Anthropic
 
 # Initialize FastAPI App
 
@@ -5291,6 +5291,27 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     }}
                 }}
                 
+                
+                function updateFunnelWonOverlay(val) {{
+                    const funnelWonHeading = document.getElementById('funnel-won-heading');
+                    const funnelWonSource = document.getElementById('funnel-won-source');
+                    if (funnelWonHeading && funnelWonSource) {{
+                        if (val === 'crm') {{
+                            funnelWonHeading.innerHTML = '💰 Won Deals & Closed Revenue (Live CRM Webhook Pipeline)';
+                            funnelWonSource.innerHTML = 'Source: <strong>Live CRM Webhooks (HubSpot / Salesforce / Zoho / ServiceTitan)</strong> → Match Method: <strong>Phone & Email Session Pair</strong>';
+                        }} else if (val === 'email') {{
+                            funnelWonHeading.innerHTML = '💰 Won Deals & Closed Revenue (Automated Email Sales Log Scanner)';
+                            funnelWonSource.innerHTML = 'Source: <strong>Email Sales Scanner / Order Confirmations</strong> → Match Method: <strong>Phone & Email Session Pair</strong>';
+                        }} else if (val === 'accounting') {{
+                            funnelWonHeading.innerHTML = '💰 Won Deals & Closed Revenue (QuickBooks / Xero Invoices)';
+                            funnelWonSource.innerHTML = 'Source: <strong>Accounting Webhooks (QuickBooks / Xero Paid Invoices)</strong> → Match Method: <strong>Phone & Email Session Pair</strong>';
+                        }} else {{
+                            funnelWonHeading.innerHTML = '💰 Won Deals & Closed Revenue (Manual CSV / Spreadsheet Upload)';
+                            funnelWonSource.innerHTML = 'Source: <strong>Manual CSV / Spreadsheet Sales Log Upload</strong> → Match Method: <strong>Phone & Email Session Pair</strong>';
+                        }}
+                    }}
+                }}
+    
                 function selectCardRadio(name, value, element) {{
                     element.parentNode.querySelectorAll('.card-radio').forEach(card => {{
                         card.classList.remove('selected');
@@ -6812,56 +6833,48 @@ def update_client_settings(request: Request, client: ClientUpdate):
                 wc_profile_id = ?
             WHERE id = ?
         """, (
-            client.name,
-            client.callrail_account_id or None,
-            client.callrail_company_id or None,
-            client.google_ads_customer_id,
-            client.facebook_ads_id,
-            client.linkedin_ads_id,
-            client.microsoft_ads_id,
-            client.tiktok_ads_id or "",
-            client.twitter_ads_id or "",
-            client.pinterest_ads_id or "",
-            client.snapchat_ads_id or "",
-            client.chatgpt_ads_id or "",
-            client.lead_gen_method,
-            client.qualification_criteria,
-            client.source_of_truth,
-            client.email_provider,
-            client.email_account,
-            client.email_app_password,
-            client.email_account_2,
-            client.email_app_password_2,
-            client.email_account_3,
-            client.email_app_password_3,
-            client.email_account_4,
-            client.email_app_password_4,
-            client.email_account_5,
-            client.email_app_password_5,
-            client.email_account_2,
-            client.email_app_password_2,
-            client.email_account_3,
-            client.email_app_password_3,
-            client.email_account_4,
-            client.email_app_password_4,
-            client.email_account_5,
-            client.email_app_password_5,
-            client.email_app_password,
-            client.crm_deal_tags,
-            client.crm_won_deal_tags,
-            client.crm_lead_tags,
-            client.lead_count_rule,
-            client.exclude_past_customers,
-            client.call_tracking_provider or "callrail",
-            client.ctm_account_id or "",
-            client.ctm_profile_id or "",
-            client.wc_account_id or "",
-            client.wc_profile_id or "",
-            client.id
+            str(getattr(client, 'name', '') or ""),
+            str(getattr(client, 'callrail_account_id', '') or "") if getattr(client, 'callrail_account_id', None) else None,
+            str(getattr(client, 'callrail_company_id', '') or "") if getattr(client, 'callrail_company_id', None) else None,
+            str(getattr(client, 'google_ads_customer_id', '') or ""),
+            str(getattr(client, 'facebook_ads_id', '') or ""),
+            str(getattr(client, 'linkedin_ads_id', '') or ""),
+            str(getattr(client, 'microsoft_ads_id', '') or ""),
+            str(getattr(client, 'tiktok_ads_id', '') or ""),
+            str(getattr(client, 'twitter_ads_id', '') or ""),
+            str(getattr(client, 'pinterest_ads_id', '') or ""),
+            str(getattr(client, 'snapchat_ads_id', '') or ""),
+            str(getattr(client, 'chatgpt_ads_id', '') or ""),
+            str(getattr(client, 'reddit_ads_id', '') or ""),
+            str(getattr(client, 'lead_gen_method', 'both') or "both"),
+            str(getattr(client, 'qualification_criteria', 'ai_audit') or "ai_audit"),
+            str(getattr(client, 'source_of_truth', 'crm') or "crm"),
+            str(getattr(client, 'email_provider', '') or ""),
+            str(getattr(client, 'email_account', '') or ""),
+            str(getattr(client, 'email_app_password', '') or ""),
+            str(getattr(client, 'email_account_2', '') or ""),
+            str(getattr(client, 'email_app_password_2', '') or ""),
+            str(getattr(client, 'email_account_3', '') or ""),
+            str(getattr(client, 'email_app_password_3', '') or ""),
+            str(getattr(client, 'email_account_4', '') or ""),
+            str(getattr(client, 'email_app_password_4', '') or ""),
+            str(getattr(client, 'email_account_5', '') or ""),
+            str(getattr(client, 'email_app_password_5', '') or ""),
+            str(getattr(client, 'crm_deal_tags', '') or ""),
+            str(getattr(client, 'crm_won_deal_tags', '') or ""),
+            str(getattr(client, 'crm_lead_tags', '') or ""),
+            str(getattr(client, 'lead_count_rule', 'all') or "all"),
+            str(getattr(client, 'exclude_past_customers', 'NO') or "NO"),
+            str(getattr(client, 'call_tracking_provider', 'callrail') or "callrail"),
+            str(getattr(client, 'ctm_account_id', '') or ""),
+            str(getattr(client, 'ctm_profile_id', '') or ""),
+            str(getattr(client, 'wc_account_id', '') or ""),
+            str(getattr(client, 'wc_profile_id', '') or ""),
+            int(client.id)
         ))
         
         # Handle excluded customers updates if a new list was uploaded
-        if client.excluded_customers is not None and len(client.excluded_customers) > 0:
+        if getattr(client, 'excluded_customers', None) is not None and len(client.excluded_customers) > 0:
             if getattr(client, 'exclusion_action', 'append') == 'replace':
                 cursor.execute("DELETE FROM excluded_customers WHERE client_id = ?", (client.id,))
                 
@@ -8490,12 +8503,37 @@ def add_client_page(request: Request):
                     document.body.removeChild(link);
                 }
 
+                
+                function updateFunnelWonOverlay(val) {{
+                    const funnelWonHeading = document.getElementById('funnel-won-heading');
+                    const funnelWonSource = document.getElementById('funnel-won-source');
+                    if (funnelWonHeading && funnelWonSource) {{
+                        if (val === 'crm') {{
+                            funnelWonHeading.innerHTML = '💰 Won Deals & Closed Revenue (Live CRM Webhook Pipeline)';
+                            funnelWonSource.innerHTML = 'Source: <strong>Live CRM Webhooks (HubSpot / Salesforce / Zoho / ServiceTitan)</strong> → Match Method: <strong>Phone & Email Session Pair</strong>';
+                        }} else if (val === 'email') {{
+                            funnelWonHeading.innerHTML = '💰 Won Deals & Closed Revenue (Automated Email Sales Log Scanner)';
+                            funnelWonSource.innerHTML = 'Source: <strong>Email Sales Scanner / Order Confirmations</strong> → Match Method: <strong>Phone & Email Session Pair</strong>';
+                        }} else if (val === 'accounting') {{
+                            funnelWonHeading.innerHTML = '💰 Won Deals & Closed Revenue (QuickBooks / Xero Invoices)';
+                            funnelWonSource.innerHTML = 'Source: <strong>Accounting Webhooks (QuickBooks / Xero Paid Invoices)</strong> → Match Method: <strong>Phone & Email Session Pair</strong>';
+                        }} else {{
+                            funnelWonHeading.innerHTML = '💰 Won Deals & Closed Revenue (Manual CSV / Spreadsheet Upload)';
+                            funnelWonSource.innerHTML = 'Source: <strong>Manual CSV / Spreadsheet Sales Log Upload</strong> → Match Method: <strong>Phone & Email Session Pair</strong>';
+                        }}
+                    }}
+                }}
+    
                 function selectCardRadio(name, value, element) {
                     element.parentNode.querySelectorAll('.card-radio').forEach(card => {
                         card.classList.remove('selected');
                     });
                     element.classList.add('selected');
                     element.querySelector('input[type="radio"]').checked = true;
+                    
+                    if (name === 'source_of_truth' || name === 'sales_source') {
+                        updateFunnelWonOverlay(value);
+                    }
                     
                     if (name === 'lead_gen_method') {
                         toggleSOTFields();
@@ -9432,7 +9470,7 @@ def create_client(request: Request, client: ClientCreate):
         client_id = cursor.lastrowid
         
         # Handle excluded customers updates for new onboarding if uploaded
-        if client.excluded_customers is not None and len(client.excluded_customers) > 0:
+        if getattr(client, 'excluded_customers', None) is not None and len(client.excluded_customers) > 0:
             for cust in client.excluded_customers:
                 normalized_p = normalize_phone(cust.phone)
                 email_clean = cust.email.strip().lower() if cust.email else ""
