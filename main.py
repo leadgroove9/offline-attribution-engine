@@ -3619,7 +3619,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             🎯 Offline Conversion Funnel Architecture
                         </h2>
                         <p style="margin: 4px 0 0 0; font-size: 12px; color: #e8eaf6;">
-                            Google Ads Conversion Menu Mapping & Offline Feedback Loop for <strong>{client_dict['name']}</strong>
+                            Google Ads Conversion Menu Mapping & Offline Feedback Loop for <strong>{client_name}</strong>
                         </p>
                     </div>
                     <span style="background: rgba(255,255,255,0.15); color: #fff; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; border: 1px solid rgba(255,255,255,0.25);">
