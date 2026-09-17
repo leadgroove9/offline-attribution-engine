@@ -10,7 +10,7 @@ from fastapi import FastAPI, Request, HTTPException, File, UploadFile, Form
 from fastapi.responses import HTMLResponse, StreamingResponse, Response, RedirectResponse
 from pydantic import BaseModel
 from typing import Optional
-# from anthropic import Anthropic
+from anthropic import Anthropic
 
 # Initialize FastAPI App
 
