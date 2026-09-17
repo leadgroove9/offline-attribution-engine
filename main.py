@@ -617,14 +617,22 @@ def init_db():
     conn.commit()
     conn.close()
 
-# Run database initialization on FastAPI startup
+import threading
+
+def _async_init_db():
+    try:
+        print("🔄 [DB Init] Starting background database schema initialization & self-healing...")
+        init_db()
+        print("✅ [DB Init] Database initialization completed successfully!")
+    except Exception as e:
+        print(f"⚠️ [DB Init] Warning: Non-fatal startup database init error: {e}")
+
+# Run database initialization asynchronously on FastAPI startup to allow instant port binding on Render
 @app.on_event("startup")
 def startup_db_init():
-    try:
-        init_db()
-        print("✅ Database initialization completed successfully on startup.")
-    except Exception as e:
-        print(f"⚠️ Warning: Non-fatal startup database init error: {e}")
+    print("🚀 [Startup] App startup event triggered! Binding port immediately...")
+    threading.Thread(target=_async_init_db, daemon=True).start()
+    print("⚡ [Startup] Port binding ready!")
 
 
 # ---------------------------------------------------------
@@ -12415,3 +12423,10 @@ def view_reports(
     </html>
     """
     return HTMLResponse(content=html_content)
+
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8000))
+    print(f"🌐 Starting Uvicorn server on 0.0.0.0:{port}...")
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
