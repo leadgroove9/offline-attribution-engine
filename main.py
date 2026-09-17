@@ -3611,6 +3611,93 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     </div>
                 </header>
 
+            <!-- Google Ads Conversion Menu Style Visual Sales Funnel -->
+            <div class="card" style="background: linear-gradient(135deg, #1a237e 0%, #283593 100%); color: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(26, 35, 126, 0.2); margin-bottom: 30px; position: relative; overflow: hidden;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.15); padding-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                    <div>
+                        <h2 style="margin: 0; font-size: 18px; color: #ffffff; display: flex; align-items: center; gap: 8px;">
+                            🎯 Offline Conversion Funnel Architecture
+                        </h2>
+                        <p style="margin: 4px 0 0 0; font-size: 12px; color: #e8eaf6;">
+                            Google Ads Conversion Menu Mapping & Offline Feedback Loop for <strong>{client_dict['name']}</strong>
+                        </p>
+                    </div>
+                    <span style="background: rgba(255,255,255,0.15); color: #fff; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; border: 1px solid rgba(255,255,255,0.25);">
+                        ⚡ Active Pipeline Sync
+                    </span>
+                </div>
+
+                <!-- Funnel Pipeline Steps Grid -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; position: relative;">
+
+                    <!-- Stage 1: Lead Capture -->
+                    <div style="background: rgba(255,255,255,0.08); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.18); border-radius: 10px; padding: 16px; position: relative;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                            <span style="font-size: 10px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; color: #90caf9;">Stage 1</span>
+                            <span style="font-size: 18px;">📞</span>
+                        </div>
+                        <h3 style="margin: 0 0 6px 0; font-size: 13px; font-weight: bold; color: #ffffff;">1. Lead Capture & Click IDs</h3>
+                        <p style="margin: 0; font-size: 11px; color: #c5cae9; line-height: 1.4;">
+                            Tracks inbound calls &amp; forms. Captures <strong>GCLID</strong>, <strong>FBCLID</strong>, <strong>MSCLKID</strong>, and contact information.
+                        </p>
+                        <div style="margin-top: 12px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: space-between; font-size: 10px; color: #bbdefb;">
+                            <span>Webhook Trigger:</span>
+                            <strong style="color: #fff;">Call Completed / Form POST</strong>
+                        </div>
+                    </div>
+
+                    <!-- Stage 2: AI Qualification Audit -->
+                    <div style="background: rgba(255,255,255,0.08); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.18); border-radius: 10px; padding: 16px; position: relative;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                            <span style="font-size: 10px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; color: #80deea;">Stage 2</span>
+                            <span style="font-size: 18px;">🤖</span>
+                        </div>
+                        <h3 style="margin: 0 0 6px 0; font-size: 13px; font-weight: bold; color: #ffffff;">2. AI Qualification Audit</h3>
+                        <p style="margin: 0; font-size: 11px; color: #c5cae9; line-height: 1.4;">
+                            Claude 4.5 Haiku evaluates call transcripts &amp; responses against custom prompt rules to identify qualified leads.
+                        </p>
+                        <div style="margin-top: 12px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: space-between; font-size: 10px; color: #b2ebf2;">
+                            <span>Signal Action:</span>
+                            <strong style="color: #fff;">Qualified Lead ($1.00 Value)</strong>
+                        </div>
+                    </div>
+
+                    <!-- Stage 3: Revenue & Closed Sale Matching -->
+                    <div style="background: rgba(255,255,255,0.08); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.18); border-radius: 10px; padding: 16px; position: relative;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                            <span style="font-size: 10px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; color: #a5d6a7;">Stage 3</span>
+                            <span style="font-size: 18px;">💳</span>
+                        </div>
+                        <h3 style="margin: 0 0 6px 0; font-size: 13px; font-weight: bold; color: #ffffff;">3. Closed Sale & Revenue Match</h3>
+                        <p style="margin: 0; font-size: 11px; color: #c5cae9; line-height: 1.4;">
+                            Matches deals &amp; invoice amounts from CRM/Spreadsheet via phone &amp; email fuzzy logic back to click session records.
+                        </p>
+                        <div style="margin-top: 12px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: space-between; font-size: 10px; color: #c8e6c9;">
+                            <span>Matching Method:</span>
+                            <strong style="color: #fff;">Phone/Email + Fuzzy Name</strong>
+                        </div>
+                    </div>
+
+                    <!-- Stage 4: Ad Network Offline Sync -->
+                    <div style="background: rgba(255,255,255,0.08); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.18); border-radius: 10px; padding: 16px; position: relative;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                            <span style="font-size: 10px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; color: #ffe082;">Stage 4</span>
+                            <span style="font-size: 18px;">🚀</span>
+                        </div>
+                        <h3 style="margin: 0 0 6px 0; font-size: 13px; font-weight: bold; color: #ffffff;">4. Conversion Upload & Bidding</h3>
+                        <p style="margin: 0; font-size: 11px; color: #c5cae9; line-height: 1.4;">
+                            Pushes audited conversion events &amp; exact revenue values to Google Ads, Meta CAPI, and Bing to optimize Smart Bidding ROAS.
+                        </p>
+                        <div style="margin-top: 12px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: space-between; font-size: 10px; color: #ffecb3;">
+                            <span>Destination:</span>
+                            <strong style="color: #fff;">Google Ads Conversion Menu</strong>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+
                 <div id="alert-box" class="alert"></div>
                 
                 <form id="settings-form" onsubmit="submitSettings(event)">
