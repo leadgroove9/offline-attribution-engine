@@ -10,7 +10,10 @@ from fastapi import FastAPI, Request, HTTPException, File, UploadFile, Form
 from fastapi.responses import HTMLResponse, StreamingResponse, Response, RedirectResponse
 from pydantic import BaseModel
 from typing import Optional
-from anthropic import Anthropic
+try:
+    from anthropic import Anthropic
+except ImportError:
+    Anthropic = None
 
 # Initialize FastAPI App
 
@@ -3153,17 +3156,37 @@ def view_settings(request: Request, client_id: Optional[int] = None):
         else:
             provider_display = "CallRail"
             
-        qual_overlay_heading = f"Qualified Leads ({provider_display} Transcripts & Forms)"
+        sot = str(client_data.get("source_of_truth", "manual") or "manual").lower()
         
-        # Dynamic Won Deals overlay based on selected Single Source of Truth
+        # Dynamic Layer a) Qualified Leads overlay based on selected Single Source of Truth
+        if sot in ["hubspot", "salesforce", "zoho", "servicetitan", "housecallpro", "gohighlevel", "pipedrive"]:
+            sot_label = SOT_MAP.get(sot, sot.upper())
+            qual_overlay_heading = f"Qualified Leads ({sot_label} Stage Sync)"
+            qual_rule_text = f"Configured Lead Rule: <strong>\"Syncs qualified lead tags & deal stage transitions from {sot_label} Webhook\"</strong>"
+        elif sot == "email":
+            qual_overlay_heading = "Qualified Leads (Email Sales & Lead Scanner)"
+            qual_rule_text = "Configured Lead Rule: <strong>\"Parses incoming lead notification emails & automated qualification reports\"</strong>"
+        elif sot in ["quickbooks", "xero", "zoho_books", "netsuite", "sage", "freshbooks"]:
+            sot_label = SOT_MAP.get(sot, sot.upper())
+            qual_overlay_heading = f"Qualified Leads ({sot_label} Integration)"
+            qual_rule_text = f"Configured Lead Rule: <strong>\"Qualifies leads upon initial invoice creation or customer onboarding in {sot_label}\"</strong>"
+        elif sot in ["google_sheets", "zapier"]:
+            sot_label = SOT_MAP.get(sot, sot.upper())
+            qual_overlay_heading = f"Qualified Leads ({sot_label} Feed)"
+            qual_rule_text = f"Configured Lead Rule: <strong>\"Qualifies leads matching custom status rows in {sot_label}\"</strong>"
+        else:
+            qual_overlay_heading = f"Qualified Leads ({provider_display} Transcripts & Forms)"
+            qual_rule_text = f"Configured AI Audit Rule: <strong>\"{prompt_text}\"</strong>"
+            
+        # Dynamic Layer b) Won Deals overlay based on selected Single Source of Truth
         sales_source = client_data.get("sales_source", "manual") or "manual"
-        if sales_source == "crm":
+        if sales_source == "crm" or sot in ["hubspot", "salesforce", "zoho", "servicetitan", "housecallpro", "gohighlevel", "pipedrive"]:
             won_overlay_heading = "Won Deals & Closed Revenue (Live CRM Webhook Pipeline)"
             won_source_text = "Source: <strong>Live CRM Webhooks (HubSpot / Salesforce / Zoho / ServiceTitan)</strong> → Match Method: <strong>Phone & Email Session Pair</strong>"
-        elif sales_source == "email":
+        elif sales_source == "email" or sot == "email":
             won_overlay_heading = "Won Deals & Closed Revenue (Automated Email Sales Log Scanner)"
             won_source_text = "Source: <strong>Email Sales Scanner / Order Confirmations</strong> → Match Method: <strong>Phone & Email Session Pair</strong>"
-        elif sales_source == "accounting":
+        elif sales_source == "accounting" or sot in ["quickbooks", "xero", "zoho_books", "netsuite", "sage", "freshbooks"]:
             won_overlay_heading = "Won Deals & Closed Revenue (QuickBooks / Xero Invoices)"
             won_source_text = "Source: <strong>Accounting Webhooks (QuickBooks / Xero Paid Invoices)</strong> → Match Method: <strong>Phone & Email Session Pair</strong>"
         else:
@@ -3699,11 +3722,11 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             <div style="position: absolute; top: -10px; left: 15px; background: #004d40; color: #80deea; font-size: 9px; font-weight: 800; padding: 2px 8px; border-radius: 10px; border: 1px solid #80deea; text-transform: uppercase; letter-spacing: 0.5px;">
                                 a) QUALIFIED LEADS TRACKING
                             </div>
-                            <div style="font-size: 13px; font-weight: bold; color: #ffffff; margin-top: 2px;">
+                            <div id="funnel-qual-heading" style="font-size: 13px; font-weight: bold; color: #ffffff; margin-top: 2px;">
                                 🎯 {qual_overlay_heading}
                             </div>
-                            <div style="font-size: 11px; color: #e0f7fa; font-style: italic; margin-top: 4px; background: rgba(0,0,0,0.22); padding: 5px 10px; border-radius: 4px; border-left: 3px solid #80deea;">
-                                Configured AI Audit Rule: <strong>"{prompt_text}"</strong>
+                            <div id="funnel-qual-rule" style="font-size: 11px; color: #e0f7fa; font-style: italic; margin-top: 4px; background: rgba(0,0,0,0.22); padding: 5px 10px; border-radius: 4px; border-left: 3px solid #80deea;">
+                                {qual_rule_text}
                             </div>
                         </div>
 
@@ -5783,6 +5806,31 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     const selectedText = selectedOption ? selectedOption.text : '';
                     const sot = sotSelect.value;
                     
+                    // Update Visual Sales Funnel Layer a) Qualified Leads Live
+                    const funnelQualHeading = document.getElementById('funnel-qual-heading');
+                    const funnelQualRule = document.getElementById('funnel-qual-rule');
+                    if (funnelQualHeading && funnelQualRule) {{
+                        if (['hubspot', 'salesforce', 'zoho', 'servicetitan', 'housecallpro', 'gohighlevel', 'pipedrive'].includes(sot)) {{
+                            funnelQualHeading.innerHTML = '🎯 Qualified Leads (' + selectedText + ' Stage Sync)';
+                            funnelQualRule.innerHTML = 'Configured Lead Rule: <strong>"Syncs qualified lead tags & deal stage transitions from ' + selectedText + ' Webhook"</strong>';
+                        }} else if (sot === 'email') {{
+                            funnelQualHeading.innerHTML = '🎯 Qualified Leads (Email Sales & Lead Scanner)';
+                            funnelQualRule.innerHTML = 'Configured Lead Rule: <strong>"Parses incoming lead notification emails & automated qualification reports"</strong>';
+                        }} else if (['quickbooks', 'xero', 'zoho_books', 'netsuite', 'sage', 'freshbooks'].includes(sot)) {{
+                            funnelQualHeading.innerHTML = '🎯 Qualified Leads (' + selectedText + ' Integration)';
+                            funnelQualRule.innerHTML = 'Configured Lead Rule: <strong>"Qualifies leads upon initial invoice creation or customer onboarding in ' + selectedText + '"</strong>';
+                        }} else if (['google_sheets', 'zapier'].includes(sot)) {{
+                            funnelQualHeading.innerHTML = '🎯 Qualified Leads (' + selectedText + ' Feed)';
+                            funnelQualRule.innerHTML = 'Configured Lead Rule: <strong>"Qualifies leads matching custom status rows in ' + selectedText + '"</strong>';
+                        }} else {{
+                            const promptInput = document.getElementById('prompt');
+                            let promptVal = (promptInput && promptInput.value && promptInput.value.trim()) ? promptInput.value.trim() : 'Standard Criteria: Inquiring about core services, requesting a quote, or scheduling an appointment';
+                            if (promptVal.length > 90) promptVal = promptVal.substring(0, 87) + '...';
+                            funnelQualHeading.innerHTML = '🎯 Qualified Leads (CallRail Transcripts & Forms)';
+                            funnelQualRule.innerHTML = 'Configured AI Audit Rule: <strong>"' + promptVal + '"</strong>';
+                        }}
+                    }}
+
                     // Update Visual Sales Funnel Layer b) Won Deals Live
                     const funnelWonHeading = document.getElementById('funnel-won-heading');
                     const funnelWonSource = document.getElementById('funnel-won-source');
