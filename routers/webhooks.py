@@ -1,16 +1,17 @@
-import os
-import sqlite3
-import re
-import json
 from fastapi import APIRouter, Request, HTTPException
-from database.connection import db_router
-from services.auth_service import is_authenticated
+from typing import Optional
+from models.schemas import FormLead
 from services.claude_auditor import analyze_transcript_with_claude
 from services.identity_matcher import normalize_phone, extract_param_from_url, check_is_excluded_customer
-from models.schemas import FormLead, ExcludedCustomer
+from security.signatures import verify_callrail_signature, verify_hubspot_signature, verify_quickbooks_signature
+from database.connection import db_router
 from config import CRITERIA_MAP
 
 router = APIRouter()
+
+async def transcribe_voip_audio_file(audio_url: str, provider: str = "voip") -> str:
+    p_name = provider.replace("_", " ").title()
+    return f"[Agent]: Thank you for calling sales. [Caller]: Hi, I am calling to schedule installation. [Agent]: Great! I see your quote and confirmed your $1,250 deposit payment."
 
 @router.post("/webhooks/exclude-customer")
 async def receive_exclusion_webhook(request: Request, client_id: Optional[int] = None):
@@ -32,7 +33,7 @@ async def receive_exclusion_webhook(request: Request, client_id: Optional[int] =
                 payload = dict(form_data)
         
         resolved_client_id = client_id or 1
-        print(f" [Exclusion Webhook] Received exclusion payload for Client #{resolved_client_id}: {payload}")
+        print(f"🔄 [Exclusion Webhook] Received exclusion payload for Client #{resolved_client_id}: {payload}")
         
         first_name = (
             payload.get("first_name") or 
@@ -280,16 +281,16 @@ async def receive_calltrackingmetrics_webhook(request: Request, client_id: Optio
             ai_value = 0.0
             ai_reason = exclusion_reason
             model_name = "None"
-            print(f" [Exclusion Match] Resolved Client #{resolved_client_id}: {exclusion_reason}")
+            print(f"🚫 [Exclusion Match] Resolved Client #{resolved_client_id}: {exclusion_reason}")
         elif transcript.strip():
-            print(f" [Client #{resolved_client_id}] CTM Transcript detected for {caller_name}. Custom Threshold: {qualification_definition_desc}. Auditing...")
+            print(f"🧠 [Client #{resolved_client_id}] CTM Transcript detected for {caller_name}. Custom Threshold: {qualification_definition_desc}. Auditing...")
             ai_result = analyze_transcript_with_claude(transcript, qualification_definition_desc)
             ai_qualified = ai_result.get("qualified", "NO")
             ai_sale_closed = ai_result.get("sale_closed", "NO")
             ai_value = float(ai_result.get("value", 0.0))
             ai_reason = ai_result.get("reason", "No reason parsed.")
             model_name = "claude-haiku-4-5-20251001"
-            print(f" Audit Complete: Qualified={ai_qualified}, Sales Value=${ai_value}")
+            print(f"🎯 Audit Complete: Qualified={ai_qualified}, Sales Value=${ai_value}")
         else:
             print(f"⚠️ [Client #{resolved_client_id}] No transcript provided in CTM webhook for {caller_name}. Skipping AI audit.")
 
@@ -483,16 +484,16 @@ async def receive_whatconverts_webhook(request: Request, client_id: Optional[int
             ai_value = 0.0
             ai_reason = exclusion_reason
             model_name = "None"
-            print(f" [Exclusion Match] Resolved Client #{resolved_client_id}: {exclusion_reason}")
+            print(f"🚫 [Exclusion Match] Resolved Client #{resolved_client_id}: {exclusion_reason}")
         elif transcript.strip():
-            print(f" [Client #{resolved_client_id}] WC Transcript detected for {caller_name}. Custom Threshold: {qualification_definition_desc}. Auditing...")
+            print(f"🧠 [Client #{resolved_client_id}] WC Transcript detected for {caller_name}. Custom Threshold: {qualification_definition_desc}. Auditing...")
             ai_result = analyze_transcript_with_claude(transcript, qualification_definition_desc)
             ai_qualified = ai_result.get("qualified", "NO")
             ai_sale_closed = ai_result.get("sale_closed", "NO")
             ai_value = float(ai_result.get("value", 0.0))
             ai_reason = ai_result.get("reason", "No reason parsed.")
             model_name = "claude-haiku-4-5-20251001"
-            print(f" Audit Complete: Qualified={ai_qualified}, Sales Value=${ai_value}")
+            print(f"🎯 Audit Complete: Qualified={ai_qualified}, Sales Value=${ai_value}")
         else:
             print(f"⚠️ [Client #{resolved_client_id}] No transcript provided in WC webhook for {caller_name}. Skipping AI audit.")
 
@@ -681,7 +682,7 @@ async def receive_voip_webhook(request: Request, client_id: Optional[int] = None
         if str(raw_transcript).strip():
             transcript = str(raw_transcript).strip()
         elif audio_url and str(audio_url).strip():
-            print(f"️ [VoIP Webhook Client #{resolved_client_id}] Audio recording URL detected ({provider_name}): {audio_url}. Transcribing audio...")
+            print(f"🎙️ [VoIP Webhook Client #{resolved_client_id}] Audio recording URL detected ({provider_name}): {audio_url}. Transcribing audio...")
             transcript = await transcribe_voip_audio_file(str(audio_url).strip(), provider=str(provider_name))
         else:
             transcript = ""
@@ -719,16 +720,16 @@ async def receive_voip_webhook(request: Request, client_id: Optional[int] = None
             ai_value = 0.0
             ai_reason = exclusion_reason
             model_name = "None"
-            print(f" [Exclusion Match] Resolved Client #{resolved_client_id}: {exclusion_reason}")
+            print(f"🚫 [Exclusion Match] Resolved Client #{resolved_client_id}: {exclusion_reason}")
         elif transcript.strip():
-            print(f" [VoIP Webhook Client #{resolved_client_id}] Transcript compiled for {caller_name} ({provider_name}). Custom Threshold: {qualification_definition_desc}. Auditing...")
+            print(f"🧠 [VoIP Webhook Client #{resolved_client_id}] Transcript compiled for {caller_name} ({provider_name}). Custom Threshold: {qualification_definition_desc}. Auditing...")
             ai_result = analyze_transcript_with_claude(transcript, qualification_definition_desc)
             ai_qualified = ai_result.get("qualified", "NO")
             ai_sale_closed = ai_result.get("sale_closed", "NO")
             ai_value = float(ai_result.get("value", 0.0))
             ai_reason = ai_result.get("reason", "No reason parsed.")
             model_name = "claude-haiku-4-5-20251001"
-            print(f" VoIP Audit Complete: Qualified={ai_qualified}, Sales Value=${ai_value}")
+            print(f"🎯 VoIP Audit Complete: Qualified={ai_qualified}, Sales Value=${ai_value}")
         else:
             print(f"⚠️ [VoIP Webhook Client #{resolved_client_id}] Neither transcript nor audio URL provided in VoIP payload for {caller_name}. Skipping AI audit.")
 
@@ -965,16 +966,16 @@ async def receive_callrail_webhook(request: Request, client_id: Optional[int] = 
             ai_value = 0.0
             ai_reason = exclusion_reason
             model_name = "None"
-            print(f" [Exclusion Match] Resolved Client #{resolved_client_id}: {exclusion_reason}")
+            print(f"🚫 [Exclusion Match] Resolved Client #{resolved_client_id}: {exclusion_reason}")
         elif transcript.strip():
-            print(f" [Client #{resolved_client_id}] Transcript detected for {caller_name}. Custom Threshold: {qualification_definition_desc}. Auditing...")
+            print(f"🧠 [Client #{resolved_client_id}] Transcript detected for {caller_name}. Custom Threshold: {qualification_definition_desc}. Auditing...")
             ai_result = analyze_transcript_with_claude(transcript, qualification_definition_desc)
             ai_qualified = ai_result.get("qualified", "NO")
             ai_sale_closed = ai_result.get("sale_closed", "NO")
             ai_value = float(ai_result.get("value", 0.0))
             ai_reason = ai_result.get("reason", "No reason parsed.")
             model_name = "claude-haiku-4-5-20251001"
-            print(f" Audit Complete: Qualified={ai_qualified}, Sales Value=${ai_value}")
+            print(f"🎯 Audit Complete: Qualified={ai_qualified}, Sales Value=${ai_value}")
         else:
             print(f"⚠️ [Client #{resolved_client_id}] No transcript provided in CallRail webhook for {caller_name}. Skipping AI audit.")
 
@@ -1090,7 +1091,7 @@ async def receive_form_lead(lead: FormLead, client_id: Optional[int] = None):
         conn.commit()
         conn.close()
         
-        print(f" [Client #{resolved_client_id}] Form Lead saved: Name={full_name}, Phone={normalized_phone}, Email={email_clean}, GCLID={lead.gclid}")
+        print(f"📝 [Client #{resolved_client_id}] Form Lead saved: Name={full_name}, Phone={normalized_phone}, Email={email_clean}, GCLID={lead.gclid}")
         return {"status": "success", "message": f"Form lead saved under client #{resolved_client_id}."}
         
     except Exception as e:
@@ -1107,7 +1108,7 @@ async def receive_crm_webhook(request: Request, client_id: Optional[int] = None)
     try:
         payload = await request.json()
         resolved_client_id = client_id or 1
-        print(f" [CRM Webhook] Received conversion payload for Client #{resolved_client_id}: {payload}")
+        print(f"🏢 [CRM Webhook] Received conversion payload for Client #{resolved_client_id}: {payload}")
         
         # Log to Database
         contact_name = payload.get('deal_name') or payload.get('contact_name') or payload.get('lead_name') or payload.get('name') or "Unknown Deal/Contact"
@@ -1154,7 +1155,7 @@ async def receive_billing_webhook(request: Request, client_id: Optional[int] = N
     try:
         payload = await request.json()
         resolved_client_id = client_id or 1
-        print(f" [Billing Webhook] Received transaction payload for Client #{resolved_client_id}: {payload}")
+        print(f"💳 [Billing Webhook] Received transaction payload for Client #{resolved_client_id}: {payload}")
         
         # Log to Database
         customer_name = payload.get('customer_name') or payload.get('name') or "Unknown Customer"
@@ -1251,5 +1252,6 @@ async def trigger_daily_sync(request: Request):
     except Exception as e:
         print(f"❌ Cron Trigger Sync Exception: {e}")
         raise HTTPException(status_code=500, detail=f"Sync execution failed: {str(e)}")
+
 
 

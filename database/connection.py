@@ -1,55 +1,60 @@
 import os
+import re
 import sqlite3
-import psycopg2
-from config import DATABASE_URL
-
-DB_PATH = "offline_attribution.db"
 
 class PostgreSQLCursorWrapper:
     def __init__(self, pg_cursor):
-        self._cursor = pg_cursor
+        self.cursor = pg_cursor
 
     def execute(self, query, params=None):
         pg_query = query.replace("?", "%s")
-        pg_query = pg_query.replace("AUTOINCREMENT", "SERIAL")
+        pg_query = re.sub(r'INTEGER PRIMARY KEY AUTOINCREMENT', 'SERIAL PRIMARY KEY', pg_query, flags=re.IGNORECASE)
+        pg_query = re.sub(r'TIMESTAMP DEFAULT CURRENT_TIMESTAMP', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP', pg_query, flags=re.IGNORECASE)
+        
         if params is None:
-            return self._cursor.execute(pg_query)
-        return self._cursor.execute(pg_query, params)
+            self.cursor.execute(pg_query)
+        else:
+            self.cursor.execute(pg_query, params)
+        return self
 
     def fetchone(self):
-        return self._cursor.fetchone()
+        return self.cursor.fetchone()
 
     def fetchall(self):
-        return self._cursor.fetchall()
+        return self.cursor.fetchall()
 
 class PostgreSQLConnectionWrapper:
     def __init__(self, pg_conn):
-        self._conn = pg_conn
+        self.conn = pg_conn
 
     def cursor(self):
-        return PostgreSQLCursorWrapper(self._conn.cursor())
+        return PostgreSQLCursorWrapper(self.conn.cursor())
 
     def commit(self):
-        return self._conn.commit()
+        self.conn.commit()
 
     def rollback(self):
-        return self._conn.rollback()
+        self.conn.rollback()
 
     def close(self):
-        return self._conn.close()
+        self.conn.close()
 
 class DatabaseRouter:
+    def __init__(self, db_path="offline_attribution.db"):
+        self.db_path = db_path
+        self.db_url = os.environ.get("DATABASE_URL")
+
     def connect(self):
-        if DATABASE_URL:
+        if self.db_url:
             try:
-                pg_conn = psycopg2.connect(DATABASE_URL)
+                import psycopg2
+                pg_conn = psycopg2.connect(self.db_url)
                 return PostgreSQLConnectionWrapper(pg_conn)
             except Exception as e:
-                print(f"⚠️ PostgreSQL connection failed ({e}). Falling back to local SQLite ({DB_PATH}).")
+                print(f"⚠️ PostgreSQL connection failed ({e}), falling back to SQLite ({self.db_path}).")
         
-        db_file = DB_PATH
-        if not os.path.exists(db_file) and os.path.exists(os.path.join("/workspace", DB_PATH)):
-            db_file = os.path.join("/workspace", DB_PATH)
-        return sqlite3.connect(db_file)
+        conn = sqlite3.connect(self.db_path)
+        conn.execute("PRAGMA journal_mode=WAL;")
+        return conn
 
 db_router = DatabaseRouter()

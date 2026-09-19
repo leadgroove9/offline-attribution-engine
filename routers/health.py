@@ -1,9 +1,9 @@
-import os
 from fastapi import APIRouter, Request, HTTPException, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from typing import Optional
-from database.connection import db_router
 from services.auth_service import is_authenticated, get_user_role_and_client
+from security.tenant_guard import verify_tenant_access
+from database.connection import db_router
 from config import ADMIN_EMAILS
 
 router = APIRouter()
@@ -70,15 +70,15 @@ def view_health_dashboard(request: Request, client_id: Optional[int] = None):
     
     admin_link_html = ""
     if email in ADMIN_EMAILS:
-        admin_link_html = ' | <a href="/dashboard/users" style="color: #2e7d32; text-decoration: none; font-weight: bold; margin-left: 5px;">️ Admin Directory</a>'
+        admin_link_html = ' | <a href="/dashboard/users" style="color: #2e7d32; text-decoration: none; font-weight: bold; margin-left: 5px;">🛡️ Admin Directory</a>'
         
     user_header_bar = f"""
     <div style="display: flex; justify-content: space-between; align-items: center; background-color: #f1f3f4; padding: 10px 15px; border-radius: 6px; margin-bottom: 20px; font-size: 13px;">
         <div>
-            <span style="color: #666; font-weight: bold;"> Active Session:</span> <span style="font-weight: bold; color: #1a237e;">{email}</span>
+            <span style="color: #666; font-weight: bold;">👤 Active Session:</span> <span style="font-weight: bold; color: #1a237e;">{email}</span>
             {admin_link_html}
         </div>
-        <a href="/logout" style="color: #c62828; text-decoration: none; font-weight: bold; display: flex; align-items: center; gap: 4px;"> Log Out</a>
+        <a href="/logout" style="color: #c62828; text-decoration: none; font-weight: bold; display: flex; align-items: center; gap: 4px;">🚪 Log Out</a>
     </div>
     """
     
@@ -109,7 +109,7 @@ def view_health_dashboard(request: Request, client_id: Optional[int] = None):
     # Render Unmatched Queue Rows
     unmatched_rows_html = ""
     if not unmatched_rows:
-        unmatched_rows_html = '<tr><td colspan="6" style="text-align: center; color: #2e7d32; padding: 20px; font-weight: bold;"> Clean Queue! All closed sales and leads successfully paired to click sessions.</td></tr>'
+        unmatched_rows_html = '<tr><td colspan="6" style="text-align: center; color: #2e7d32; padding: 20px; font-weight: bold;">🎉 Clean Queue! All closed sales and leads successfully paired to click sessions.</td></tr>'
     else:
         for u_id, rec_type, cust_id, amount, source_sys, reason, status, created_at in unmatched_rows:
             unmatched_rows_html += f"""
@@ -123,7 +123,7 @@ def view_health_dashboard(request: Request, client_id: Optional[int] = None):
                     <form action="/dashboard/health/resolve-unmatched" method="POST" style="margin: 0;">
                         <input type="hidden" name="record_id" value="{u_id}">
                         <input type="hidden" name="client_id" value="{active_client_id}">
-                        <button type="submit" style="background-color: #1a237e; color: white; border: none; padding: 6px 12px; border-radius: 4px; font-weight: bold; font-size: 11px; cursor: pointer;"> Resolve / Link Session</button>
+                        <button type="submit" style="background-color: #1a237e; color: white; border: none; padding: 6px 12px; border-radius: 4px; font-weight: bold; font-size: 11px; cursor: pointer;">🔗 Resolve / Link Session</button>
                     </form>
                 </td>
             </tr>
@@ -133,7 +133,7 @@ def view_health_dashboard(request: Request, client_id: Optional[int] = None):
     <!DOCTYPE html>
     <html>
         <head>
-            <title>Webhook &amp; Sync Diagnostics </title>
+            <title>Webhook &amp; Sync Diagnostics 🩺</title>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <style>
@@ -162,13 +162,13 @@ def view_health_dashboard(request: Request, client_id: Optional[int] = None):
                 {user_header_bar}
                 <header>
                     <div>
-                        <h1>Webhook &amp; Sync Diagnostics </h1>
+                        <h1>Webhook &amp; Sync Diagnostics 🩺</h1>
                         <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">Live integration payload stream, discrepancy queue, and identity matching status for {client_name}.</p>
                     </div>
                     
                     <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
                         <a href="/dashboard?client_id={active_client_id}" class="btn-nav">⬅️ Dashboard</a>
-                        <a href="/dashboard/reports?client_id={active_client_id}" class="btn-nav" style="background-color: #2e7d32;"> Reports</a>
+                        <a href="/dashboard/reports?client_id={active_client_id}" class="btn-nav" style="background-color: #2e7d32;">📈 Reports</a>
                         <a href="/dashboard/settings?client_id={active_client_id}" class="btn-nav" style="background-color: #00838f;">⚙️ Settings</a>
                         
                         <div style="background: #e8eaf6; padding: 8px 12px; border-radius: 6px; border: 1px solid #c5cae9; display: flex; align-items: center; gap: 8px;">
@@ -189,7 +189,7 @@ def view_health_dashboard(request: Request, client_id: Optional[int] = None):
                     </div>
                     
                     <div class="kpi-card" style="border-top-color: #1a237e;">
-                        <div class="kpi-lbl"> 24h Webhook Ingest Volume</div>
+                        <div class="kpi-lbl">📥 24h Webhook Ingest Volume</div>
                         <div class="kpi-val">{total_logs}</div>
                         <div style="font-size: 11px; color: #666; margin-top: 4px;">CallRail, Web Forms, CRM &amp; Billing</div>
                     </div>
@@ -201,7 +201,7 @@ def view_health_dashboard(request: Request, client_id: Optional[int] = None):
                     </div>
 
                     <div class="kpi-card" style="border-top-color: #00838f;">
-                        <div class="kpi-lbl"> Smart Bidding ROAS Feedback</div>
+                        <div class="kpi-lbl">🚀 Smart Bidding ROAS Feedback</div>
                         <div class="kpi-val" style="color: #00838f; font-size: 20px;">Active &amp; Healthy</div>
                         <div style="font-size: 11px; color: #666; margin-top: 4px;">Google Ads &amp; Meta Conversion Uploads</div>
                     </div>
@@ -234,7 +234,7 @@ def view_health_dashboard(request: Request, client_id: Optional[int] = None):
                 <!-- Section 2: Live Webhook Stream -->
                 <div class="section-card">
                     <div class="section-header">
-                        <span> Live Webhook Delivery &amp; Payload Log (Last 50 Events)</span>
+                        <span>📥 Live Webhook Delivery &amp; Payload Log (Last 50 Events)</span>
                         <span style="font-size: 12px; font-weight: normal; color: #666;">Real-time status stream across CallRail, CRMs, Web Forms, and Billing</span>
                     </div>
                     
@@ -272,3 +272,4 @@ def resolve_unmatched_record(request: Request, record_id: int = Form(...), clien
     conn.close()
     
     return RedirectResponse(url=f"/dashboard/health?client_id={client_id}", status_code=303)
+

@@ -1,34 +1,38 @@
 import os
 
+DB_PATH = "offline_attribution.db"
 DATABASE_URL = os.environ.get("DATABASE_URL")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()
 
+CALLRAIL_WEBHOOK_SECRET = os.environ.get("CALLRAIL_WEBHOOK_SECRET", "").strip()
+HUBSPOT_CLIENT_SECRET = os.environ.get("HUBSPOT_CLIENT_SECRET", "").strip()
+QUICKBOOKS_VERIFIER_TOKEN = os.environ.get("QUICKBOOKS_VERIFIER_TOKEN", "").strip()
+
 ADMIN_EMAILS = {"admin@leadgrove.net", "admin@leadgroove.net", "corey@test.com", "corey@leadgrove.net"}
 
-SOT_MAP = {
-    "hubspot": "HubSpot CRM Webhook",
-    "salesforce": "Salesforce CRM Webhook",
-    "zoho": "Zoho CRM Webhook",
-    "servicetitan": "ServiceTitan Lead & Job Webhook",
-    "housecallpro": "Housecall Pro Job Webhook",
-    "gohighlevel": "GoHighLevel CRM Webhook",
-    "pipedrive": "Pipedrive CRM Webhook",
-    "quickbooks": "QuickBooks Online Paid Invoice Webhook",
-    "xero": "Xero Paid Invoice Webhook",
-    "zoho_books": "Zoho Books Paid Invoice Webhook",
-    "netsuite": "NetSuite Paid Invoice Webhook",
-    "sage": "Sage Accounting Paid Invoice Webhook",
-    "freshbooks": "FreshBooks Paid Invoice Webhook",
-    "google_sheets": "Google Sheets Live Sync",
-    "zapier": "Zapier Custom Webhook",
-    "email": "Automated Email Sales Log Scanner",
-    "manual": "Manual CSV / Spreadsheet Upload",
-    "ai_rating": "Claude AI Transcript Rating (All Calls)"
+CRITERIA_MAP = {
+    "A": "Option A: Anyone asking basic questions about services, pricing, or company hours",
+    "B": "Option B: Someone who is inquiring about a quote or requesting pricing details",
+    "C": "Option C: Someone who actually schedules an appointment, books a service, or agrees to a proposal",
+    "ai_rules": "Standard Criteria: Inquiring about core services, requesting a quote, or scheduling an appointment"
 }
 
-CRITERIA_MAP = {
-    "A": "Option A: Anyone asking for pricing, services, quote, or appointment",
-    "B": "Option B: Anyone who requested a quote or schedule",
-    "C": "Option C: Someone who books an appointment or makes a purchase",
-    "D": "Option D: Highly qualified decision-maker ready to buy immediately"
+SOT_MAP = {
+    "hubspot": "HubSpot CRM",
+    "salesforce": "Salesforce CRM",
+    "zoho": "Zoho CRM",
+    "servicetitan": "ServiceTitan",
+    "housecallpro": "Housecall Pro",
+    "gohighlevel": "GoHighLevel",
+    "pipedrive": "Pipedrive",
+    "quickbooks": "QuickBooks Online",
+    "xero": "Xero Accounting",
+    "zoho_books": "Zoho Books",
+    "netsuite": "NetSuite",
+    "sage": "Sage Intacct",
+    "freshbooks": "FreshBooks",
+    "google_sheets": "Google Sheets (Live Sync)",
+    "zapier": "Zapier Webhook Feed",
+    "email": "Automated Email Sales Scanner",
+    "manual": "Manual CSV / Spreadsheet Upload"
 }

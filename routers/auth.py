@@ -1,13 +1,9 @@
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request, HTTPException, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from typing import Optional
+from services.auth_service import hash_password, verify_password, create_session, delete_session, is_authenticated, get_user_role_and_client
+from security.rate_limiter import rate_limiter
 from database.connection import db_router
-from services.auth_service import (
-    hash_password, verify_password, create_session, get_session_email,
-    delete_session, is_authenticated, get_user_role_and_client
-)
-from models.schemas import UserRoleUpdate, UserDelete, InviteRoleUpdate, InviteDelete, UserInvite
-import uuid
 
 router = APIRouter()
 
@@ -43,7 +39,7 @@ def get_register(request: Request, error: Optional[str] = None, invite_token: Op
     return f"""
     <html>
         <head>
-            <title>Register - LeadGroove </title>
+            <title>Register - LeadGroove 🤖</title>
             <style>
                 body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding-top: 100px; background-color: #f4f6f9; color: #333; }}
                 .container {{ display: inline-block; background: white; padding: 40px; border-radius: 12px; box-shadow: 0px 8px 24px rgba(0,0,0,0.08); max-width: 400px; width: 100%; text-align: left; box-sizing: border-box; }}
@@ -80,7 +76,7 @@ def get_register(request: Request, error: Optional[str] = None, invite_token: Op
                         <label for="confirm_password">Confirm Password</label>
                         <input type="password" id="confirm_password" name="confirm_password" required placeholder="••••••••">
                     </div>
-                    <button type="submit" class="btn"> Create Account</button>
+                    <button type="submit" class="btn">🚀 Create Account</button>
                 </form>
                 <div class="switch-link">
                     Already have an account? <a href="/login">Log In</a>
@@ -170,7 +166,7 @@ def get_login(request: Request, error: Optional[str] = None):
     return f"""
     <html>
         <head>
-            <title>Log In - LeadGroove </title>
+            <title>Log In - LeadGroove 🤖</title>
             <style>
                 body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding-top: 120px; background-color: #f4f6f9; color: #333; }}
                 .container {{ display: inline-block; background: white; padding: 40px; border-radius: 12px; box-shadow: 0px 8px 24px rgba(0,0,0,0.08); max-width: 400px; width: 100%; text-align: left; box-sizing: border-box; }}
@@ -201,7 +197,7 @@ def get_login(request: Request, error: Optional[str] = None):
                         <label for="password">Password</label>
                         <input type="password" id="password" name="password" required placeholder="••••••••">
                     </div>
-                    <button type="submit" class="btn"> Log In</button>
+                    <button type="submit" class="btn">🔑 Log In</button>
                 </form>
                 <div class="switch-link">
                     Don't have an account? <a href="/register">Sign Up</a>
@@ -275,7 +271,7 @@ def get_forgot_password(request: Request, error: Optional[str] = None, success: 
         if token:
             success_html += f'''
             <div style="background-color: #fff9c4; border: 1px solid #fbc02d; padding: 16px; border-radius: 6px; margin-bottom: 25px; text-align: left; font-size: 13px; color: #574300; line-height: 1.5;">
-                ️ <strong>Developer Sandbox Notice:</strong> Since no SMTP mail server is connected, the password reset request has been printed to the server console and generated directly below:
+                🛠️ <strong>Developer Sandbox Notice:</strong> Since no SMTP mail server is connected, the password reset request has been printed to the server console and generated directly below:
                 <div style="margin-top: 10px; font-weight: bold; font-family: monospace; background: white; padding: 10px; border-radius: 4px; border: 1px solid #ffeb3b; word-break: break-all;">
                     <a href="/reset-password?token={token}" style="color: #1a237e; text-decoration: underline;">Click here to reset password</a>
                 </div>
@@ -357,7 +353,7 @@ async def post_forgot_password(request: Request):
         conn.close()
         
         # Print link to standard logs
-        print(f" [PASSWORD RESET] Link generated for {email}: http://localhost:8000/reset-password?token={token}")
+        print(f"🔑 [PASSWORD RESET] Link generated for {email}: http://localhost:8000/reset-password?token={token}")
         
         return HTMLResponse(get_forgot_password(
             request, 
@@ -475,7 +471,7 @@ def get_reset_password(request: Request, token: Optional[str] = None, error: Opt
                         <label for="confirm_password">Confirm New Password</label>
                         <input type="password" id="confirm_password" name="confirm_password" required placeholder="••••••••">
                     </div>
-                    <button type="submit" class="btn"> Save & Apply Password</button>
+                    <button type="submit" class="btn">💾 Save & Apply Password</button>
                 </form>
             </div>
         </body>
@@ -580,7 +576,7 @@ def get_admin_users(request: Request):
         
     user_rows_html = ""
     for u_id, u_email, created_at in users:
-        role_badge = '<span class="badge-admin">️ Administrator</span>' if u_email in ADMIN_EMAILS else '<span class="badge-user"> Registered User</span>'
+        role_badge = '<span class="badge-admin">🛡️ Administrator</span>' if u_email in ADMIN_EMAILS else '<span class="badge-user">👤 Registered User</span>'
         user_rows_html += f"""
         <tr>
             <td><strong>#{u_id}</strong></td>
@@ -597,15 +593,15 @@ def get_admin_users(request: Request):
     
     admin_link_html = ""
     if email in ADMIN_EMAILS:
-        admin_link_html = ' | <a href="/admin/users" style="color: #2e7d32; text-decoration: none; font-weight: bold; margin-left: 5px;">️ Admin User Directory</a>'
+        admin_link_html = ' | <a href="/admin/users" style="color: #2e7d32; text-decoration: none; font-weight: bold; margin-left: 5px;">🛡️ Admin User Directory</a>'
         
     user_header_bar = f"""
     <div style="display: flex; justify-content: space-between; align-items: center; background-color: #f1f3f4; padding: 10px 15px; border-radius: 6px; margin-bottom: 20px; font-size: 13px;">
         <div>
-            <span style="color: #666; font-weight: bold;"> Active Session:</span> <span style="font-weight: bold; color: #1a237e;">{email}</span>
+            <span style="color: #666; font-weight: bold;">👤 Active Session:</span> <span style="font-weight: bold; color: #1a237e;">{email}</span>
             {admin_link_html}
         </div>
-        <a href="/logout" style="color: #c62828; text-decoration: none; font-weight: bold; display: flex; align-items: center; gap: 4px;"> Log Out</a>
+        <a href="/logout" style="color: #c62828; text-decoration: none; font-weight: bold; display: flex; align-items: center; gap: 4px;">🚪 Log Out</a>
     </div>
     """
     
@@ -613,7 +609,7 @@ def get_admin_users(request: Request):
     <!DOCTYPE html>
     <html>
         <head>
-            <title>LeadGrove Admin - User Directory ️</title>
+            <title>LeadGrove Admin - User Directory 🛡️</title>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <style>
@@ -636,7 +632,7 @@ def get_admin_users(request: Request):
                 {user_header_bar}
                 <header>
                     <div>
-                        <h1>️ LeadGrove Registered Users Directory</h1>
+                        <h1>🛡️ LeadGrove Registered Users Directory</h1>
                         <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">Total registered accounts using LeadGrove: <strong>{total_users}</strong></p>
                     </div>
                     <a href="/dashboard" class="btn-back">⬅️ Back to Dashboard</a>
@@ -660,4 +656,118 @@ def get_admin_users(request: Request):
     </html>
     """
     return HTMLResponse(html_content)
+
+@router.get("/", response_class=HTMLResponse)
+def read_root(request: Request):
+    """Agency Portal Landing Page with Auth Check."""
+    email = is_authenticated(request)
+    user_header_html = ""
+    auth_buttons_html = ""
+    
+    if email:
+        user_header_html = f'<p style="color: #2e7d32; font-weight: bold; font-size: 15px;">👤 Logged in as: {email} | <a href="/logout" style="color: #c62828; text-decoration: none;">🚪 Log Out</a></p>'
+        auth_buttons_html = '<a href="/dashboard" class="btn">📊 Open Agency & Client Dashboard</a>'
+    else:
+        user_header_html = '<p style="color: #666; font-weight: bold; font-size: 14px;">🔒 Account registration is currently free</p>'
+        auth_buttons_html = '''
+            <div style="display: flex; gap: 15px; justify-content: center; margin-top: 20px;">
+                <a href="/login" class="btn" style="margin-top: 0; background-color: #1a237e;">🔑 Log In</a>
+                <a href="/register" class="btn" style="margin-top: 0; background-color: #2e7d32;">🚀 Sign Up Free</a>
+            </div>
+        '''
+        
+    return f"""
+    <html>
+        <head>
+            <title>Multi-Tenant Multi-Channel Attribution Engine 🤖</title>
+            <style>
+                body {{ font-family: Arial, sans-serif; text-align: center; padding-top: 80px; background-color: #f4f6f9; }}
+                .container {{ display: inline-block; background: white; padding: 40px; border-radius: 10px; box-shadow: 0px 4px 10px rgba(0,0,0,0.1); max-width: 600px; }}
+                h1 {{ color: #1a237e; margin-bottom: 10px; }}
+                p {{ color: #555; font-size: 18px; }}
+                .badge {{ background-color: #e8f5e9; color: #2e7d32; padding: 5px 15px; border-radius: 15px; font-weight: bold; }}
+                .btn {{ display: inline-block; background-color: #1a237e; color: white; padding: 12px 24px; text-decoration: none; font-size: 16px; font-weight: bold; border-radius: 5px; margin-top: 20px; transition: background 0.2s; }}
+                .btn:hover {{ background-color: #0d1b2a; }}
+                .feature-list {{ text-align: left; margin-top: 25px; color: #333; line-height: 1.6; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>Welcome To Lead Grove's Offline Conversion Tracking Automation SAAS!</h1>
+                <p>Status: <span class="badge">Healthy, Multi-Tenant & AI-Enabled</span></p>
+                <p>Just point us to your offline lead/sales data, and it gets imported to your AD accounts automatically!</p>
+                {user_header_html}
+                {auth_buttons_html}
+                
+                <div class="feature-list">
+                    <h3>Multi-Tenant Architecture Capabilities:</h3>
+                    <ul>
+                        <li>🏢 <strong>Multi-Channel Tracking</strong>: Seamless matching of Google (GCLID), Facebook (FBCLID), LinkedIn (LI_FAT_ID), and Microsoft (MSCLKID) Click IDs!</li>
+                        <li>🏢 <strong>5-Step Onboarding Wizard</strong>: Custom qualification mapping, billing order routing, and CRM parameters.</li>
+                        <li>📥 <strong>Dynamic Webhook Endpoint</strong>: `/webhooks/callrail?client_id=X` automatically links tracking logs to the correct account.</li>
+                        <li>🧠 <strong>Claude 4.5 Haiku Custom Audits</strong>: Real-time transcript parsing based on client's specific qualification definitions.</li>
+                    </ul>
+                </div>
+            </div>
+        </body>
+    </html>
+    """
+
+
+
+def is_in_date_range(created_at_val, date_range: str, start_date_str: str, end_date_str: str) -> bool:
+    if not date_range or date_range == "all":
+        return True
+        
+    if not created_at_val:
+        return True
+        
+    try:
+        from datetime import datetime, timedelta
+        dt = None
+        if isinstance(created_at_val, datetime):
+            dt = created_at_val
+        else:
+            s_clean = str(created_at_val).strip()
+            if "T" in s_clean:
+                s_clean = s_clean.replace("T", " ")
+            s_clean = s_clean.split(".")[0]
+            try:
+                dt = datetime.strptime(s_clean, "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                try:
+                    dt = datetime.strptime(s_clean, "%Y-%m-%d")
+                except ValueError:
+                    return True
+                    
+        now = datetime.now()
+        if date_range in ["1d", "today"]:
+            cutoff = now - timedelta(days=1)
+            return dt >= cutoff
+        elif date_range == "7d":
+            cutoff = now - timedelta(days=7)
+            return dt >= cutoff
+        elif date_range == "30d":
+            cutoff = now - timedelta(days=30)
+            return dt >= cutoff
+        elif date_range == "90d":
+            cutoff = now - timedelta(days=90)
+            return dt >= cutoff
+        elif date_range == "custom":
+            valid = True
+            if start_date_str and start_date_str.strip():
+                s_dt = datetime.strptime(start_date_str.strip(), "%Y-%m-%d")
+                valid = valid and (dt >= s_dt)
+            if end_date_str and end_date_str.strip():
+                e_dt = datetime.strptime(end_date_str.strip(), "%Y-%m-%d") + timedelta(days=1)
+                valid = valid and (dt < e_dt)
+            return valid
+    except Exception as e:
+        print(f"Date filter parse exception: {e}")
+        return True
+        
+    return True
+
+
+
 

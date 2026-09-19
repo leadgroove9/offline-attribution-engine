@@ -1,25 +1,66 @@
-import os
+from models.schemas import ExcludedCustomer
+from pydantic import BaseModel
 import re
-import json
 import io
 import pandas as pd
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Request, HTTPException, File, UploadFile, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from typing import Optional
-from database.connection import db_router
+from models.schemas import UserInvite, UserRoleUpdate, UserDelete, InviteRoleUpdate, InviteDelete, SaleAdjustment
 from services.auth_service import is_authenticated, get_user_role_and_client
-from services.identity_matcher import (
-    normalize_phone, calculate_company_similarity, check_name_transposition, find_dynamic_columns_custom
-)
-from models.schemas import SaleAdjustment
+from services.identity_matcher import normalize_phone, normalize_email, clean_company_name, clean_person_name, check_name_transposition, calculate_company_similarity
+from security.tenant_guard import verify_tenant_access
+from database.connection import db_router
 
 router = APIRouter()
 
-def normalize_email(email_str: str) -> str:
-    if not email_str:
-        return ""
-    return str(email_str).strip().lower()
+def find_dynamic_columns_custom(columns: list) -> tuple:
+    phone_col, email_col, value_col, name_col, company_col = None, None, None, None, None
+    cleaned_cols = {col: re.sub(r"[\s_-]+", "", col.lower()) for col in columns}
+    for original_col, clean_col in cleaned_cols.items():
+        if not phone_col and re.search(r"(phone|tele|mobile|cell|num|contact)", clean_col):
+            phone_col = original_col
+            continue
+        if not email_col and re.search(r"(email|mail|address)", clean_col):
+            email_col = original_col
+            continue
+        if not value_col and re.search(r"(amount|value|revenue|total|price|paid|sum|invoice|sale|cost)", clean_col):
+            value_col = original_col
+            continue
+        if not name_col and re.search(r"(name|customer|client|contact|lead)", clean_col):
+            name_col = original_col
+            continue
+        if not company_col and re.search(r"(company|business|firm|org|account)", clean_col):
+            company_col = original_col
+            continue
+    return phone_col, email_col, value_col, name_col, company_col
+
+def is_in_date_range(created_at_val, date_range: str, start_date_str: str, end_date_str: str) -> bool:
+    if not created_at_val or date_range in [None, "all", ""]:
+        return True
+    try:
+        now = datetime.now()
+        dt_str = str(created_at_val).strip()
+        dt = datetime.strptime(dt_str[:19], "%Y-%m-%d %H:%M:%S") if len(dt_str) >= 19 else datetime.now()
+        if date_range in ["1d", "today"]:
+            return dt.date() == now.date()
+        elif date_range == "7d":
+            return dt >= (now - timedelta(days=7))
+        elif date_range == "30d":
+            return dt >= (now - timedelta(days=30))
+        elif date_range == "90d":
+            return dt >= (now - timedelta(days=90))
+        elif date_range == "custom":
+            valid = True
+            if start_date_str and start_date_str.strip():
+                valid = valid and (dt >= datetime.strptime(start_date_str.strip(), "%Y-%m-%d"))
+            if end_date_str and end_date_str.strip():
+                valid = valid and (dt < (datetime.strptime(end_date_str.strip(), "%Y-%m-%d") + timedelta(days=1)))
+            return valid
+    except Exception:
+        return True
+    return True
 
 @router.get("/dashboard", response_class=HTMLResponse)
 def view_dashboard(request: Request, client_id: Optional[int] = None, date_range: Optional[str] = "all", start_date: Optional[str] = "", end_date: Optional[str] = ""):
@@ -142,12 +183,12 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
     if user_client_id is not None:
         restricted_clients = [c for c in clients if c[0] == user_client_id]
         for c_id, c_name, c_ads, c_fb, c_li, c_ms, c_tt, c_tw, c_pin, c_gpt, c_rdt in restricted_clients:
-            dropdown_options += f'<option value="{c_id}" selected> {c_name} (Ads: {c_ads})</option>'
+            dropdown_options += f'<option value="{c_id}" selected>👤 {c_name} (Ads: {c_ads})</option>'
     else:
-        dropdown_options = f'<option value="0" {"selected" if selected_client_id == 0 else ""}> [Show All Clients / Agency View]</option>'
+        dropdown_options = f'<option value="0" {"selected" if selected_client_id == 0 else ""}>📂 [Show All Clients / Agency View]</option>'
         for c_id, c_name, c_ads, c_fb, c_li, c_ms, c_tt, c_tw, c_pin, c_gpt, c_rdt in clients:
             is_selected = "selected" if selected_client_id == c_id else ""
-            dropdown_options += f'<option value="{c_id}" {is_selected}> {c_name} (Ads: {c_ads})</option>'
+            dropdown_options += f'<option value="{c_id}" {is_selected}>👤 {c_name} (Ads: {c_ads})</option>'
 
     # Convert rows to table items
     table_rows_html = ""
@@ -158,9 +199,9 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
         
         if sale_closed == 'YES':
             if adjusted == 'YES' and adjustment_type == 'RETRACT':
-                closed_badge = '<span style="background: #ffebee; color: #c62828; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 11px; text-decoration: line-through;">YES</span><br><small style="color: #c62828; font-weight: bold;"> Retracted</small>'
+                closed_badge = '<span style="background: #ffebee; color: #c62828; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 11px; text-decoration: line-through;">YES</span><br><small style="color: #c62828; font-weight: bold;">🚫 Retracted</small>'
             elif adjusted == 'YES' and adjustment_type == 'RESTATE':
-                closed_badge = '<span style="background: #e8f5e9; color: #2e7d32; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 11px;">YES</span><br><small style="color: #f57c00; font-weight: bold;"> Restated</small>'
+                closed_badge = '<span style="background: #e8f5e9; color: #2e7d32; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 11px;">YES</span><br><small style="color: #f57c00; font-weight: bold;">🔄 Restated</small>'
             else:
                 closed_badge = '<span style="background: #e8f5e9; color: #2e7d32; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 12px;">YES</span>'
         else:
@@ -215,7 +256,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
         # Determine Matching Method & Certainty Badge
         if sale_closed == 'YES':
             if match_fuzzy == 'YES':
-                matching_badge = f'<td><span style="background-color: #fff3cd; color: #856404; border: 1px solid #ffe0b2; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 11px; white-space: nowrap;"> Fuzzy Match ({certainty_score or 0}%)</span></td>'
+                matching_badge = f'<td><span style="background-color: #fff3cd; color: #856404; border: 1px solid #ffe0b2; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 11px; white-space: nowrap;">🔍 Fuzzy Match ({certainty_score or 0}%)</span></td>'
             else:
                 matching_badge = f'<td><span style="background-color: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 11px; white-space: nowrap;">✅ Exact Match ({certainty_score or 100}%)</span></td>'
         else:
@@ -224,9 +265,9 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
         # Beautiful lead source delineation (Phone Call vs Web Form)
         source_lower = str(source).lower() if source else ""
         if 'form' in source_lower:
-            source_badge = '<span class="badge-source badge-form"> Web Form</span>'
+            source_badge = '<span class="badge-source badge-form">📝 Web Form</span>'
         elif any(x in source_lower for x in ['call', 'phone', 'callrail']):
-            source_badge = '<span class="badge-source badge-call"> Phone Call</span>'
+            source_badge = '<span class="badge-source badge-call">📞 Phone Call</span>'
         else:
             source_badge = f'<span class="badge-source">{str(source).upper()}</span>'
             
@@ -256,61 +297,61 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
 
     # Build multi-channel action buttons dynamically
     if selected_client_id == 0:
-        google_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Google Ads offline conversion CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;"> Export Disabled</button>'
-        google_adjustments_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Google Ads offline conversion adjustments CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;"> Export Disabled</button>'
-        microsoft_adjustments_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Microsoft Ads offline conversion adjustments CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;"> Export Disabled</button>'
-        google_audience_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Google Customer Match list!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;"> Export Disabled</button>'
-        facebook_audience_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Meta Custom Audience list!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;"> Export Disabled</button>'
-        linkedin_audience_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their LinkedIn List Match list!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;"> Export Disabled</button>'
-        facebook_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Facebook conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;"> Export Disabled</button>'
-        linkedin_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their LinkedIn conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;"> Export Disabled</button>'
-        microsoft_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Microsoft conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;"> Export Disabled</button>'
-        tiktok_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their TikTok conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;"> Export Disabled</button>'
-        twitter_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their X Ads conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;"> Export Disabled</button>'
-        pinterest_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Pinterest conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;"> Export Disabled</button>'
-        snapchat_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Snapchat conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;"> Export Disabled</button>'
-        chatgpt_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their ChatGPT Ads conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;"> Export Disabled</button>'
-        reddit_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Reddit Ads conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;"> Export Disabled</button>'
+        google_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Google Ads offline conversion CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
+        google_adjustments_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Google Ads offline conversion adjustments CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
+        microsoft_adjustments_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Microsoft Ads offline conversion adjustments CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
+        google_audience_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Google Customer Match list!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
+        facebook_audience_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Meta Custom Audience list!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
+        linkedin_audience_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their LinkedIn List Match list!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
+        facebook_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Facebook conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
+        linkedin_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their LinkedIn conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
+        microsoft_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Microsoft conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
+        tiktok_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their TikTok conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
+        twitter_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their X Ads conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
+        pinterest_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Pinterest conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
+        snapchat_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Snapchat conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
+        chatgpt_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their ChatGPT Ads conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
+        reddit_export_button = '<button class="btn-export disabled" onclick="alert(\'Please select a specific client from the dropdown above to export their Reddit Ads conversions CSV!\')" style="opacity:0.6; cursor:not-allowed; background-color: #bdc3c7; width: 100%;">📥 Export Disabled</button>'
     else:
-        google_export_button = f'<a href="/dashboard/export/google?client_id={selected_client_id}" class="btn-export" style="background-color: #4285F4; text-align: center; text-decoration: none; width: 100%;"> Download Google CSV ({exportable_google})</a>'
-        google_adjustments_button = f'<a href="/dashboard/export/google-adjustments?client_id={selected_client_id}" class="btn-export" style="background-color: #37474F; text-align: center; text-decoration: none; width: 100%;"> Download Google Adjustments CSV ({exportable_adjustments})</a>'
-        microsoft_adjustments_button = f'<a href="/dashboard/export/microsoft-adjustments?client_id={selected_client_id}" class="btn-export" style="background-color: #00838F; text-align: center; text-decoration: none; width: 100%;"> Download Bing Adjustments CSV ({exportable_microsoft_adjustments})</a>'
+        google_export_button = f'<a href="/dashboard/export/google?client_id={selected_client_id}" class="btn-export" style="background-color: #4285F4; text-align: center; text-decoration: none; width: 100%;">📥 Download Google CSV ({exportable_google})</a>'
+        google_adjustments_button = f'<a href="/dashboard/export/google-adjustments?client_id={selected_client_id}" class="btn-export" style="background-color: #37474F; text-align: center; text-decoration: none; width: 100%;">📥 Download Google Adjustments CSV ({exportable_adjustments})</a>'
+        microsoft_adjustments_button = f'<a href="/dashboard/export/microsoft-adjustments?client_id={selected_client_id}" class="btn-export" style="background-color: #00838F; text-align: center; text-decoration: none; width: 100%;">📥 Download Bing Adjustments CSV ({exportable_microsoft_adjustments})</a>'
         google_audience_button = f"""
         <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px; width: 100%;">
-            <a href="/dashboard/export/audience/google?client_id={selected_client_id}&segment=all" class="btn-export" style="background-color: #4285F4; text-align: center; text-decoration: none; font-size: 12px; font-weight: bold; border-radius: 5px; padding: 10px 12px;"> All Profiles (Leads & Buyers)</a>
-            <a href="/dashboard/export/audience/google?client_id={selected_client_id}&segment=single" class="btn-export" style="background-color: #3b71ca; text-align: center; text-decoration: none; font-size: 12px; font-weight: bold; border-radius: 5px; padding: 10px 12px;"> Single-Time Buyers</a>
-            <a href="/dashboard/export/audience/google?client_id={selected_client_id}&segment=multi" class="btn-export" style="background-color: #14a44d; text-align: center; text-decoration: none; font-size: 12px; font-weight: bold; border-radius: 5px; padding: 10px 12px;"> Repeat Buyers (2+ Sales)</a>
+            <a href="/dashboard/export/audience/google?client_id={selected_client_id}&segment=all" class="btn-export" style="background-color: #4285F4; text-align: center; text-decoration: none; font-size: 12px; font-weight: bold; border-radius: 5px; padding: 10px 12px;">📥 All Profiles (Leads & Buyers)</a>
+            <a href="/dashboard/export/audience/google?client_id={selected_client_id}&segment=single" class="btn-export" style="background-color: #3b71ca; text-align: center; text-decoration: none; font-size: 12px; font-weight: bold; border-radius: 5px; padding: 10px 12px;">📥 Single-Time Buyers</a>
+            <a href="/dashboard/export/audience/google?client_id={selected_client_id}&segment=multi" class="btn-export" style="background-color: #14a44d; text-align: center; text-decoration: none; font-size: 12px; font-weight: bold; border-radius: 5px; padding: 10px 12px;">🏆 Repeat Buyers (2+ Sales)</a>
         </div>
         """
         facebook_audience_button = f"""
         <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px; width: 100%;">
-            <a href="/dashboard/export/audience/facebook?client_id={selected_client_id}&segment=all" class="btn-export" style="background-color: #1877F2; text-align: center; text-decoration: none; font-size: 12px; font-weight: bold; border-radius: 5px; padding: 10px 12px;"> All Profiles (Leads & Buyers)</a>
-            <a href="/dashboard/export/audience/facebook?client_id={selected_client_id}&segment=single" class="btn-export" style="background-color: #3b5998; text-align: center; text-decoration: none; font-size: 12px; font-weight: bold; border-radius: 5px; padding: 10px 12px;"> Single-Time Buyers</a>
-            <a href="/dashboard/export/audience/facebook?client_id={selected_client_id}&segment=multi" class="btn-export" style="background-color: #2e7d32; text-align: center; text-decoration: none; font-size: 12px; font-weight: bold; border-radius: 5px; padding: 10px 12px;"> Repeat Buyers (2+ Sales)</a>
+            <a href="/dashboard/export/audience/facebook?client_id={selected_client_id}&segment=all" class="btn-export" style="background-color: #1877F2; text-align: center; text-decoration: none; font-size: 12px; font-weight: bold; border-radius: 5px; padding: 10px 12px;">📥 All Profiles (Leads & Buyers)</a>
+            <a href="/dashboard/export/audience/facebook?client_id={selected_client_id}&segment=single" class="btn-export" style="background-color: #3b5998; text-align: center; text-decoration: none; font-size: 12px; font-weight: bold; border-radius: 5px; padding: 10px 12px;">📥 Single-Time Buyers</a>
+            <a href="/dashboard/export/audience/facebook?client_id={selected_client_id}&segment=multi" class="btn-export" style="background-color: #2e7d32; text-align: center; text-decoration: none; font-size: 12px; font-weight: bold; border-radius: 5px; padding: 10px 12px;">🏆 Repeat Buyers (2+ Sales)</a>
         </div>
         """
         linkedin_audience_button = f"""
         <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px; width: 100%;">
-            <a href="/dashboard/export/audience/linkedin?client_id={selected_client_id}&segment=all" class="btn-export" style="background-color: #0A66C2; text-align: center; text-decoration: none; font-size: 12px; font-weight: bold; border-radius: 5px; padding: 10px 12px;"> All Profiles (Leads & Buyers)</a>
-            <a href="/dashboard/export/audience/linkedin?client_id={selected_client_id}&segment=single" class="btn-export" style="background-color: #0077b5; text-align: center; text-decoration: none; font-size: 12px; font-weight: bold; border-radius: 5px; padding: 10px 12px;"> Single-Time Buyers</a>
-            <a href="/dashboard/export/audience/linkedin?client_id={selected_client_id}&segment=multi" class="btn-export" style="background-color: #155724; text-align: center; text-decoration: none; font-size: 12px; font-weight: bold; border-radius: 5px; padding: 10px 12px;"> Repeat Buyers (2+ Sales)</a>
+            <a href="/dashboard/export/audience/linkedin?client_id={selected_client_id}&segment=all" class="btn-export" style="background-color: #0A66C2; text-align: center; text-decoration: none; font-size: 12px; font-weight: bold; border-radius: 5px; padding: 10px 12px;">📥 All Profiles (Leads & Buyers)</a>
+            <a href="/dashboard/export/audience/linkedin?client_id={selected_client_id}&segment=single" class="btn-export" style="background-color: #0077b5; text-align: center; text-decoration: none; font-size: 12px; font-weight: bold; border-radius: 5px; padding: 10px 12px;">📥 Single-Time Buyers</a>
+            <a href="/dashboard/export/audience/linkedin?client_id={selected_client_id}&segment=multi" class="btn-export" style="background-color: #155724; text-align: center; text-decoration: none; font-size: 12px; font-weight: bold; border-radius: 5px; padding: 10px 12px;">🏆 Repeat Buyers (2+ Sales)</a>
         </div>
         """
-        facebook_export_button = f'<a href="/dashboard/export/facebook?client_id={selected_client_id}" class="btn-export" style="background-color: #1877F2; text-align: center; text-decoration: none; width: 100%;"> Download Meta CSV ({exportable_facebook})</a>'
-        linkedin_export_button = f'<a href="/dashboard/export/linkedin?client_id={selected_client_id}" class="btn-export" style="background-color: #0A66C2; text-align: center; text-decoration: none; width: 100%;"> Download LinkedIn CSV ({exportable_linkedin})</a>'
-        microsoft_export_button = f'<a href="/dashboard/export/microsoft?client_id={selected_client_id}" class="btn-export" style="background-color: #00A4EF; text-align: center; text-decoration: none; width: 100%;"> Download Bing CSV ({exportable_microsoft})</a>'
-        tiktok_export_button = f'<a href="/dashboard/export/tiktok?client_id={selected_client_id}" class="btn-export" style="background-color: #010101; text-align: center; text-decoration: none; width: 100%;"> Download TikTok CSV ({exportable_tiktok})</a>'
-        twitter_export_button = f'<a href="/dashboard/export/twitter?client_id={selected_client_id}" class="btn-export" style="background-color: #15202B; text-align: center; text-decoration: none; width: 100%;"> Download X Ads CSV ({exportable_twitter})</a>'
-        pinterest_export_button = f'<a href="/dashboard/export/pinterest?client_id={selected_client_id}" class="btn-export" style="background-color: #E60023; text-align: center; text-decoration: none; width: 100%;"> Download Pinterest CSV ({exportable_pinterest})</a>'
-        snapchat_export_button = f'<a href="/dashboard/export/snapchat?client_id={selected_client_id}" class="btn-export" style="background-color: #E9B800; color: #000; text-align: center; text-decoration: none; width: 100%;"> Download Snapchat CSV ({exportable_snapchat})</a>'
-        chatgpt_export_button = f'<a href="/dashboard/export/chatgpt?client_id={selected_client_id}" class="btn-export" style="background-color: #10a37f; text-align: center; text-decoration: none; width: 100%;"> Download ChatGPT CSV ({exportable_chatgpt})</a>'
-        reddit_export_button = f'<a href="/dashboard/export/reddit?client_id={selected_client_id}" class="btn-export" style="background-color: #FF4500; text-align: center; text-decoration: none; width: 100%;"> Download Reddit CSV ({exportable_reddit})</a>'
+        facebook_export_button = f'<a href="/dashboard/export/facebook?client_id={selected_client_id}" class="btn-export" style="background-color: #1877F2; text-align: center; text-decoration: none; width: 100%;">📥 Download Meta CSV ({exportable_facebook})</a>'
+        linkedin_export_button = f'<a href="/dashboard/export/linkedin?client_id={selected_client_id}" class="btn-export" style="background-color: #0A66C2; text-align: center; text-decoration: none; width: 100%;">📥 Download LinkedIn CSV ({exportable_linkedin})</a>'
+        microsoft_export_button = f'<a href="/dashboard/export/microsoft?client_id={selected_client_id}" class="btn-export" style="background-color: #00A4EF; text-align: center; text-decoration: none; width: 100%;">📥 Download Bing CSV ({exportable_microsoft})</a>'
+        tiktok_export_button = f'<a href="/dashboard/export/tiktok?client_id={selected_client_id}" class="btn-export" style="background-color: #010101; text-align: center; text-decoration: none; width: 100%;">📥 Download TikTok CSV ({exportable_tiktok})</a>'
+        twitter_export_button = f'<a href="/dashboard/export/twitter?client_id={selected_client_id}" class="btn-export" style="background-color: #15202B; text-align: center; text-decoration: none; width: 100%;">📥 Download X Ads CSV ({exportable_twitter})</a>'
+        pinterest_export_button = f'<a href="/dashboard/export/pinterest?client_id={selected_client_id}" class="btn-export" style="background-color: #E60023; text-align: center; text-decoration: none; width: 100%;">📥 Download Pinterest CSV ({exportable_pinterest})</a>'
+        snapchat_export_button = f'<a href="/dashboard/export/snapchat?client_id={selected_client_id}" class="btn-export" style="background-color: #E9B800; color: #000; text-align: center; text-decoration: none; width: 100%;">📥 Download Snapchat CSV ({exportable_snapchat})</a>'
+        chatgpt_export_button = f'<a href="/dashboard/export/chatgpt?client_id={selected_client_id}" class="btn-export" style="background-color: #10a37f; text-align: center; text-decoration: none; width: 100%;">📥 Download ChatGPT CSV ({exportable_chatgpt})</a>'
+        reddit_export_button = f'<a href="/dashboard/export/reddit?client_id={selected_client_id}" class="btn-export" style="background-color: #FF4500; text-align: center; text-decoration: none; width: 100%;">📥 Download Reddit CSV ({exportable_reddit})</a>'
 
     # Conditionally show the Client header column
     client_th_html = '<th>Client Account</th>' if selected_client_id == 0 else ''
     admin_link_html = ""
     if email in ADMIN_EMAILS:
-        admin_link_html = ' | <a href="/admin/users" style="color: #2e7d32; text-decoration: none; font-weight: bold; margin-left: 5px;">️ Admin User Directory</a>'
+        admin_link_html = ' | <a href="/admin/users" style="color: #2e7d32; text-decoration: none; font-weight: bold; margin-left: 5px;">🛡️ Admin User Directory</a>'
         
 
     # Define Global Instructions and Adjustments Modals (Rendered for ALL users)
@@ -320,18 +361,18 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
             <div style="background: white; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); max-width: 550px; width: 90%; text-align: left; overflow: hidden; display: flex; flex-direction: column;">
                 <!-- Header -->
                 <div id="ins_modal_header" style="background: #1a237e; color: white; padding: 20px; display: flex; justify-content: space-between; align-items: center;">
-                    <h3 id="ins_modal_title" style="margin: 0; font-size: 16px; color: white; display: flex; align-items: center; gap: 8px;"> Upload Instructions</h3>
+                    <h3 id="ins_modal_title" style="margin: 0; font-size: 16px; color: white; display: flex; align-items: center; gap: 8px;">📋 Upload Instructions</h3>
                     <span onclick="closeUploadInstructionsModal()" style="font-size: 24px; font-weight: bold; cursor: pointer; color: white; opacity: 0.8;">&times;</span>
                 </div>
                 <!-- Body -->
                 <div style="padding: 25px; font-size: 14px; color: #333; margin: 0; overflow-y: auto; max-height: 70vh;">
                     <div style="margin-bottom: 15px; background: #e8eaf6; padding: 12px; border-radius: 6px; border-left: 4px solid #1a237e;">
-                        <span style="font-weight: bold; color: #1a237e; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 4px;"> TARGET UPLOAD LOCATION:</span>
+                        <span style="font-weight: bold; color: #1a237e; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 4px;">📂 TARGET UPLOAD LOCATION:</span>
                         <strong id="ins_platform_path" style="display: block; font-size: 13px; color: #333; line-height: 1.4;"></strong>
                     </div>
                     
                     <div style="margin-top: 15px;">
-                        <span style="font-weight: bold; color: #666; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 8px;"> STEP-BY-STEP WORKFLOW:</span>
+                        <span style="font-weight: bold; color: #666; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 8px;">📝 STEP-BY-STEP WORKFLOW:</span>
                         <ol id="ins_steps_list" style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;"></ol>
                     </div>
                 </div>
@@ -370,14 +411,14 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
                             <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; background: #fdfdfd; border: 1px solid #e0e0e0; padding: 10px 12px; border-radius: 6px; margin: 0;">
                                 <input type="radio" name="adj_strategy" value="RETRACT" onclick="toggleAdjValueField(false)" checked style="margin-top: 3px;">
                                 <div>
-                                    <strong style="color: #c62828; font-size: 13px;"> Refund / Cancel Sale (Retract)</strong>
+                                    <strong style="color: #c62828; font-size: 13px;">🚫 Refund / Cancel Sale (Retract)</strong>
                                     <span style="display: block; font-size: 11px; color: #666; margin-top: 2px;">Instructs Google to completely delete/cancel this conversion from your ad optimization datasets.</span>
                                 </div>
                             </label>
                             <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; background: #fdfdfd; border: 1px solid #e0e0e0; padding: 10px 12px; border-radius: 6px; margin: 0;">
                                 <input type="radio" name="adj_strategy" value="RESTATE" onclick="toggleAdjValueField(true)" style="margin-top: 3px;">
                                 <div>
-                                    <strong style="color: #2e7d32; font-size: 13px;"> Restate Transaction Value (Restate)</strong>
+                                    <strong style="color: #2e7d32; font-size: 13px;">🔄 Restate Transaction Value (Restate)</strong>
                                     <span style="display: block; font-size: 11px; color: #666; margin-top: 2px;">Corrects or updates the transaction revenue value. Perfect for partial refunds or contract upsells.</span>
                                 </div>
                             </label>
@@ -391,7 +432,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
                     
                     <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #eaeaea; padding-top: 20px; margin-top: 20px;">
                         <button type="button" onclick="closeAdjustmentModal()" style="background: #f1f3f4; color: #333; border: none; padding: 10px 18px; border-radius: 6px; font-weight: bold; cursor: pointer;">Cancel</button>
-                        <button type="submit" style="background: #1a237e; color: white; border: none; padding: 10px 24px; border-radius: 6px; font-weight: bold; cursor: pointer;"> Save Adjustment</button>
+                        <button type="submit" style="background: #1a237e; color: white; border: none; padding: 10px 24px; border-radius: 6px; font-weight: bold; cursor: pointer;">💾 Save Adjustment</button>
                     </div>
                 </form>
             </div>
@@ -495,7 +536,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
                 let steps = [];
                 
                 if (platform === 'google') {
-                    title = " Google Ads Upload Instructions";
+                    title = "🔍 Google Ads Upload Instructions";
                     headerBg = "#4285F4";
                     path = "Tools and Settings ➡️ Goals ➡️ Conversions ➡️ Uploads";
                     steps = [
@@ -505,7 +546,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
                         "Select <strong>Apply</strong> or click <strong>Preview</strong> to verify GCLID click mappings and timestamps before applying."
                     ];
                 } else if (platform === 'facebook') {
-                    title = " Meta / Facebook Offline Conversions Upload Guide";
+                    title = "🔵 Meta / Facebook Offline Conversions Upload Guide";
                     headerBg = "#1877F2";
                     path = "Meta Events Manager ➡️ Data Sources";
                     steps = [
@@ -516,7 +557,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
                         "Click <strong>Start Upload</strong> to transmit transaction attribution data to Meta."
                     ];
                 } else if (platform === 'linkedin') {
-                    title = " LinkedIn Offline Conversions Upload Guide";
+                    title = "🔗 LinkedIn Offline Conversions Upload Guide";
                     headerBg = "#0A66C2";
                     path = "LinkedIn Campaign Manager ➡️ Analyze ➡️ Conversion Tracking";
                     steps = [
@@ -526,7 +567,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
                         "Choose the downloaded LinkedIn CSV file, associate your offline conversion goal, and click <strong>Upload</strong>."
                     ];
                 } else if (platform === 'microsoft') {
-                    title = " Microsoft (Bing) Ads Offline Conversions Guide";
+                    title = "🟢 Microsoft (Bing) Ads Offline Conversions Guide";
                     headerBg = "#00A4EF";
                     path = "Microsoft Advertising Dashboard ➡️ Tools ➡️ Conversion Goals";
                     steps = [
@@ -536,7 +577,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
                         "Ensure the TimeZone is aligned (defaults to UTC/+00:00), and click <strong>Apply</strong> to complete the process."
                     ];
                 } else if (platform === 'tiktok') {
-                    title = " TikTok Ads Offline Event Upload Instructions";
+                    title = "🎵 TikTok Ads Offline Event Upload Instructions";
                     headerBg = "#010101";
                     path = "TikTok Ads Manager ➡️ Tools ➡️ Events ➡️ Offline Events";
                     steps = [
@@ -546,7 +587,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
                         "Verify that click ID (<code>ttclid</code>), conversion event name, value, and timestamp map cleanly, and click <strong>Submit</strong>."
                     ];
                 } else if (platform === 'twitter') {
-                    title = " X (Twitter) Ads Offline Upload Guide";
+                    title = "🐦 X (Twitter) Ads Offline Upload Guide";
                     headerBg = "#15202B";
                     path = "X Ads Manager ➡️ Tools ➡️ Events Manager";
                     steps = [
@@ -556,7 +597,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
                         "Review column mappings (click ID, value, timestamp) and click <strong>Apply</strong> to queue conversion attribution."
                     ];
                 } else if (platform === 'snapchat') {
-                    title = " Snapchat Ads Offline Conversions Upload Instructions";
+                    title = "👻 Snapchat Ads Offline Conversions Upload Instructions";
                     headerBg = "#E9B800";
                     path = "Snapchat Ads Manager ➡️ Assets ➡️ Events Manager";
                     steps = [
@@ -566,7 +607,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
                         "Verify event matching parameters (Click ID, Event Name) and click <strong>Process</strong> to trigger matching."
                     ];
                 } else if (platform === 'pinterest') {
-                    title = " Pinterest Ads Offline Event Upload Guide";
+                    title = "📌 Pinterest Ads Offline Event Upload Guide";
                     headerBg = "#E60023";
                     path = "Pinterest Ads Manager ➡️ Ads ➡️ Conversions ➡️ Offline Conversions";
                     steps = [
@@ -576,7 +617,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
                         "Confirm column metrics (PIN Click ID, Value, Currency) and select <strong>Apply</strong>."
                     ];
                 } else if (platform === 'chatgpt') {
-                    title = " ChatGPT Ads Conversion Upload Instructions";
+                    title = "🧠 ChatGPT Ads Conversion Upload Instructions";
                     headerBg = "#10a37f";
                     path = "ChatGPT Ads Campaign Manager ➡️ Conversion Event Manager";
                     steps = [
@@ -585,7 +626,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
                         "Verify target mapping fields (ChatGPT Click ID, Event Name) and click <strong>Apply</strong>."
                     ];
                 } else if (platform === 'reddit') {
-                    title = " Reddit Ads Offline Conversion Upload Guide";
+                    title = "🔴 Reddit Ads Offline Conversion Upload Guide";
                     headerBg = "#FF4500";
                     path = "Reddit Ads Manager ➡️ Events Manager ➡️ Offline Conversions";
                     steps = [
@@ -695,7 +736,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
             """
             for c_id, c_name, *rest in clients:
                 sel_up = 'selected' if c_id == selected_client_id else ''
-                upload_client_selector_html += f'<option value="{c_id}" {sel_up}> {c_name}</option>'
+                upload_client_selector_html += f'<option value="{c_id}" {sel_up}>👤 {c_name}</option>'
             upload_client_selector_html += """
                 </select>
             </div>
@@ -708,7 +749,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
         <div style="background: #ffffff; border: 1px solid #e0e6ed; border-left: 4px solid #1a237e; border-radius: 8px; padding: 18px 20px; margin-bottom: 20px; text-align: left; box-shadow: 0 2px 6px rgba(0,0,0,0.03);">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
                 <strong style="color: #1a237e; font-size: 14px; display: flex; align-items: center; gap: 6px;">
-                     How to Format Your Sales Spreadsheet (CSV or Excel)
+                    📋 How to Format Your Sales Spreadsheet (CSV or Excel)
                 </strong>
                 <span style="font-size: 11px; background: #e8eaf6; color: #1a237e; padding: 3px 8px; border-radius: 4px; font-weight: bold;">
                     Supported Formats: .CSV, .XLSX, .XLS
@@ -721,7 +762,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
             
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin-bottom: 12px;">
                 <div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px; padding: 10px;">
-                    <span style="font-size: 11px; font-weight: bold; color: #1a237e; display: block; margin-bottom: 3px;"> Phone Column (Required)</span>
+                    <span style="font-size: 11px; font-weight: bold; color: #1a237e; display: block; margin-bottom: 3px;">📞 Phone Column (Required)</span>
                     <span style="font-size: 11px; color: #666; display: block;">Header: <code>Phone</code>, <code>Telephone</code>, <code>Mobile</code>, or <code>Contact</code></span>
                     <small style="font-size: 10px; color: #888; display: block; margin-top: 3px;">Used for exact phone matching against CallRail call logs.</small>
                 </div>
@@ -733,27 +774,27 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
                 </div>
                 
                 <div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px; padding: 10px;">
-                    <span style="font-size: 11px; font-weight: bold; color: #2e7d32; display: block; margin-bottom: 3px;"> Sale Amount Column</span>
+                    <span style="font-size: 11px; font-weight: bold; color: #2e7d32; display: block; margin-bottom: 3px;">💰 Sale Amount Column</span>
                     <span style="font-size: 11px; color: #666; display: block;">Header: <code>Amount</code>, <code>Value</code>, <code>Revenue</code>, <code>Price</code>, or <code>Total</code></span>
                     <small style="font-size: 10px; color: #888; display: block; margin-top: 3px;">Purchase dollar value uploaded to ad networks (e.g. <code>450.00</code>).</small>
                 </div>
                 
                 <div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px; padding: 10px;">
-                    <span style="font-size: 11px; font-weight: bold; color: #495057; display: block; margin-bottom: 3px;"> Name & Company (Optional)</span>
+                    <span style="font-size: 11px; font-weight: bold; color: #495057; display: block; margin-bottom: 3px;">👤 Name & Company (Optional)</span>
                     <span style="font-size: 11px; color: #666; display: block;">Header: <code>Name</code>, <code>Customer</code>, <code>Company</code></span>
                     <small style="font-size: 10px; color: #888; display: block; margin-top: 3px;">Used for dashboard logs and smart fuzzy matching.</small>
                 </div>
             </div>
             
             <div style="font-size: 11px; color: #495057; background: #e8eaf6; padding: 8px 12px; border-radius: 4px; border: 1px dashed #3f51b5;">
-                 <strong>Formatting Tip:</strong> Phone numbers can include dashes or parentheses (LeadGrove normalizes them automatically), and currency values can include <code>$</code> symbols or commas.
+                💡 <strong>Formatting Tip:</strong> Phone numbers can include dashes or parentheses (LeadGrove normalizes them automatically), and currency values can include <code>$</code> symbols or commas.
             </div>
         </div>
 
         <!-- Drag & Drop Ingestion Box -->
         <div id="drop-zone" style="background: #f8f9fc; border: 2px dashed #1a237e; border-radius: 8px; padding: 25px; text-align: center; margin-bottom: 30px; cursor: pointer; transition: all 0.2s; position: relative;">
             <div id="drop-zone-content">
-                <span style="font-size: 32px; display: block; margin-bottom: 10px;"></span>
+                <span style="font-size: 32px; display: block; margin-bottom: 10px;">📊</span>
                 <strong style="color: #1a237e; font-size: 15px; display: block;">Drag & drop your Customer Sales Spreadsheet (CSV or Excel)</strong>
                 <span style="color: #666; font-size: 13px; display: block; margin-top: 5px;">Or click here to browse and upload from your computer</span>
                 <small style="color: #888; font-size: 11px; display: block; margin-top: 10px; font-style: italic;">Supports exact phone/email matching & smart fuzzy name/company matching</small>
@@ -768,14 +809,14 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
             <div style="background: white; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); max-width: 480px; width: 90%; text-align: center; overflow: hidden;">
                 <!-- Header -->
                 <div style="background: #1a237e; color: white; padding: 20px;">
-                    <span style="font-size: 40px;"></span>
+                    <span style="font-size: 40px;">🎉</span>
                     <h3 style="margin: 10px 0 0 0; font-size: 18px;">Sales Spreadsheet Processed!</h3>
                 </div>
                 <!-- Body -->
                 <div style="padding: 25px; text-align: left; font-size: 14px; color: #333; line-height: 1.6;">
                     <p id="modal-message" style="margin-top: 0; font-weight: 600; text-align: center; color: #1b5e20;"></p>
                     <div style="background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 8px; padding: 15px; margin-top: 15px;">
-                        <strong style="display: block; margin-bottom: 8px; font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;"> Ingestion Stats:</strong>
+                        <strong style="display: block; margin-bottom: 8px; font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">📊 Ingestion Stats:</strong>
                         <ul style="margin: 0; padding-left: 20px;">
                             <li>Processed Rows: <strong id="stat-processed">0</strong></li>
                             <li>Successful Matches: <strong id="stat-matches" style="color: #2e7d32;">0</strong></li>
@@ -896,10 +937,10 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
     user_header_bar = f"""
     <div style="display: flex; justify-content: space-between; align-items: center; background-color: #f1f3f4; padding: 10px 15px; border-radius: 6px; margin-bottom: 20px; font-size: 13px;">
         <div>
-            <span style="color: #666; font-weight: bold;"> Active Session:</span> <span style="font-weight: bold; color: #1a237e;">{email}</span>
+            <span style="color: #666; font-weight: bold;">👤 Active Session:</span> <span style="font-weight: bold; color: #1a237e;">{email}</span>
             {admin_link_html}
         </div>
-        <a href="/logout" style="color: #c62828; text-decoration: none; font-weight: bold; display: flex; align-items: center; gap: 4px;"> Log Out</a>
+        <a href="/logout" style="color: #c62828; text-decoration: none; font-weight: bold; display: flex; align-items: center; gap: 4px;">🚪 Log Out</a>
     </div>
     """
 
@@ -908,7 +949,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
     <!DOCTYPE html>
     <html>
         <head>
-            <title>Offline Lead & Conversion Dashboard </title>
+            <title>Offline Lead & Conversion Dashboard 📊</title>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <style>
@@ -963,7 +1004,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
                 {user_header_bar}
                 <header>
                     <div>
-                        <h1>{client_name_header} </h1>
+                        <h1>{client_name_header} 📊</h1>
                         <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">Google Ads Account: <strong>{client_ads_id}</strong> | Multi-Tenant Agency Engine</p>
                     </div>
                     
@@ -973,7 +1014,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
                 
                 <!-- Client Selection Dropdown -->
                 <div style="display: flex; align-items: center; gap: 10px;">
-                    <label for="dashboard_client_select" style="font-weight: bold; color: #1a237e; font-size: 13px;"> Active Client Profile:</label>
+                    <label for="dashboard_client_select" style="font-weight: bold; color: #1a237e; font-size: 13px;">🏢 Active Client Profile:</label>
                     <select id="dashboard_client_select" class="client-select" onchange="filterDashboard()" style="padding: 8px 14px; border-radius: 6px; border: 1px solid #1a237e; font-weight: bold; font-size: 13px; cursor: pointer; background: #f8f9fc; color: #1a237e;">
                         {dropdown_options}
                     </select>
@@ -981,14 +1022,14 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
 
                 <!-- Date Range Filters -->
                 <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                    <label for="date_range_select" style="font-weight: bold; color: #1a237e; font-size: 13px;"> Date Filter:</label>
+                    <label for="date_range_select" style="font-weight: bold; color: #1a237e; font-size: 13px;">📅 Date Filter:</label>
                     <select id="date_range_select" onchange="toggleCustomDateInputs(); filterDashboard();" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #ced4da; font-weight: bold; font-size: 13px; cursor: pointer; background: #fff;">
                         <option value="all" {opt_all}>All Time</option>
                         <option value="1d" {opt_1d}>1 Day (Today)</option>
                         <option value="7d" {opt_7d}>Last 7 Days</option>
                         <option value="30d" {opt_30d}>Last 30 Days</option>
                         <option value="90d" {opt_90d}>Last 90 Days</option>
-                        <option value="custom" {opt_custom}> Custom Range...</option>
+                        <option value="custom" {opt_custom}>📅 Custom Range...</option>
                     </select>
 
                     <!-- Custom Calendar Pickers -->
@@ -1010,7 +1051,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
 
             </div>
         </div>
-                        <a href="/dashboard/health?client_id={selected_client_id}" class="btn-copy" style="background-color: #d81b60; text-decoration: none; padding: 10px 16px; font-size: 13px; font-weight: bold; color: white; margin-right: 8px;"> Webhook & Sync Health</a> <a href="/dashboard/reports?client_id={selected_client_id}" class="btn-copy" style="background-color: #1a237e; text-decoration: none; padding: 10px 16px; font-size: 13px; font-weight: bold; color: white;"> Reports & Analytics</a>
+                        <a href="/dashboard/health?client_id={selected_client_id}" class="btn-copy" style="background-color: #d81b60; text-decoration: none; padding: 10px 16px; font-size: 13px; font-weight: bold; color: white; margin-right: 8px;">🩺 Webhook & Sync Health</a> <a href="/dashboard/reports?client_id={selected_client_id}" class="btn-copy" style="background-color: #1a237e; text-decoration: none; padding: 10px 16px; font-size: 13px; font-weight: bold; color: white;">📈 Reports & Analytics</a>
                         {settings_btn_html}
                         {onboard_btn_html}
                     </div>
@@ -1023,22 +1064,22 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
                         <p class="value">{total_leads}</p>
                     </div>
                     <div class="stat-card">
-                        <h3>AI Qualified Leads </h3>
+                        <h3>AI Qualified Leads 🟢</h3>
                         <p class="value">{qualified_leads}</p>
                     </div>
                     <div class="stat-card">
-                        <h3>Sales Closed </h3>
+                        <h3>Sales Closed 🤝</h3>
                         <p class="value">{sales_closed}</p>
                     </div>
                     <div class="stat-card rev">
-                        <h3>Tracked Sales Revenue </h3>
+                        <h3>Tracked Sales Revenue 💰</h3>
                         <p class="value">${total_revenue:,.2f}</p>
                     </div>
                 </div>
 
                 <!-- Multi-Channel Exports Panel -->
                 <div style="background: #fafafa; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px; margin-bottom: 30px;">
-                    <h3 style="margin: 0 0 15px 0; color: #1a237e; font-size: 15px; text-transform: uppercase; letter-spacing: 0.5px;"> Multi-Channel Offline Conversion Exports</h3>
+                    <h3 style="margin: 0 0 15px 0; color: #1a237e; font-size: 15px; text-transform: uppercase; letter-spacing: 0.5px;">📥 Multi-Channel Offline Conversion Exports</h3>
                     <div class="export-card-grid">
                         <!-- Google Ads -->
                         <div class="export-card">
@@ -1047,7 +1088,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
                                 <p>Export verified lead signals and transaction revenue for Smart Bidding optimization.</p>
                             </div>
                             {google_export_button}
-                            <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('google')" style="color: #4285F4; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;"> Instructions for uploading</a></div>
+                            <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('google')" style="color: #4285F4; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;">📋 Instructions for uploading</a></div>
                         </div>
                         <!-- Facebook Ads -->
                         <div class="export-card">
@@ -1056,7 +1097,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
                                 <p>Export offline events to optimize Facebook Conversions API and Custom Audiences.</p>
                             </div>
                             {facebook_export_button}
-                            <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('facebook')" style="color: #1877F2; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;"> Instructions for uploading</a></div>
+                            <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('facebook')" style="color: #1877F2; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;">📋 Instructions for uploading</a></div>
                         </div>
                         <!-- LinkedIn Ads -->
                         <div class="export-card">
@@ -1065,7 +1106,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
                                 <p>Export professional business conversions directly into LinkedIn Campaign Manager.</p>
                             </div>
                             {linkedin_export_button}
-                            <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('linkedin')" style="color: #0A66C2; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;"> Instructions for uploading</a></div>
+                            <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('linkedin')" style="color: #0A66C2; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;">📋 Instructions for uploading</a></div>
                         </div>
                         <!-- Microsoft Ads -->
                         <div class="export-card">
@@ -1074,7 +1115,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
                                 <p>Export click-matched offline sessions back into Bing/Microsoft campaign metrics.</p>
                             </div>
                             {microsoft_export_button}
-                            <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('microsoft')" style="color: #00A4EF; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;"> Instructions for uploading</a></div>
+                            <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('microsoft')" style="color: #00A4EF; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;">📋 Instructions for uploading</a></div>
                         </div>
                         <!-- TikTok Ads -->
                         <div class="export-card">
@@ -1083,7 +1124,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
                                 <p>Export offline conversion signals and purchase revenue directly into TikTok Ads Manager.</p>
                             </div>
                             {tiktok_export_button}
-                            <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('tiktok')" style="color: #010101; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;"> Instructions for uploading</a></div>
+                            <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('tiktok')" style="color: #010101; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;">📋 Instructions for uploading</a></div>
                         </div>
                         <!-- X Ads -->
                         <div class="export-card">
@@ -1092,7 +1133,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
                                 <p>Export verified offline lead and sale transactions back into your X Ads campaigns.</p>
                             </div>
                             {twitter_export_button}
-                            <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('twitter')" style="color: #15202B; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;"> Instructions for uploading</a></div>
+                            <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('twitter')" style="color: #15202B; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;">📋 Instructions for uploading</a></div>
                         </div>
                         <!-- Snapchat Ads -->
                         <div class="export-card">
@@ -1101,7 +1142,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
                                 <p style="margin-top: 5px;">Export offline event transactions directly into Snapchat Ads Pixel conversions manager.</p>
                             </div>
                             {snapchat_export_button}
-                            <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('snapchat')" style="color: #000; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;"> Instructions for uploading</a></div>
+                            <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('snapchat')" style="color: #000; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;">📋 Instructions for uploading</a></div>
                         </div>
                         <!-- Pinterest Ads -->
                         <div class="export-card">
@@ -1110,7 +1151,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
                                 <p>Export matched audience actions directly into your Pinterest Tag metrics.</p>
                             </div>
                             {pinterest_export_button}
-                            <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('pinterest')" style="color: #E60023; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;"> Instructions for uploading</a></div>
+                            <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('pinterest')" style="color: #E60023; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;">📋 Instructions for uploading</a></div>
                         </div>
                         <!-- ChatGPT Ads -->
                         <div class="export-card">
@@ -1119,7 +1160,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
                                 <p>Export verified offline lead and sale transactions back into your ChatGPT Ads metrics.</p>
                             </div>
                             {chatgpt_export_button}
-                            <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('chatgpt')" style="color: #10a37f; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;"> Instructions for uploading</a></div>
+                            <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('chatgpt')" style="color: #10a37f; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;">📋 Instructions for uploading</a></div>
                         </div>
                         <!-- Reddit Ads -->
                         <div class="export-card">
@@ -1128,7 +1169,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
                                 <p>Export verified offline lead and purchase conversions directly into Reddit Ads Manager.</p>
                             </div>
                             {reddit_export_button}
-                            <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('reddit')" style="color: #FF4500; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;"> Instructions for uploading</a></div>
+                            <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('reddit')" style="color: #FF4500; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;">📋 Instructions for uploading</a></div>
                         </div>
                         <!-- Google Ads Adjustments -->
                         <div class="export-card">
@@ -1137,7 +1178,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
                                 <p>Export conversion adjustments (retractions and value restatements) to optimize bid accuracy.</p>
                             </div>
                             {google_adjustments_button}
-                            <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('google-adjustments')" style="color: #37474F; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;"> Instructions for uploading</a></div>
+                            <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('google-adjustments')" style="color: #37474F; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;">📋 Instructions for uploading</a></div>
                         </div>
                         <!-- Microsoft Ads Adjustments -->
                         <div class="export-card">
@@ -1146,7 +1187,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
                                 <p>Export Bing/Microsoft conversion adjustments (retractions & value restatements) for ROAS accuracy.</p>
                             </div>
                             {microsoft_adjustments_button}
-                            <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('microsoft-adjustments')" style="color: #00838F; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;"> Instructions for uploading</a></div>
+                            <div style="text-align: center; margin-top: 10px;"><a href="javascript:void(0)" onclick="openUploadInstructions('microsoft-adjustments')" style="color: #00838F; text-decoration: underline; font-size: 11px; font-weight: bold; cursor: pointer; display: block;">📋 Instructions for uploading</a></div>
                         </div>
                     </div>
                 </div>
@@ -1154,7 +1195,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
                 <!-- First-Party Audience Builder Panel (Customer Match) -->
                 <div style="background: #fafafa; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px; margin-bottom: 30px;">
                     <h3 style="margin: 0 0 5px 0; color: #1a237e; font-size: 15px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                         First-Party Audience Builder (Customer Match)
+                        👥 First-Party Audience Builder (Customer Match)
                         <span style="background: #e8f5e9; color: #2e7d32; font-size: 10px; padding: 2px 8px; border-radius: 12px; font-weight: bold; text-transform: none; letter-spacing: normal;">⚡ Active Bonus Feature</span>
                     </h3>
                     <p style="margin: 0 0 20px 0; font-size: 13px; color: #555; line-height: 1.5;">
@@ -1165,7 +1206,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
                         <div class="export-card">
                             <div>
                                 <h4 style="color: #4285F4; display: flex; align-items: center; gap: 6px; margin: 0 0 5px 0;">
-                                    <span style="font-size: 16px;"></span> Google Ads Customer Match
+                                    <span style="font-size: 16px;">🔍</span> Google Ads Customer Match
                                 </h4>
                                 <p>Download privacy-compliant hashed CSV for Google Customer Match. Boost smart bidding accuracy instantly.</p>
                             </div>
@@ -1175,7 +1216,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
                         <div class="export-card">
                             <div>
                                 <h4 style="color: #1877F2; display: flex; align-items: center; gap: 6px; margin: 0 0 5px 0;">
-                                    <span style="font-size: 16px;"></span> Meta Custom Audiences
+                                    <span style="font-size: 16px;">🔵</span> Meta Custom Audiences
                                 </h4>
                                 <p>Download SHA-256 hashed CSV to build Facebook Custom/Lookalike Audiences and target high-value buyers.</p>
                             </div>
@@ -1185,7 +1226,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
                         <div class="export-card">
                             <div>
                                 <h4 style="color: #0A66C2; display: flex; align-items: center; gap: 6px; margin: 0 0 5px 0;">
-                                    <span style="font-size: 16px;"></span> LinkedIn List Matching
+                                    <span style="font-size: 16px;">🔗</span> LinkedIn List Matching
                                 </h4>
                                 <p>Download pre-formatted target contact lists incorporating hashed identifiers and corporate accounts for LinkedIn B2B matched audiences.</p>
                             </div>
@@ -1201,12 +1242,12 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
                 <!-- Table -->
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
             <h3 style="margin: 0; color: #1a237e; display: flex; align-items: center; gap: 8px;">
-                 Lead Activity Log
+                📊 Lead Activity Log
                 <span style="font-size: 12px; font-weight: normal; background: #e8eaf6; color: #1a237e; padding: 3px 10px; border-radius: 12px;">Showing {len(rows)} entries ({date_range_label})</span>
             </h3>
             <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
                 <a href="#" onclick="exportFilteredLeads(event)" class="btn-copy" style="background-color: #2e7d32; text-decoration: none; padding: 8px 14px; font-size: 12px; font-weight: bold; color: white; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
-                     Export Filtered Leads CSV ({len(rows)})
+                    📥 Export Filtered Leads CSV ({len(rows)})
                 </a>
                 <div style="font-size: 12px; color: #666; font-style: italic;">
                     Active: <strong>{active_client_name}</strong> | <strong>{date_range_label}</strong>
@@ -1310,5 +1351,433 @@ class ClientUpdate(BaseModel):
     exclude_past_customers: str
     excluded_customers: Optional[list[ExcludedCustomer]] = None
     exclusion_action: Optional[str] = "append"
+
+
+
+
+@router.post("/dashboard/upload-sales")
+async def dashboard_upload_sales(
+    request: Request,
+    file: UploadFile = File(...),
+    client_id: int = Form(...)
+):
+    email = is_authenticated(request)
+    if not email:
+        raise HTTPException(status_code=401, detail="Session expired. Please log in again.")
+    user_role, user_client_id = get_user_role_and_client(email)
+    if user_role != "full":
+        raise HTTPException(status_code=403, detail="Unauthorized: Only managers and administrators can upload sales reports.")
+    if user_client_id is not None and client_id != user_client_id:
+        raise HTTPException(status_code=403, detail="Unauthorized: You do not have permission to upload sales for this client.")
+        
+    contents = await file.read()
+    import io
+    try:
+        if file.filename.endswith(".csv"):
+            df = pd.read_csv(io.BytesIO(contents))
+        else:
+            df = pd.read_excel(io.BytesIO(contents))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to read file: {e}")
+        
+    columns = list(df.columns)
+    phone_col, email_col, value_col, name_col, company_col = find_dynamic_columns_custom(columns)
+    
+    if not phone_col and not email_col:
+        raise HTTPException(status_code=400, detail=f"Mapping Failure: Could not locate a valid phone or email contact column in headers: {columns}")
+        
+    stats = {"processed": 0, "successful_matches": 0, "organic_logged": 0, "errors": 0}
+    
+    conn = db_router.connect()
+    cursor = conn.cursor()
+    
+    try:
+        for _, row in df.iterrows():
+            stats["processed"] += 1
+            
+            raw_phone = str(row[phone_col]) if phone_col and pd.notna(row[phone_col]) else ""
+            raw_email = str(row[email_col]) if email_col and pd.notna(row[email_col]) else ""
+            raw_value = row[value_col] if value_col and pd.notna(row[value_col]) else 0.0
+            raw_name = str(row[name_col]).strip() if name_col and pd.notna(row[name_col]) else ""
+            raw_company = str(row[company_col]).strip() if company_col and pd.notna(row[company_col]) else ""
+            
+            norm_phone = normalize_phone(raw_phone)
+            norm_email = normalize_email(raw_email)
+            
+            try:
+                clean_val_str = re.sub(r"[^\d.]", "", str(raw_value))
+                value = float(clean_val_str) if clean_val_str else 0.0
+            except (ValueError, TypeError):
+                value = 0.0
+                
+            if not norm_phone and not norm_email and not raw_name and not raw_company:
+                stats["errors"] += 1
+                continue
+                
+            matching_session_id = None
+            match_reason = ""
+            match_fuzzy = "NO"
+            certainty_score = 100
+            current_status = None
+            
+            # Tier 1: Search by Phone Match
+            if norm_phone:
+                cursor.execute("""
+                    SELECT id, gclid, fbclid, msclkid, li_fat_id, sale_closed, value 
+                    FROM sessions 
+                    WHERE client_id = ? AND phone = ?
+                    ORDER BY created_at DESC LIMIT 1
+                """, (client_id, norm_phone))
+                row_match = cursor.fetchone()
+                if row_match:
+                    matching_session_id, g, fb, ms, li, sale_closed, val = row_match
+                    current_status = (sale_closed, val)
+                    match_reason = f"Successfully matched closed transaction via spreadsheet upload (Phone Match: {norm_phone})."
+                    
+            # Tier 2: Search by Email Match
+            if not matching_session_id and norm_email:
+                cursor.execute("""
+                    SELECT id, gclid, fbclid, msclkid, li_fat_id, sale_closed, value 
+                    FROM sessions 
+                    WHERE client_id = ? AND email = ?
+                    ORDER BY created_at DESC LIMIT 1
+                """, (client_id, norm_email))
+                row_match = cursor.fetchone()
+                if row_match:
+                    matching_session_id, g, fb, ms, li, sale_closed, val = row_match
+                    current_status = (sale_closed, val)
+                    match_reason = f"Successfully matched closed transaction via spreadsheet upload (Email Match: {norm_email})."
+                    
+            # Tier 3 & 4: Fuzzy Match against Active Sessions
+            if not matching_session_id:
+                cursor.execute("""
+                    SELECT id, phone, email, name, company, gclid, fbclid, msclkid, li_fat_id, sale_closed, value 
+                    FROM sessions 
+                    WHERE client_id = ? AND (sale_closed IS NULL OR sale_closed = 'NO')
+                    ORDER BY created_at DESC
+                """)
+                unclosed_sessions = cursor.fetchall()
+                
+                best_match_id = None
+                best_score = 0
+                best_reason = ""
+                best_click_vals = None
+                
+                for sess in unclosed_sessions:
+                    s_id, s_phone, s_email, s_name, s_company, s_g, s_fb, s_ms, s_li, s_closed, s_val = sess
+                    
+                    # Fuzzy Company Matching (Tier 3)
+                    if raw_company and s_company:
+                        score = calculate_company_similarity(raw_company, s_company)
+                        if score >= 0.85 and int(score * 100) > best_score:
+                            best_score = int(score * 100)
+                            best_match_id = s_id
+                            best_reason = f"Successfully matched closed transaction via Fuzzy Company Match ('{raw_company.strip()}' ➡️ '{s_company.strip()}')."
+                            best_click_vals = (s_closed, s_val)
+                            
+                    # Fuzzy Name Matching (Tier 4)
+                    if raw_name and s_name:
+                        score = check_name_transposition(raw_name, s_name)
+                        if score >= 0.80 and int(score * 100) > best_score:
+                            best_score = int(score * 100)
+                            best_match_id = s_id
+                            best_reason = f"Successfully matched closed transaction via Fuzzy Name Match ('{raw_name.strip()}' ➡️ '{s_name.strip()}')."
+                            best_click_vals = (s_closed, s_val)
+                            
+                if best_match_id:
+                    matching_session_id = best_match_id
+                    s_closed, s_val = best_click_vals
+                    current_status = (s_closed, s_val)
+                    match_fuzzy = "YES"
+                    certainty_score = best_score
+                    match_reason = best_reason
+                    
+            # Update database
+            if not matching_session_id:
+                cursor.execute("""
+                    INSERT INTO sessions (
+                        client_id, phone, email, name, company, source, qualified, sale_closed, value, reason, model_used, match_fuzzy, certainty_score
+                    ) VALUES (?, ?, ?, ?, ?, 'dashboard_upload', 'NO', 'YES', ?, ?, 'Dashboard Spreadsheet Ingest', 'NO', 100)
+                """, (
+                    client_id,
+                    norm_phone or None,
+                    norm_email or None,
+                    raw_name or "Dashboard Export Lead",
+                    raw_company or None,
+                    value,
+                    "Organic transaction saved: No corresponding historical click-session detected.",
+                ))
+                stats["organic_logged"] += 1
+            else:
+                if current_status and current_status[0] == "YES" and current_status[1] >= value:
+                    continue
+                    
+                cursor.execute("""
+                    UPDATE sessions SET 
+                        sale_closed = 'YES',
+                        value = ?,
+                        reason = ?,
+                        model_used = 'Dashboard Spreadsheet Ingest',
+                        match_fuzzy = ?,
+                        certainty_score = ?
+                    WHERE id = ?
+                """, (value, match_reason, match_fuzzy, certainty_score, matching_session_id))
+                stats["successful_matches"] += 1
+                
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Database upload error: {str(e)}")
+    finally:
+        conn.close()
+        
+    return {"status": "success", "stats": stats}
+
+
+@router.post("/dashboard/settings")
+def update_client_settings(request: Request, client: ClientUpdate):
+    email = is_authenticated(request)
+    if not email:
+        raise HTTPException(status_code=401, detail="Session expired. Please log in again.")
+    user_role, user_client_id = get_user_role_and_client(email)
+    if user_role != "full":
+        raise HTTPException(status_code=403, detail="Unauthorized: Client setting modifications are restricted to managers and administrators.")
+    if user_client_id is not None and client.id != user_client_id:
+        raise HTTPException(status_code=403, detail="Unauthorized: You do not have permission to modify settings for this client account.")
+    """Endpoint to handle questionnaire form settings update."""
+    try:
+        conn = db_router.connect()
+        cursor = conn.cursor()
+        
+        # Extract column names dynamically
+        cursor.execute("PRAGMA table_info(clients)")
+        cols = [col[1] for col in cursor.fetchall()]
+        
+        # Verify client exists and fetch old settings using explicit columns order to avoid zip misalignment on PostgreSQL
+        cols_formatted = ", ".join([f'"{c}"' for c in cols])
+        cursor.execute(f"SELECT {cols_formatted} FROM clients WHERE id = ?", (client.id,))
+        client_row = cursor.fetchone()
+        if not client_row:
+            raise HTTPException(status_code=404, detail="Client not found")
+            
+        old_data = dict(zip(cols, client_row))
+        
+        # Field label mappings for change history log
+        FIELD_LABELS = {
+            "name": "Client Business Name",
+            "call_tracking_provider": "Call Tracking Provider",
+            "callrail_account_id": "CallRail Account ID",
+            "callrail_company_id": "CallRail Client ID",
+            "ctm_account_id": "CallTrackingMetrics Account ID",
+            "ctm_profile_id": "CallTrackingMetrics Client ID",
+            "wc_account_id": "WhatConverts Account ID",
+            "wc_profile_id": "WhatConverts Client ID",
+            "google_ads_customer_id": "Google Ads Customer ID",
+            "facebook_ads_id": "Facebook Ads Pixel/Account ID",
+            "linkedin_ads_id": "LinkedIn Ads Account ID",
+            "microsoft_ads_id": "Microsoft Ads Account ID",
+            "tiktok_ads_id": "TikTok Ads Pixel/Account ID",
+            "twitter_ads_id": "X (Twitter) Ads Pixel ID",
+            "pinterest_ads_id": "Pinterest Ads ID",
+            "snapchat_ads_id": "Snapchat Ads Pixel ID",
+            "chatgpt_ads_id": "ChatGPT Ads ID",
+            "reddit_ads_id": "Reddit Ads Account / Pixel ID",
+            "lead_gen_method": "Lead Gen Method",
+            "qualification_criteria": "Qualification Criteria Option",
+            "source_of_truth": "Single Source of Truth",
+            "email_provider": "Email Provider",
+            "email_account": "Email Integration Account #1",
+            "email_app_password": "Email Integration App Password #1",
+            "email_account_2": "Email Integration Account #2",
+            "email_app_password_2": "Email Integration App Password #2",
+            "email_account_3": "Email Integration Account #3",
+            "email_app_password_3": "Email Integration App Password #3",
+            "email_account_4": "Email Integration Account #4",
+            "email_app_password_4": "Email Integration App Password #4",
+            "email_account_5": "Email Integration Account #5",
+            "email_app_password_5": "Email Integration App Password #5",
+            "crm_deal_tags": "CRM Deal Tags",
+            "crm_won_deal_tags": "CRM Won Deal Tags",
+            "crm_value_field": "Google Sheet Transaction Value Column",
+            "crm_lead_tags": "CRM Lead Qualification Tags",
+            "lead_count_rule": "Lead Count Optimization Rule",
+            "exclude_past_customers": "Exclude Past Customers Setting"
+        }
+        
+        new_data = {
+            "name": client.name,
+            "call_tracking_provider": client.call_tracking_provider or "callrail",
+            "callrail_account_id": client.callrail_account_id or "",
+            "callrail_company_id": client.callrail_company_id or "",
+            "ctm_account_id": client.ctm_account_id or "",
+            "ctm_profile_id": client.ctm_profile_id or "",
+            "wc_account_id": client.wc_account_id or "",
+            "wc_profile_id": client.wc_profile_id or "",
+            "google_ads_customer_id": client.google_ads_customer_id,
+            "facebook_ads_id": client.facebook_ads_id or "",
+            "linkedin_ads_id": client.linkedin_ads_id or "",
+            "microsoft_ads_id": client.microsoft_ads_id or "",
+            "tiktok_ads_id": client.tiktok_ads_id or "",
+            "twitter_ads_id": client.twitter_ads_id or "",
+            "pinterest_ads_id": client.pinterest_ads_id or "",
+            "snapchat_ads_id": client.snapchat_ads_id or "",
+            "chatgpt_ads_id": client.chatgpt_ads_id or "",
+            "reddit_ads_id": client.reddit_ads_id or "",
+            "lead_gen_method": client.lead_gen_method,
+            "qualification_criteria": client.qualification_criteria,
+            "source_of_truth": client.source_of_truth,
+            "email_provider": client.email_provider or "",
+            "email_account": client.email_account or "",
+            "email_app_password": client.email_app_password or "",
+            "email_account_2": client.email_account_2 or "",
+            "email_app_password_2": client.email_app_password_2 or "",
+            "email_account_3": client.email_account_3 or "",
+            "email_app_password_3": client.email_app_password_3 or "",
+            "email_account_4": client.email_account_4 or "",
+            "email_app_password_4": client.email_app_password_4 or "",
+            "email_account_5": client.email_account_5 or "",
+            "email_app_password_5": client.email_app_password_5 or "",
+            "crm_deal_tags": client.crm_deal_tags or "",
+            "crm_won_deal_tags": client.crm_won_deal_tags or "",
+            "crm_value_field": getattr(client, 'crm_value_field', '') or "",
+            "crm_lead_tags": client.crm_lead_tags or "",
+            "lead_count_rule": client.lead_count_rule,
+            "exclude_past_customers": client.exclude_past_customers
+        }
+
+        # Scan each field and write updates to client_config_history
+        for field, label in FIELD_LABELS.items():
+            old_val = str(old_data.get(field) or "").strip()
+            new_val = str(new_data.get(field) or "").strip()
+            if old_val != new_val:
+                cursor.execute("""
+                    INSERT INTO client_config_history (client_id, changed_by, feature_name, old_value, new_value)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (client.id, email, label, old_val, new_val))
+            
+        # Update settings
+        cursor.execute("""
+            UPDATE clients SET
+                name = ?,
+                callrail_account_id = ?,
+                callrail_company_id = ?,
+                google_ads_customer_id = ?,
+                facebook_ads_id = ?,
+                linkedin_ads_id = ?,
+                microsoft_ads_id = ?,
+                tiktok_ads_id = ?,
+                twitter_ads_id = ?,
+                pinterest_ads_id = ?,
+                snapchat_ads_id = ?,
+                chatgpt_ads_id = ?,
+                reddit_ads_id = ?,
+                lead_gen_method = ?,
+                qualification_criteria = ?,
+                source_of_truth = ?,
+                email_provider = ?,
+                email_account = ?,
+                email_app_password = ?,
+                email_account_2 = ?,
+                email_app_password_2 = ?,
+                email_account_3 = ?,
+                email_app_password_3 = ?,
+                email_account_4 = ?,
+                email_app_password_4 = ?,
+                email_account_5 = ?,
+                email_app_password_5 = ?,
+                crm_deal_tags = ?,
+                crm_won_deal_tags = ?,
+                crm_value_field = ?,
+                crm_lead_tags = ?,
+                lead_count_rule = ?,
+                exclude_past_customers = ?,
+                call_tracking_provider = ?,
+                ctm_account_id = ?,
+                ctm_profile_id = ?,
+                wc_account_id = ?,
+                wc_profile_id = ?
+            WHERE id = ?
+        """, (
+            str(client.name or ""),
+            client.callrail_account_id or None,
+            client.callrail_company_id or None,
+            str(client.google_ads_customer_id or ""),
+            str(client.facebook_ads_id or ""),
+            str(client.linkedin_ads_id or ""),
+            str(client.microsoft_ads_id or ""),
+            str(client.tiktok_ads_id or ""),
+            str(client.twitter_ads_id or ""),
+            str(client.pinterest_ads_id or ""),
+            str(client.snapchat_ads_id or ""),
+            str(client.chatgpt_ads_id or ""),
+            str(getattr(client, 'reddit_ads_id', '') or ""),
+            str(client.lead_gen_method or "both"),
+            str(client.qualification_criteria or "ai_rules"),
+            str(client.source_of_truth or "manual"),
+            str(client.email_provider or ""),
+            str(client.email_account or ""),
+            str(client.email_app_password or ""),
+            str(client.email_account_2 or ""),
+            str(client.email_app_password_2 or ""),
+            str(client.email_account_3 or ""),
+            str(client.email_app_password_3 or ""),
+            str(client.email_account_4 or ""),
+            str(client.email_app_password_4 or ""),
+            str(client.email_account_5 or ""),
+            str(client.email_app_password_5 or ""),
+            str(client.crm_deal_tags or ""),
+            str(client.crm_won_deal_tags or ""),
+            str(getattr(client, 'crm_value_field', '') or ""),
+            str(client.crm_lead_tags or ""),
+            str(client.lead_count_rule or "all"),
+            str(client.exclude_past_customers or "NO"),
+            str(client.call_tracking_provider or "callrail"),
+            str(client.ctm_account_id or ""),
+            str(client.ctm_profile_id or ""),
+            str(client.wc_account_id or ""),
+            str(client.wc_profile_id or ""),
+            int(client.id)
+        ))
+        
+        # Handle excluded customers updates if a new list was uploaded
+        if client.excluded_customers is not None and len(client.excluded_customers) > 0:
+            if getattr(client, 'exclusion_action', 'append') == 'replace':
+                cursor.execute("DELETE FROM excluded_customers WHERE client_id = ?", (client.id,))
+                
+            for cust in client.excluded_customers:
+                normalized_p = normalize_phone(cust.phone)
+                email_clean = cust.email.strip().lower() if cust.email else ""
+                
+                # Check for duplicates before inserting in append mode
+                if getattr(client, 'exclusion_action', 'append') == 'append':
+                    exists = False
+                    if normalized_p:
+                        cursor.execute("SELECT id FROM excluded_customers WHERE client_id = ? AND phone = ?", (client.id, normalized_p))
+                        if cursor.fetchone():
+                            exists = True
+                    if not exists and email_clean:
+                        cursor.execute("SELECT id FROM excluded_customers WHERE client_id = ? AND email = ?", (client.id, email_clean))
+                        if cursor.fetchone():
+                            exists = True
+                    if exists:
+                        continue # Skip duplicate record
+                        
+                cursor.execute("""
+                    INSERT INTO excluded_customers (client_id, first_name, last_name, email, phone, company_name)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (
+                    client.id,
+                    cust.first_name,
+                    cust.last_name,
+                    email_clean,
+                    normalized_p,
+                    cust.company_name
+                ))
+        
+        conn.commit()
+        conn.close()
+        return {"status": "success", "message": f"Settings for '{client.name}' updated successfully!"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database update error: {str(e)}")
 
 

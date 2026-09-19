@@ -1,13 +1,13 @@
-import os
-import sqlite3
-import re
-from fastapi import APIRouter, Request, HTTPException
+from models.schemas import UserRoleUpdate, UserDelete, InviteRoleUpdate, InviteDelete, UserInvite, SaleAdjustment, ClientCreate, ClientUpdate, ExcludedCustomer
+from pydantic import BaseModel
+from fastapi import APIRouter, Request, HTTPException, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from typing import Optional
-from database.connection import db_router
+from models.schemas import ClientCreate, ClientUpdate, ExcludedCustomer
 from services.auth_service import is_authenticated, get_user_role_and_client
-from models.schemas import ClientCreate, ClientUpdate, UserInvite, UserRoleUpdate, UserDelete, InviteRoleUpdate, InviteDelete
-from config import CRITERIA_MAP, SOT_MAP, ADMIN_EMAILS
+from security.tenant_guard import verify_tenant_access
+from database.connection import db_router
+from config import CRITERIA_MAP, SOT_MAP
 
 router = APIRouter()
 
@@ -205,15 +205,15 @@ def view_settings(request: Request, client_id: Optional[int] = None):
         p_wc_style = 'display: flex;' if active_provider == 'whatconverts' else 'display: none;'
 
         if active_provider == "calltrackingmetrics":
-            webhook_card_title = " CallTrackingMetrics Transcription Webhook"
+            webhook_card_title = "📞 CallTrackingMetrics Transcription Webhook"
             webhook_card_desc = "Paste this dynamic endpoint into CallTrackingMetrics webhook setup to sync automated call recordings and transcripts:"
             webhook_suffix = f"/webhooks/calltrackingmetrics?client_id={active_client_id}"
         elif active_provider == "whatconverts":
-            webhook_card_title = " WhatConverts CallCompleted Webhook"
+            webhook_card_title = "📞 WhatConverts CallCompleted Webhook"
             webhook_card_desc = "Paste this dynamic endpoint into WhatConverts webhook setup to sync automated call recordings and transcripts:"
             webhook_suffix = f"/webhooks/whatconverts?client_id={active_client_id}"
         else:
-            webhook_card_title = " CallRail CallCompleted Webhook"
+            webhook_card_title = "📞 CallRail CallCompleted Webhook"
             webhook_card_desc = "Paste this dynamic endpoint into CallRail Integration Settings to sync automated call recordings and transcripts:"
             webhook_suffix = f"/webhooks/callrail?client_id={active_client_id}" 
         
@@ -424,11 +424,11 @@ def view_settings(request: Request, client_id: Optional[int] = None):
     
     # Configure read-only form elements mapping
     if is_readonly:
-        save_btn_html = "<div style=\"background-color: #fff3cd; color: #856404; padding: 15px; border-radius: 6px; font-weight: bold; font-size: 13px; border: 1px solid #ffeeba; display: flex; align-items: center; gap: 8px;\"> Read-Only: You have view-only access to the configuration section.</div>"
+        save_btn_html = "<div style=\"background-color: #fff3cd; color: #856404; padding: 15px; border-radius: 6px; font-weight: bold; font-size: 13px; border: 1px solid #ffeeba; display: flex; align-items: center; gap: 8px;\">🔒 Read-Only: You have view-only access to the configuration section.</div>"
         fieldset_disabled_attr = "disabled"
         invite_form_display = "none"
     else:
-        save_btn_html = "<button type=\"submit\" id=\"btn-settings-submit\" class=\"btn-submit\"> Save Configuration Changes</button>"
+        save_btn_html = "<button type=\"submit\" id=\"btn-settings-submit\" class=\"btn-submit\">💾 Save Configuration Changes</button>"
         fieldset_disabled_attr = "" 
 
     # Generate the Selector Dropdown Options for the Settings Header
@@ -436,11 +436,11 @@ def view_settings(request: Request, client_id: Optional[int] = None):
     if user_client_id is not None:
         restricted_clients = [c for c in all_clients if c[0] == user_client_id]
         for c_id, c_name, c_ads in restricted_clients:
-            dropdown_options += f'<option value="{c_id}" selected> {c_name} (Ads: {c_ads})</option>'
+            dropdown_options += f'<option value="{c_id}" selected>👤 {c_name} (Ads: {c_ads})</option>'
     else:
         for c_id, c_name, c_ads in all_clients:
             is_selected = "selected" if active_client_id == c_id else ""
-            dropdown_options += f'<option value="{c_id}" {is_selected}> {c_name} (Ads: {c_ads})</option>'
+            dropdown_options += f'<option value="{c_id}" {is_selected}>👤 {c_name} (Ads: {c_ads})</option>'
 
     # Handle dropdown lists with pre-selected options
     lead_gen_both_checked = "checked" if client_data.get("lead_gen_method") == "both" else ""
@@ -476,15 +476,15 @@ def view_settings(request: Request, client_id: Optional[int] = None):
     client_name = client_data.get("name", "")
     admin_link_html = ""
     if email in ADMIN_EMAILS:
-        admin_link_html = ' | <a href="/admin/users" style="color: #2e7d32; text-decoration: none; font-weight: bold; margin-left: 5px;">️ Admin User Directory</a>'
+        admin_link_html = ' | <a href="/admin/users" style="color: #2e7d32; text-decoration: none; font-weight: bold; margin-left: 5px;">🛡️ Admin User Directory</a>'
         
     user_header_bar = f"""
     <div style="display: flex; justify-content: space-between; align-items: center; background-color: #f1f3f4; padding: 10px 15px; border-radius: 6px; margin-bottom: 20px; font-size: 13px;">
         <div>
-            <span style="color: #666; font-weight: bold;"> Active Session:</span> <span style="font-weight: bold; color: #1a237e;">{email}</span>
+            <span style="color: #666; font-weight: bold;">👤 Active Session:</span> <span style="font-weight: bold; color: #1a237e;">{email}</span>
             {admin_link_html}
         </div>
-        <a href="/logout" style="color: #c62828; text-decoration: none; font-weight: bold; display: flex; align-items: center; gap: 4px;"> Log Out</a>
+        <a href="/logout" style="color: #c62828; text-decoration: none; font-weight: bold; display: flex; align-items: center; gap: 4px;">🚪 Log Out</a>
     </div>
     """
 
@@ -685,7 +685,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.15); padding-bottom: 15px; flex-wrap: wrap; gap: 10px;">
                     <div>
                         <h2 style="margin: 0; font-size: 18px; color: #ffffff; display: flex; align-items: center; gap: 8px;">
-                             Offline Conversion Funnel Architecture
+                            🎯 Offline Conversion Funnel Architecture
                         </h2>
                         <p style="margin: 4px 0 0 0; font-size: 12px; color: #e8eaf6;">
                             Google Ads Conversion Menu Mapping & Offline Feedback Loop for <strong>{client_name}</strong>
@@ -699,7 +699,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                 <!-- VISUAL SALES FUNNEL DIAGRAM GRAPHIC -->
                 <div style="background: rgba(0, 0, 0, 0.25); border-radius: 10px; padding: 22px 20px; margin-bottom: 25px; border: 1px solid rgba(255,255,255,0.15); box-shadow: inset 0 2px 10px rgba(0,0,0,0.2);">
                     <div style="text-align: center; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #90caf9; margin-bottom: 15px;">
-                         Active Client Sales Funnel Graphic & Tracking Overlays
+                        📐 Active Client Sales Funnel Graphic & Tracking Overlays
                     </div>
 
                     <div style="max-width: 780px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 6px;">
@@ -707,7 +707,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         <!-- Funnel Tier 1: All Inbound Clicks & Leads -->
                         <div style="width: 100%; background: linear-gradient(90deg, #1565c0 0%, #1e88e5 100%); padding: 12px 16px; border-radius: 8px 8px 3px 3px; text-align: center; box-shadow: 0 3px 6px rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.2); position: relative;">
                             <div style="font-size: 12px; font-weight: bold; color: #ffffff; display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap;">
-                                <span> 1. Inbound Leads & Traffic Capture</span>
+                                <span>🌐 1. Inbound Leads & Traffic Capture</span>
                                 <span style="font-size: 10px; background: rgba(0,0,0,0.25); padding: 2px 8px; border-radius: 10px; color: #e3f2fd;">GCLID / FBCLID / MSCLKID</span>
                             </div>
                             <div id="funnel-tier1-source" style="font-size: 11px; color: #e3f2fd; margin-top: 3px;">
@@ -724,7 +724,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                 a) QUALIFIED LEADS TRACKING
                             </div>
                             <div id="funnel-qual-heading" style="font-size: 13px; font-weight: bold; color: #ffffff; margin-top: 2px;">
-                                 {qual_overlay_heading}
+                                🎯 {qual_overlay_heading}
                             </div>
                             <div id="funnel-qual-rule" style="font-size: 11px; color: #e0f7fa; font-style: italic; margin-top: 4px; background: rgba(0,0,0,0.22); padding: 5px 10px; border-radius: 4px; border-left: 3px solid #80deea;">
                                 {qual_rule_text}
@@ -740,7 +740,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                 b) WON DEALS & REVENUE TRACKING
                             </div>
                             <div id="funnel-won-heading" style="font-size: 13px; font-weight: bold; color: #ffffff; margin-top: 2px;">
-                                 {won_overlay_heading}
+                                💰 {won_overlay_heading}
                             </div>
                             <div id="funnel-won-source" style="font-size: 11px; color: #e8f5e9; font-style: italic; margin-top: 4px; background: rgba(0,0,0,0.22); padding: 5px 10px; border-radius: 4px; border-left: 3px solid #a5d6a7;">
                                 {won_source_text}
@@ -753,7 +753,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         <!-- Funnel Spout: Ad Network Offline Sync -->
                         <div style="width: 48%; min-width: 260px; background: linear-gradient(90deg, #f57f17 0%, #fbc02d 100%); padding: 8px 12px; border-radius: 3px 3px 8px 8px; text-align: center; box-shadow: 0 3px 8px rgba(0,0,0,0.3); border: 1.5px solid #ffe082; color: #000;">
                             <div style="font-size: 11px; font-weight: 900; color: #212121; text-transform: uppercase; letter-spacing: 0.5px;">
-                                 Smart Bidding Feedback Loop
+                                🚀 Smart Bidding Feedback Loop
                             </div>
                             <div id="funnel-ad-platforms-spout" style="font-size: 10px; color: #37474f; font-weight: bold;">
                                 {ad_platforms_display}
@@ -770,7 +770,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     <div style="background: rgba(255,255,255,0.08); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.18); border-radius: 10px; padding: 16px; position: relative;">
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
                             <span style="font-size: 10px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; color: #90caf9;">Stage 1</span>
-                            <span style="font-size: 18px;"></span>
+                            <span style="font-size: 18px;">📞</span>
                         </div>
                         <h3 style="margin: 0 0 6px 0; font-size: 13px; font-weight: bold; color: #ffffff;">1. Lead Capture & Click IDs</h3>
                         <p id="stage1-card-desc" style="margin: 0; font-size: 11px; color: #c5cae9; line-height: 1.4;">
@@ -786,7 +786,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     <div style="background: rgba(255,255,255,0.08); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.18); border-radius: 10px; padding: 16px; position: relative;">
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
                             <span style="font-size: 10px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; color: #80deea;">Stage 2</span>
-                            <span style="font-size: 18px;"></span>
+                            <span style="font-size: 18px;">🤖</span>
                         </div>
                         <h3 style="margin: 0 0 6px 0; font-size: 13px; font-weight: bold; color: #ffffff;">2. AI Qualification Audit</h3>
                         <p id="stage2-card-desc" style="margin: 0; font-size: 11px; color: #c5cae9; line-height: 1.4;">
@@ -802,7 +802,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     <div style="background: rgba(255,255,255,0.08); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.18); border-radius: 10px; padding: 16px; position: relative;">
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
                             <span style="font-size: 10px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; color: #a5d6a7;">Stage 3</span>
-                            <span style="font-size: 18px;"></span>
+                            <span style="font-size: 18px;">💳</span>
                         </div>
                         <h3 style="margin: 0 0 6px 0; font-size: 13px; font-weight: bold; color: #ffffff;">3. Closed Sale & Revenue Match</h3>
                         <p id="stage3-card-desc" style="margin: 0; font-size: 11px; color: #c5cae9; line-height: 1.4;">
@@ -818,7 +818,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     <div style="background: rgba(255,255,255,0.08); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.18); border-radius: 10px; padding: 16px; position: relative;">
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
                             <span style="font-size: 10px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; color: #ffe082;">Stage 4</span>
-                            <span style="font-size: 18px;"></span>
+                            <span style="font-size: 18px;">🚀</span>
                         </div>
                         <h3 style="margin: 0 0 6px 0; font-size: 13px; font-weight: bold; color: #ffffff;">4. Conversion Upload & Bidding</h3>
                         <p id="stage4-card-desc" style="margin: 0; font-size: 11px; color: #c5cae9; line-height: 1.4;">
@@ -843,7 +843,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         <!-- LEFT COLUMN: Configurations -->
                         <div>
                             <!-- SECTION 1: Accounts -->
-                            <div class="section-title"> Profile & Ad Accounts</div>
+                            <div class="section-title">🏢 Profile & Ad Accounts</div>
                             
                             <div class="form-group">
                                 <label for="name">Client Business Name</label>
@@ -942,7 +942,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                     <div style="display: flex; align-items: center; gap: 6px;">
                                         <label for="twitter_ads_id" style="margin-bottom: 0;">X (Twitter) Ads Pixel ID</label>
                                         <span class="tooltip-icon">
-                                            
+                                            💬
                                             <span class="tooltip-text" style="width: 250px;">
                                                 ⚠️ <strong>Manual UTM required:</strong> To track X click IDs (twclid) via CallRail/form submissions, you must manually append <code>?twclid={{click_id}}</code> to your X Ad destination URLs.
                                             </span>
@@ -956,7 +956,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             </div>
                             
                             <!-- SECTION 2: Lead Gen & Qualification -->
-                            <div class="section-title"> Lead Generation & AI Auditing</div>
+                            <div class="section-title">🧠 Lead Generation & AI Auditing</div>
                             
                             <div class="form-group">
                                 <label>How do you generate your leads?</label>
@@ -985,7 +985,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             <div class="form-group">
                                 <label for="qualification_criteria" style="display: inline-flex; align-items: center; gap: 5px;">
                                     How do you qualify a lead?
-                                    <span class="tooltip">
+                                    <span class="tooltip">💬
                                         <span class="tooltiptext">Define a lead stage that is &quot;good enough&quot;, and would be happy with paying for all day long from your Ads. This is the minimum standard the system will go for when optimizing your Ads.</span>
                                     </span>
                                 </label>
@@ -995,7 +995,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             </div>
                             
                             <!-- SECTION 4: Smart Deduplication -->
-                            <div class="section-title"> Smart Conversion Controls</div>
+                            <div class="section-title">💰 Smart Conversion Controls</div>
                             
                             <div class="form-group">
                                 <label>How should we track multiple leads from the same customer?</label>
@@ -1039,17 +1039,17 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             </p>
                             <div id="exclusion-upload-box" class="conditional-box" style="display: {'block' if client_data.get('exclude_past_customers') == 'YES' else 'none'}; padding: 15px; margin-top: 10px;">
                                 <div class="instructions" style="background-color: #f1f8e9; border-left-color: #2e7d32; color: #2e7d32; margin-bottom: 15px; font-size: 12px; line-height: 1.5; padding: 12px;">
-                                     <strong>Upload Past Customers to Ignore:</strong><br>
+                                    📂 <strong>Upload Past Customers to Ignore:</strong><br>
                                     Upload your list of customers, to use to ignore future conversion triggering. Only one piece of information is needed for each user in order to do this, but more data points for each user is best, for higher match rates. Here is a sample sheet that you can use to fill in, or you can provide your own sheet that have "first name, last name, email, phone number, company name" as the column headers.
                                 </div>
                                 <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 15px; flex-wrap: wrap;">
-                                    <button type="button" onclick="triggerSampleSheetDownload()" class="btn-copy" style="background-color: #1a237e; padding: 8px 12px; font-size: 11px;"> Download Sample Sheet (.CSV)</button>
-                                    <a href="/dashboard/export/exclusions?client_id={active_client_id}" id="btn-download-exclusions" class="btn-copy" style="background-color: #607d8b; padding: 8px 12px; font-size: 11px; text-decoration: none; display: {'inline-block' if exclusion_count > 0 else 'none'};"> Download Current Exclusions ({exclusion_count})</a>
+                                    <button type="button" onclick="triggerSampleSheetDownload()" class="btn-copy" style="background-color: #1a237e; padding: 8px 12px; font-size: 11px;">📥 Download Sample Sheet (.CSV)</button>
+                                    <a href="/dashboard/export/exclusions?client_id={active_client_id}" id="btn-download-exclusions" class="btn-copy" style="background-color: #607d8b; padding: 8px 12px; font-size: 11px; text-decoration: none; display: {'inline-block' if exclusion_count > 0 else 'none'};">📥 Download Current Exclusions ({exclusion_count})</a>
                                     <input type="file" id="exclusion-file-input" accept=".csv" onchange="handleExclusionFileUpload(event)" style="display: none;">
-                                    <button type="button" onclick="document.getElementById('exclusion-file-input').click()" class="btn-copy" style="background-color: #2e7d32; padding: 8px 12px; font-size: 11px;"> Choose File & Upload (.CSV)</button>
+                                    <button type="button" onclick="document.getElementById('exclusion-file-input').click()" class="btn-copy" style="background-color: #2e7d32; padding: 8px 12px; font-size: 11px;">📤 Choose File & Upload (.CSV)</button>
                                 </div>
                                 <div style="margin-top: 15px; margin-bottom: 15px; background: #fff; padding: 12px; border: 1px solid #e0e0e0; border-radius: 6px;">
-                                    <label style="font-weight: bold; font-size: 12px; margin-bottom: 8px; display: block; color: #1a237e;"> Exclusions Upload Strategy:</label>
+                                    <label style="font-weight: bold; font-size: 12px; margin-bottom: 8px; display: block; color: #1a237e;">🔄 Exclusions Upload Strategy:</label>
                                     <div style="display: flex; gap: 20px; align-items: center;">
                                         <label style="font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 12px; margin: 0;">
                                             <input type="radio" name="exclusion_upload_action" value="append" checked style="cursor: pointer;">
@@ -1073,7 +1073,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                 </p>
                                 <div class="webhook-input-group">
                                     <input type="text" class="webhook-input" id="exclusion-crm-webhook" readonly value="" data-suffix="/webhooks/exclude-customer?client_id={active_client_id}">
-                                    <button type="button" onclick="copyText('exclusion-crm-webhook', 'exclusion-crm-copy-btn')" id="exclusion-crm-copy-btn" class="btn-copy"> Copy</button>
+                                    <button type="button" onclick="copyText('exclusion-crm-webhook', 'exclusion-crm-copy-btn')" id="exclusion-crm-copy-btn" class="btn-copy">📋 Copy</button>
                                 </div>
                             </div>
 
@@ -1082,7 +1082,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         <!-- RIGHT COLUMN: Webhooks & SOT Integration -->
                         <div>
                             <!-- SECTION 3: SOT Integration -->
-                            <div class="section-title"> Single Source of Truth Settings</div>
+                            <div class="section-title">🔌 Single Source of Truth Settings</div>
                             
                             <div class="form-group">
                                 <label for="source_of_truth">Single Source of Truth Platform</label>
@@ -1105,7 +1105,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             
                                                     <div id="sot-hubspot-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #fff8e1; border-left: 4px solid #ffb300; padding: 15px; border-radius: 4px; color: #5d4037; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                 <strong>HubSpot Private App Quick Setup Guide:</strong><br>
+                                💡 <strong>HubSpot Private App Quick Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #4e342e;">
                                     <li>Log into HubSpot as a <strong>Super Admin</strong>.</li>
                                     <li>Go to <strong>Settings (Gear Icon) &gt; Integrations &gt; Private Apps</strong>.</li>
@@ -1122,14 +1122,14 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                     <label style="font-size: 11px; font-weight: bold; color: #5d4037; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
                                     <div class="webhook-input-group">
                                         <input type="text" class="webhook-input" id="sot-hubspot-instructions-box-input" readonly value="" data-suffix="/webhooks/crm?client_id={active_client_id}">
-                                        <button type="button" onclick="copyText('sot-hubspot-instructions-box-input', 'sot-hubspot-instructions-box-btn')" id="sot-hubspot-instructions-box-btn" class="btn-copy"> Copy Webhook URL</button>
+                                        <button type="button" onclick="copyText('sot-hubspot-instructions-box-input', 'sot-hubspot-instructions-box-btn')" id="sot-hubspot-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         <div id="sot-salesforce-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #e3f2fd; border-left: 4px solid #1e88e5; padding: 15px; border-radius: 4px; color: #0d47a1; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                 <strong>Salesforce Outbound Flow Setup Guide:</strong><br>
+                                💡 <strong>Salesforce Outbound Flow Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #1565c0;">
                                 <li>In Salesforce Setup, go to <strong>Named Credentials &gt; External Credentials</strong> tab, click <strong>New</strong>. Label <code>LeadGroove External Credential</code>, Name <code>LeadGroove_External_Credential</code>, Protocol <strong>Custom</strong>. Save, scroll to <em>Principals</em>, click <strong>New</strong> and define a principal named <code>LeadGroove_Principal</code>.</li>
                                 <li>Create a <strong>Permission Set</strong> in Setup named <code>LeadGroove Webhook Access</code>. In it, click <strong>External Credential Principal Access</strong>, enable your new credential and principal, and assign this permission set to any integrating users.</li>
@@ -1141,14 +1141,14 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                     <label style="font-size: 11px; font-weight: bold; color: #0d47a1; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
                                     <div class="webhook-input-group">
                                         <input type="text" class="webhook-input" id="sot-salesforce-instructions-box-input" readonly value="" data-suffix="/webhooks/crm?client_id={active_client_id}">
-                                        <button type="button" onclick="copyText('sot-salesforce-instructions-box-input', 'sot-salesforce-instructions-box-btn')" id="sot-salesforce-instructions-box-btn" class="btn-copy"> Copy Webhook URL</button>
+                                        <button type="button" onclick="copyText('sot-salesforce-instructions-box-input', 'sot-salesforce-instructions-box-btn')" id="sot-salesforce-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         <div id="sot-zoho-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #e8f5e9; border-left: 4px solid #2e7d32; padding: 15px; border-radius: 4px; color: #1b5e20; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                 <strong>Zoho CRM Outbound Webhook Setup Guide:</strong><br>
+                                💡 <strong>Zoho CRM Outbound Webhook Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #2e7d32;">
                                 <li>Click the <strong>Setup (Gear Icon)</strong> in the top-right corner of your Zoho CRM dashboard.</li>
                                 <li>Under <strong>Automation</strong>, click on <strong>Actions</strong>, then select the <strong>Webhooks</strong> tab at the top.</li>
@@ -1159,14 +1159,14 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                     <label style="font-size: 11px; font-weight: bold; color: #1b5e20; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
                                     <div class="webhook-input-group">
                                         <input type="text" class="webhook-input" id="sot-zoho-instructions-box-input" readonly value="" data-suffix="/webhooks/crm?client_id={active_client_id}">
-                                        <button type="button" onclick="copyText('sot-zoho-instructions-box-input', 'sot-zoho-instructions-box-btn')" id="sot-zoho-instructions-box-btn" class="btn-copy"> Copy Webhook URL</button>
+                                        <button type="button" onclick="copyText('sot-zoho-instructions-box-input', 'sot-zoho-instructions-box-btn')" id="sot-zoho-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         <div id="sot-servicetitan-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #f3f4f6; border-left: 4px solid #4b5563; padding: 15px; border-radius: 4px; color: #1f2937; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                 <strong>ServiceTitan Webhooks V2 Quick Setup Guide:</strong><br>
+                                💡 <strong>ServiceTitan Webhooks V2 Quick Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #374151;">
                                     <li>Navigate to the <strong>ServiceTitan Developer Portal</strong> at <a href="https://developer.servicetitan.io" target="_blank" style="color: #1a237e; font-weight: bold; text-decoration: none;">developer.servicetitan.io</a>.</li>
                                     <li>Click <strong>Create and Manage Applications ➡️ Create New App</strong>. Name it <code>LeadGroove Webhook Sync</code> and set scopes <code>crm.objects.leads.read</code> / <code>jpm.objects.jobs.read</code>.</li>
@@ -1176,14 +1176,14 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                     <label style="font-size: 11px; font-weight: bold; color: #1f2937; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
                                     <div class="webhook-input-group">
                                         <input type="text" class="webhook-input" id="sot-servicetitan-instructions-box-input" readonly value="" data-suffix="/webhooks/crm?client_id={active_client_id}">
-                                        <button type="button" onclick="copyText('sot-servicetitan-instructions-box-input', 'sot-servicetitan-instructions-box-btn')" id="sot-servicetitan-instructions-box-btn" class="btn-copy"> Copy Webhook URL</button>
+                                        <button type="button" onclick="copyText('sot-servicetitan-instructions-box-input', 'sot-servicetitan-instructions-box-btn')" id="sot-servicetitan-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         <div id="sot-gohighlevel-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #e8eaf6; border-left: 4px solid #3f51b5; padding: 15px; border-radius: 4px; color: #1a237e; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                 <strong>GoHighLevel (GHL) Workflow Webhook Setup Guide:</strong><br>
+                                💡 <strong>GoHighLevel (GHL) Workflow Webhook Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #1a237e;">
                                 <li>Log into your <strong>GoHighLevel Sub-Account / Agency Portal</strong>.</li>
                                 <li>Go to <strong>Automation ➡️ Workflows</strong> and click <strong>+ Create Workflow</strong>.</li>
@@ -1195,14 +1195,14 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                     <label style="font-size: 11px; font-weight: bold; color: #1a237e; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
                                     <div class="webhook-input-group">
                                         <input type="text" class="webhook-input" id="sot-gohighlevel-instructions-box-input" readonly value="" data-suffix="/webhooks/crm?client_id={active_client_id}">
-                                        <button type="button" onclick="copyText('sot-gohighlevel-instructions-box-input', 'sot-gohighlevel-instructions-box-btn')" id="sot-gohighlevel-instructions-box-btn" class="btn-copy"> Copy Webhook URL</button>
+                                        <button type="button" onclick="copyText('sot-gohighlevel-instructions-box-input', 'sot-gohighlevel-instructions-box-btn')" id="sot-gohighlevel-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         <div id="sot-housecallpro-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #fff3e0; border-left: 4px solid #e65100; padding: 15px; border-radius: 4px; color: #e65100; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                 <strong>Housecall Pro Webhooks Quick Setup Guide:</strong><br>
+                                💡 <strong>Housecall Pro Webhooks Quick Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #e65100;">
                                     <li>Sign in as an <strong>Admin</strong> user in Housecall Pro.</li>
                                     <li>Go to <strong>My Apps ➡️ All Apps</strong>, search for <strong>Webhooks</strong>, and click to open.</li>
@@ -1213,14 +1213,14 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                     <label style="font-size: 11px; font-weight: bold; color: #e65100; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
                                     <div class="webhook-input-group">
                                         <input type="text" class="webhook-input" id="sot-housecallpro-instructions-box-input" readonly value="" data-suffix="/webhooks/crm?client_id={active_client_id}">
-                                        <button type="button" onclick="copyText('sot-housecallpro-instructions-box-input', 'sot-housecallpro-instructions-box-btn')" id="sot-housecallpro-instructions-box-btn" class="btn-copy"> Copy Webhook URL</button>
+                                        <button type="button" onclick="copyText('sot-housecallpro-instructions-box-input', 'sot-housecallpro-instructions-box-btn')" id="sot-housecallpro-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         <div id="sot-quickbooks-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #e3f2fd; border-left: 4px solid #0288d1; padding: 15px; border-radius: 4px; color: #01579b; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                 <strong>QuickBooks Online Webhooks Setup Guide:</strong><br>
+                                💡 <strong>QuickBooks Online Webhooks Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #0277bd;">
                                     <li>Log into the <strong>Intuit Developer Portal</strong> at <a href="https://developer.intuit.com" target="_blank" style="color: #1a237e; font-weight: bold; text-decoration: none;">developer.intuit.com</a>.</li>
                                     <li>Go to <strong>Production Settings ➡️ Webhooks</strong> in your App sidebar.</li>
@@ -1231,14 +1231,14 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                     <label style="font-size: 11px; font-weight: bold; color: #01579b; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
                                     <div class="webhook-input-group">
                                         <input type="text" class="webhook-input" id="sot-quickbooks-instructions-box-input" readonly value="" data-suffix="/webhooks/billing?client_id={active_client_id}">
-                                        <button type="button" onclick="copyText('sot-quickbooks-instructions-box-input', 'sot-quickbooks-instructions-box-btn')" id="sot-quickbooks-instructions-box-btn" class="btn-copy"> Copy Webhook URL</button>
+                                        <button type="button" onclick="copyText('sot-quickbooks-instructions-box-input', 'sot-quickbooks-instructions-box-btn')" id="sot-quickbooks-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         <div id="sot-xero-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #e0f7fa; border-left: 4px solid #00b0ff; padding: 15px; border-radius: 4px; color: #006064; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                 <strong>Xero Webhooks Setup Guide:</strong><br>
+                                💡 <strong>Xero Webhooks Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #00838f;">
                                     <li>Log into <strong>Xero Developer Portal</strong> under My Apps, select your App, and open the <strong>Webhooks</strong> tab.</li>
                                     <li>Paste your live endpoint below into the <strong>Send notifications to</strong> field.</li>
@@ -1248,14 +1248,14 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                     <label style="font-size: 11px; font-weight: bold; color: #006064; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
                                     <div class="webhook-input-group">
                                         <input type="text" class="webhook-input" id="sot-xero-instructions-box-input" readonly value="" data-suffix="/webhooks/billing?client_id={active_client_id}">
-                                        <button type="button" onclick="copyText('sot-xero-instructions-box-input', 'sot-xero-instructions-box-btn')" id="sot-xero-instructions-box-btn" class="btn-copy"> Copy Webhook URL</button>
+                                        <button type="button" onclick="copyText('sot-xero-instructions-box-input', 'sot-xero-instructions-box-btn')" id="sot-xero-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         <div id="sot-zoho_books-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #e8f5e9; border-left: 4px solid #2e7d32; padding: 15px; border-radius: 4px; color: #1b5e20; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                 <strong>Zoho Books Webhooks Setup Guide:</strong><br>
+                                💡 <strong>Zoho Books Webhooks Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #1b5e20;">
                                     <li>Go to <strong>Settings ➡️ Developer Space ➡️ Webhooks</strong> in Zoho Books and click <strong>+ New Webhook</strong>.</li>
                                     <li>Paste your custom endpoint below into <strong>URL to Notify</strong>, set Module to <strong>Invoices</strong>, and select event <strong>Invoice Paid</strong>!</li>
@@ -1264,14 +1264,14 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                     <label style="font-size: 11px; font-weight: bold; color: #1b5e20; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
                                     <div class="webhook-input-group">
                                         <input type="text" class="webhook-input" id="sot-zoho_books-instructions-box-input" readonly value="" data-suffix="/webhooks/billing?client_id={active_client_id}">
-                                        <button type="button" onclick="copyText('sot-zoho_books-instructions-box-input', 'sot-zoho_books-instructions-box-btn')" id="sot-zoho_books-instructions-box-btn" class="btn-copy"> Copy Webhook URL</button>
+                                        <button type="button" onclick="copyText('sot-zoho_books-instructions-box-input', 'sot-zoho_books-instructions-box-btn')" id="sot-zoho_books-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         <div id="sot-netsuite-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #eceff1; border-left: 4px solid #455a64; padding: 15px; border-radius: 4px; color: #263238; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                 <strong>NetSuite SuiteScript Integration Guide:</strong><br>
+                                💡 <strong>NetSuite SuiteScript Integration Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #37474f;">
                                     <li>Deploy a <strong>SuiteScript 2.x User Event Script</strong> on `Invoice` or `CustomerPayment` records.</li>
                                     <li>On `afterSubmit`, trigger an outbound HTTP POST to your web receiver endpoint below.</li>
@@ -1280,14 +1280,14 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                     <label style="font-size: 11px; font-weight: bold; color: #263238; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
                                     <div class="webhook-input-group">
                                         <input type="text" class="webhook-input" id="sot-netsuite-instructions-box-input" readonly value="" data-suffix="/webhooks/billing?client_id={active_client_id}">
-                                        <button type="button" onclick="copyText('sot-netsuite-instructions-box-input', 'sot-netsuite-instructions-box-btn')" id="sot-netsuite-instructions-box-btn" class="btn-copy"> Copy Webhook URL</button>
+                                        <button type="button" onclick="copyText('sot-netsuite-instructions-box-input', 'sot-netsuite-instructions-box-btn')" id="sot-netsuite-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         <div id="sot-sage-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #fff3e0; border-left: 4px solid #e65100; padding: 15px; border-radius: 4px; color: #e65100; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                 <strong>Sage Accounting Webhooks Setup Guide:</strong><br>
+                                💡 <strong>Sage Accounting Webhooks Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #e65100;">
                                     <li>In Sage Developer Portal, configure webhooks and paste your dynamic endpoint URL below.</li>
                                     <li>Subscribe to <code>sales_invoice.paid</code> and <code>payment_received</code>!</li>
@@ -1296,14 +1296,14 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                     <label style="font-size: 11px; font-weight: bold; color: #e65100; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
                                     <div class="webhook-input-group">
                                         <input type="text" class="webhook-input" id="sot-sage-instructions-box-input" readonly value="" data-suffix="/webhooks/billing?client_id={active_client_id}">
-                                        <button type="button" onclick="copyText('sot-sage-instructions-box-input', 'sot-sage-instructions-box-btn')" id="sot-sage-instructions-box-btn" class="btn-copy"> Copy Webhook URL</button>
+                                        <button type="button" onclick="copyText('sot-sage-instructions-box-input', 'sot-sage-instructions-box-btn')" id="sot-sage-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         <div id="sot-freshbooks-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #f3e5f5; border-left: 4px solid #4a148c; padding: 15px; border-radius: 4px; color: #4a148c; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                 <strong>FreshBooks Billing Webhooks Guide:</strong><br>
+                                💡 <strong>FreshBooks Billing Webhooks Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #4a148c;">
                                     <li>Subscribe to webhook notifications in FreshBooks Developer Center and paste your endpoint below.</li>
                                     <li>Set trigger event to <code>invoice.payment.create</code>.</li>
@@ -1312,14 +1312,14 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                     <label style="font-size: 11px; font-weight: bold; color: #4a148c; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
                                     <div class="webhook-input-group">
                                         <input type="text" class="webhook-input" id="sot-freshbooks-instructions-box-input" readonly value="" data-suffix="/webhooks/billing?client_id={active_client_id}">
-                                        <button type="button" onclick="copyText('sot-freshbooks-instructions-box-input', 'sot-freshbooks-instructions-box-btn')" id="sot-freshbooks-instructions-box-btn" class="btn-copy"> Copy Webhook URL</button>
+                                        <button type="button" onclick="copyText('sot-freshbooks-instructions-box-input', 'sot-freshbooks-instructions-box-btn')" id="sot-freshbooks-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         <div id="sot-google_sheets-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #efebe9; border-left: 4px solid #4e342e; padding: 15px; border-radius: 4px; color: #4e342e; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                 <strong>Google Sheets (Live Sync via Apps Script) Setup Guide:</strong><br>
+                                💡 <strong>Google Sheets (Live Sync via Apps Script) Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #4e342e;">
                                     <li><strong>Define Lead & Won Deal Tags Above:</strong> Enter status tags in the <em>Qualified Lead Tags</em> and <em>Won Deal Tags</em> boxes above (e.g. <code>appointment-booked</code> or <code>closed-won</code>).</li>
                                     <li><strong>Format Row 1 Column Headings:</strong> Ensure your Google Sheet contains these standard Row 1 headers:
@@ -1337,14 +1337,14 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                     <label style="font-size: 11px; font-weight: bold; color: #4e342e; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
                                     <div class="webhook-input-group">
                                         <input type="text" class="webhook-input" id="sot-google_sheets-instructions-box-input" readonly value="" data-suffix="/webhooks/crm?client_id={active_client_id}">
-                                        <button type="button" onclick="copyText('sot-google_sheets-instructions-box-input', 'sot-google_sheets-instructions-box-btn')" id="sot-google_sheets-instructions-box-btn" class="btn-copy"> Copy Webhook URL</button>
+                                        <button type="button" onclick="copyText('sot-google_sheets-instructions-box-input', 'sot-google_sheets-instructions-box-btn')" id="sot-google_sheets-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
                                     </div>
                                 </div>
                             </div>
                         </div>
                                                 <div id="sot-zapier-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #f57c00; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #fff3e0; border-left: 4px solid #ff9800; padding: 15px; border-radius: 4px; color: #e65100; font-size: 13px; line-height: 1.6; margin-bottom: 0; text-align: left;">
-                                 <strong>Webhooks by Zapier Custom Setup Guide:</strong><br>
+                                💡 <strong>Webhooks by Zapier Custom Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 10px; margin-bottom: 10px; line-height: 1.8; font-size: 12px; color: #e65100;">
                                     <li><strong>Indicate Conversion Tags Above:</strong> In the fields above, enter the exact tags or statuses (e.g. <code>appointment-booked</code>, <code>closed-won</code>, <code>paid</code>) that signify a <strong>Qualified Lead</strong> and a <strong>Won Deal</strong> in your pipeline.</li>
                                     <li><strong>Create a Zap in Zapier:</strong> Set your <strong>Trigger</strong> app (e.g. Stripe, PayPal, Typeform, Calendly, or custom CRM).</li>
@@ -1366,7 +1366,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                     </div>
                                     <div style="display: flex; align-items: center; justify-content: space-around; gap: 8px; flex-wrap: wrap; text-align: center; margin-bottom: 12px;">
                                         <div style="background: #fff8e1; border: 1px solid #ffe0b2; border-radius: 6px; padding: 10px; min-width: 120px; flex: 1;">
-                                            <div style="font-size: 18px;"></div>
+                                            <div style="font-size: 18px;">📥</div>
                                             <div style="font-weight: bold; font-size: 11px; color: #e65100;">1. Trigger App</div>
                                             <div style="font-size: 10px; color: #795548;">CRM, Form, Stripe</div>
                                         </div>
@@ -1378,7 +1378,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                         </div>
                                         <div style="font-size: 16px; color: #ff9800; font-weight: bold;">➔</div>
                                         <div style="background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 6px; padding: 10px; min-width: 120px; flex: 1;">
-                                            <div style="font-size: 18px;"></div>
+                                            <div style="font-size: 18px;">🎯</div>
                                             <div style="font-weight: bold; font-size: 11px; color: #2e7d32;">3. LeadGrove Engine</div>
                                             <div style="font-size: 10px; color: #388e3c;">Ad Network Uploads</div>
                                         </div>
@@ -1400,14 +1400,14 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                     <label style="font-size: 11px; font-weight: bold; color: #f57f17; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
                                     <div class="webhook-input-group">
                                         <input type="text" class="webhook-input" id="sot-zapier-instructions-box-input" readonly value="" data-suffix="/webhooks/crm?client_id={active_client_id}">
-                                        <button type="button" onclick="copyText('sot-zapier-instructions-box-input', 'sot-zapier-instructions-box-btn')" id="sot-zapier-instructions-box-btn" class="btn-copy"> Copy Webhook URL</button>
+                                        <button type="button" onclick="copyText('sot-zapier-instructions-box-input', 'sot-zapier-instructions-box-btn')" id="sot-zapier-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         <div id="sot-monthly-email-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #e8eaf6; border-left: 4px solid #1a237e; padding: 15px; border-radius: 4px; color: #1a237e; font-size: 13px; line-height: 1.6; margin-bottom: 0; text-align: left;">
-                                 <strong>Monthly Sales Spreadsheet Email Ingestion Setup Guide:</strong><br>
+                                💡 <strong>Monthly Sales Spreadsheet Email Ingestion Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 10px; margin-bottom: 10px; line-height: 1.8; font-size: 12px; color: #1a237e;">
                                     <li><strong>Setup Email Forwarding:</strong> Set up automated forwarding or email your monthly sales spreadsheet directly to:<br>
                                         <div style="margin-top: 6px; margin-bottom: 6px; background: white; padding: 10px; border-radius: 6px; border: 1px solid #c5cae9; display: inline-block;">
@@ -1459,7 +1459,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                 <!-- Dynamic Instructions per VoIP Provider -->
 
                                 <div id="voip-inst-dialpad" class="voip-inst-card" style="display: none; background-color: #f3e5f5; border-left: 4px solid #7b1fa2; padding: 14px; border-radius: 4px; color: #4a148c; font-size: 12px; line-height: 1.5;">
-                                     <strong>Dialpad (Ai Recap) Setup Instructions:</strong><br>
+                                    💡 <strong>Dialpad (Ai Recap) Setup Instructions:</strong><br>
                                     1. In Dialpad Admin Settings, go to <strong>Integrations ➡️ Webhooks ➡️ Add Webhook</strong>.<br>
                                     2. Set Target URL to your endpoint below, and check events <strong>"call_completed"</strong> and <strong>"transcript_ready"</strong>.<br>
                                     3. Dialpad's native AI transcripts will automatically stream to LeadGrove for Claude auditing!
@@ -1467,13 +1467,13 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                         <label style="font-size: 11px; font-weight: bold; color: #4a148c; display: block; margin-bottom: 4px;">⚡ DIALPAD WEBHOOK ENDPOINT URL:</label>
                                         <div class="webhook-input-group">
                                             <input type="text" class="webhook-input" id="voip-endpoint-dialpad" readonly value="" data-suffix="/webhooks/voip?client_id={active_client_id}">
-                                            <button type="button" onclick="copyText('voip-endpoint-dialpad', 'voip-btn-dialpad')" id="voip-btn-dialpad" class="btn-copy"> Copy Webhook URL</button>
+                                            <button type="button" onclick="copyText('voip-endpoint-dialpad', 'voip-btn-dialpad')" id="voip-btn-dialpad" class="btn-copy">📋 Copy Webhook URL</button>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div id="voip-inst-ringcentral" class="voip-inst-card" style="display: none; background-color: #e0f7fa; border-left: 4px solid #0097a7; padding: 14px; border-radius: 4px; color: #006064; font-size: 12px; line-height: 1.5;">
-                                     <strong>RingCentral Setup Instructions:</strong><br>
+                                    💡 <strong>RingCentral Setup Instructions:</strong><br>
                                     1. In RingCentral Admin Console, go to <strong>Integrations / Webhooks ➡️ Create Subscription</strong>.<br>
                                     2. Set Notification Event to <strong>"Telephony Session / Call Log"</strong> and paste target URL below.<br>
                                     3. RingCentral inbound & outbound calls will sync automatically with LeadGrove lead timelines!
@@ -1481,13 +1481,13 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                         <label style="font-size: 11px; font-weight: bold; color: #006064; display: block; margin-bottom: 4px;">⚡ RINGCENTRAL WEBHOOK ENDPOINT URL:</label>
                                         <div class="webhook-input-group">
                                             <input type="text" class="webhook-input" id="voip-endpoint-rc" readonly value="" data-suffix="/webhooks/voip?client_id={active_client_id}">
-                                            <button type="button" onclick="copyText('voip-endpoint-rc', 'voip-btn-rc')" id="voip-btn-rc" class="btn-copy"> Copy Webhook URL</button>
+                                            <button type="button" onclick="copyText('voip-endpoint-rc', 'voip-btn-rc')" id="voip-btn-rc" class="btn-copy">📋 Copy Webhook URL</button>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div id="voip-inst-zoom_phone" class="voip-inst-card" style="display: none; background-color: #e3f2fd; border-left: 4px solid #1e88e5; padding: 14px; border-radius: 4px; color: #0d47a1; font-size: 12px; line-height: 1.5;">
-                                     <strong>Zoom Phone Setup Instructions:</strong><br>
+                                    💡 <strong>Zoom Phone Setup Instructions:</strong><br>
                                     1. In Zoom Marketplace, go to <strong>Develop ➡️ Build App ➡️ Webhook Only</strong>.<br>
                                     2. Subscribe to Event Notifications: <strong>"phone.callee_ended"</strong> & <strong>"phone.recording_completed"</strong>.<br>
                                     3. Set Webhook Endpoint URL to the link below to stream Zoom call logs directly to LeadGrove!
@@ -1495,13 +1495,13 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                         <label style="font-size: 11px; font-weight: bold; color: #0d47a1; display: block; margin-bottom: 4px;">⚡ ZOOM PHONE WEBHOOK ENDPOINT URL:</label>
                                         <div class="webhook-input-group">
                                             <input type="text" class="webhook-input" id="voip-endpoint-zoom" readonly value="" data-suffix="/webhooks/voip?client_id={active_client_id}">
-                                            <button type="button" onclick="copyText('voip-endpoint-zoom', 'voip-btn-zoom')" id="voip-btn-zoom" class="btn-copy"> Copy Webhook URL</button>
+                                            <button type="button" onclick="copyText('voip-endpoint-zoom', 'voip-btn-zoom')" id="voip-btn-zoom" class="btn-copy">📋 Copy Webhook URL</button>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div id="voip-inst-openphone" class="voip-inst-card" style="display: none; background-color: #f1f8e9; border-left: 4px solid #33691e; padding: 14px; border-radius: 4px; color: #1b5e20; font-size: 12px; line-height: 1.5;">
-                                     <strong>OpenPhone Setup Instructions:</strong><br>
+                                    💡 <strong>OpenPhone Setup Instructions:</strong><br>
                                     1. In OpenPhone Settings, go to <strong>Integrations ➡️ Webhooks ➡️ Add Webhook</strong>.<br>
                                     2. Paste target URL below and check events: <strong>"call.completed"</strong> and <strong>"call.transcript.completed"</strong>.<br>
                                     3. Sales rep follow-up calls will instantly pair with original lead click IDs!
@@ -1509,13 +1509,13 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                         <label style="font-size: 11px; font-weight: bold; color: #1b5e20; display: block; margin-bottom: 4px;">⚡ OPENPHONE WEBHOOK ENDPOINT URL:</label>
                                         <div class="webhook-input-group">
                                             <input type="text" class="webhook-input" id="voip-endpoint-openphone" readonly value="" data-suffix="/webhooks/voip?client_id={active_client_id}">
-                                            <button type="button" onclick="copyText('voip-endpoint-openphone', 'voip-btn-openphone')" id="voip-btn-openphone" class="btn-copy"> Copy Webhook URL</button>
+                                            <button type="button" onclick="copyText('voip-endpoint-openphone', 'voip-btn-openphone')" id="voip-btn-openphone" class="btn-copy">📋 Copy Webhook URL</button>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div id="voip-inst-nextiva" class="voip-inst-card" style="display: none; background-color: #e8eaf6; border-left: 4px solid #283593; padding: 14px; border-radius: 4px; color: #1a237e; font-size: 12px; line-height: 1.5;">
-                                     <strong>Nextiva Setup Instructions:</strong><br>
+                                    💡 <strong>Nextiva Setup Instructions:</strong><br>
                                     1. Log into Nextiva Voice Admin Portal ➡️ <strong>Integrations / Analytics ➡️ Webhooks</strong>.<br>
                                     2. Click <strong>Add Webhook</strong>, set Target URL to your endpoint below, and subscribe to <strong>"Call Completed"</strong>.<br>
                                     3. Ensure Call Recording & Speech-to-Text Transcriptions are enabled for your team extensions!
@@ -1523,13 +1523,13 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                         <label style="font-size: 11px; font-weight: bold; color: #1a237e; display: block; margin-bottom: 4px;">⚡ NEXTIVA WEBHOOK ENDPOINT URL:</label>
                                         <div class="webhook-input-group">
                                             <input type="text" class="webhook-input" id="voip-endpoint-nextiva" readonly value="" data-suffix="/webhooks/voip?client_id={active_client_id}">
-                                            <button type="button" onclick="copyText('voip-endpoint-nextiva', 'voip-btn-nextiva')" id="voip-btn-nextiva" class="btn-copy"> Copy Webhook URL</button>
+                                            <button type="button" onclick="copyText('voip-endpoint-nextiva', 'voip-btn-nextiva')" id="voip-btn-nextiva" class="btn-copy">📋 Copy Webhook URL</button>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div id="voip-inst-vonage" class="voip-inst-card" style="display: none; background-color: #fff3e0; border-left: 4px solid #e65100; padding: 14px; border-radius: 4px; color: #e65100; font-size: 12px; line-height: 1.5;">
-                                     <strong>Vonage Business Setup Instructions:</strong><br>
+                                    💡 <strong>Vonage Business Setup Instructions:</strong><br>
                                     1. Log into Vonage Business Communications (VBC) Admin Portal ➡️ <strong>Integration Suite ➡️ Webhooks</strong>.<br>
                                     2. Create a new webhook subscription, paste your Target URL below, and select event <strong>"call.completed"</strong>.<br>
                                     3. Ensure Automatic Call Recording is enabled so call logs and audio stream directly to LeadGrove!
@@ -1537,13 +1537,13 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                         <label style="font-size: 11px; font-weight: bold; color: #e65100; display: block; margin-bottom: 4px;">⚡ VONAGE WEBHOOK ENDPOINT URL:</label>
                                         <div class="webhook-input-group">
                                             <input type="text" class="webhook-input" id="voip-endpoint-vonage" readonly value="" data-suffix="/webhooks/voip?client_id={active_client_id}">
-                                            <button type="button" onclick="copyText('voip-endpoint-vonage', 'voip-btn-vonage')" id="voip-btn-vonage" class="btn-copy"> Copy Webhook URL</button>
+                                            <button type="button" onclick="copyText('voip-endpoint-vonage', 'voip-btn-vonage')" id="voip-btn-vonage" class="btn-copy">📋 Copy Webhook URL</button>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div id="voip-inst-ooma" class="voip-inst-card" style="display: none; background-color: #e0f2f1; border-left: 4px solid #00695c; padding: 14px; border-radius: 4px; color: #004d40; font-size: 12px; line-height: 1.5;">
-                                     <strong>Ooma Office Setup Instructions:</strong><br>
+                                    💡 <strong>Ooma Office Setup Instructions:</strong><br>
                                     1. Log into Ooma Office Manager (office.ooma.com) ➡️ <strong>System ➡️ Integrations & API Webhooks</strong>.<br>
                                     2. Click <strong>Add Webhook</strong>, paste your target endpoint below, and set trigger to <strong>"Call Ended"</strong>.<br>
                                     3. Confirm Call Recording is activated for your extension group so recordings & transcripts are captured!
@@ -1551,13 +1551,13 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                         <label style="font-size: 11px; font-weight: bold; color: #004d40; display: block; margin-bottom: 4px;">⚡ OOMA OFFICE WEBHOOK ENDPOINT URL:</label>
                                         <div class="webhook-input-group">
                                             <input type="text" class="webhook-input" id="voip-endpoint-ooma" readonly value="" data-suffix="/webhooks/voip?client_id={active_client_id}">
-                                            <button type="button" onclick="copyText('voip-endpoint-ooma', 'voip-btn-ooma')" id="voip-btn-ooma" class="btn-copy"> Copy Webhook URL</button>
+                                            <button type="button" onclick="copyText('voip-endpoint-ooma', 'voip-btn-ooma')" id="voip-btn-ooma" class="btn-copy">📋 Copy Webhook URL</button>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div id="voip-inst-grasshopper" class="voip-inst-card" style="display: none; background-color: #f3e5f5; border-left: 4px solid #6a1b9a; padding: 14px; border-radius: 4px; color: #4a148c; font-size: 12px; line-height: 1.5;">
-                                     <strong>Grasshopper Setup Instructions:</strong><br>
+                                    💡 <strong>Grasshopper Setup Instructions:</strong><br>
                                     1. Log into Grasshopper Admin Portal ➡️ <strong>Settings ➡️ Integrations & Webhooks</strong>.<br>
                                     2. Enable Call Webhook Notifications and paste your dynamic target endpoint URL below.<br>
                                     3. Ensure Voicemail & Call Transcriptions are toggled ON so call data streams automatically to LeadGrove!
@@ -1565,13 +1565,13 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                         <label style="font-size: 11px; font-weight: bold; color: #4a148c; display: block; margin-bottom: 4px;">⚡ GRASSHOPPER WEBHOOK ENDPOINT URL:</label>
                                         <div class="webhook-input-group">
                                             <input type="text" class="webhook-input" id="voip-endpoint-grasshopper" readonly value="" data-suffix="/webhooks/voip?client_id={active_client_id}">
-                                            <button type="button" onclick="copyText('voip-endpoint-grasshopper', 'voip-btn-grasshopper')" id="voip-btn-grasshopper" class="btn-copy"> Copy Webhook URL</button>
+                                            <button type="button" onclick="copyText('voip-endpoint-grasshopper', 'voip-btn-grasshopper')" id="voip-btn-grasshopper" class="btn-copy">📋 Copy Webhook URL</button>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div id="voip-inst-custom_voip" class="voip-inst-card" style="display: none; background-color: #eceff1; border-left: 4px solid #455a64; padding: 14px; border-radius: 4px; color: #263238; font-size: 12px; line-height: 1.5;">
-                                     <strong>Custom VoIP / Other Setup Instructions:</strong><br>
+                                    💡 <strong>Custom VoIP / Other Setup Instructions:</strong><br>
                                     1. In your VoIP provider's developer console or Zapier Integration, configure an HTTP POST Webhook.<br>
                                     2. Set target destination URL to the endpoint below.<br>
                                     3. Ensure call recording URLs and customer phone parameters are included in the payload!
@@ -1579,7 +1579,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                         <label style="font-size: 11px; font-weight: bold; color: #263238; display: block; margin-bottom: 4px;">⚡ CUSTOM VOIP WEBHOOK ENDPOINT URL:</label>
                                         <div class="webhook-input-group">
                                             <input type="text" class="webhook-input" id="voip-endpoint-custom" readonly value="" data-suffix="/webhooks/voip?client_id={active_client_id}">
-                                            <button type="button" onclick="copyText('voip-endpoint-custom', 'voip-btn-custom')" id="voip-btn-custom" class="btn-copy"> Copy Webhook URL</button>
+                                            <button type="button" onclick="copyText('voip-endpoint-custom', 'voip-btn-custom')" id="voip-btn-custom" class="btn-copy">📋 Copy Webhook URL</button>
                                         </div>
                                     </div>
                                 </div>
@@ -1601,7 +1601,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                         
                                         <!-- Speech Bubble Tooltip -->
                                         <span class="tooltip-icon">
-                                            
+                                            💬
                                             <span class="tooltip-text">
                                                 As a secondary option, you can also have AI monitor your incoming emails by cc'ing a copy of every email correspondence to:<br>
                                                 <strong class="settings-forwarding-email" style="color: #81c784; word-break: break-all;">conversions-{active_client_id}@your-agency.com</strong>
@@ -1626,7 +1626,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 5px;">
                                         <label for="email_app_password" style="font-weight: bold; margin-bottom: 0;">Inbox #1 App Password / IMAP Key</label>
                                         <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none; display: flex; align-items: center; gap: 4px;">
-                                             How to get an App Password?
+                                            🔑 How to get an App Password?
                                         </a>
                                     </div>
                                     <input type="password" id="email_app_password" value="{client_data.get("email_app_password", "") or ""}" placeholder="e.g. abcd efgh ijkl mnop">
@@ -1641,7 +1641,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                     <div class="form-group" style="margin-top: 10px;">
                                         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 5px;">
                                             <label for="email_app_password_2" style="font-weight: bold;">Inbox #2 App Password / IMAP Key</label>
-                                            <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none;"> How to get an App Password?</a>
+                                            <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none;">🔑 How to get an App Password?</a>
                                         </div>
                                         <input type="password" id="email_app_password_2" value="{client_data.get("email_app_password_2", "") or ""}" placeholder="e.g. abcd efgh ijkl mnop">
                                     </div>
@@ -1656,7 +1656,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                     <div class="form-group" style="margin-top: 10px;">
                                         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 5px;">
                                             <label for="email_app_password_3" style="font-weight: bold;">Inbox #3 App Password / IMAP Key</label>
-                                            <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none;"> How to get an App Password?</a>
+                                            <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none;">🔑 How to get an App Password?</a>
                                         </div>
                                         <input type="password" id="email_app_password_3" value="{client_data.get("email_app_password_3", "") or ""}" placeholder="e.g. abcd efgh ijkl mnop">
                                     </div>
@@ -1671,7 +1671,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                     <div class="form-group" style="margin-top: 10px;">
                                         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 5px;">
                                             <label for="email_app_password_4" style="font-weight: bold;">Inbox #4 App Password / IMAP Key</label>
-                                            <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none;"> How to get an App Password?</a>
+                                            <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none;">🔑 How to get an App Password?</a>
                                         </div>
                                         <input type="password" id="email_app_password_4" value="{client_data.get("email_app_password_4", "") or ""}" placeholder="e.g. abcd efgh ijkl mnop">
                                     </div>
@@ -1686,7 +1686,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                     <div class="form-group" style="margin-top: 10px;">
                                         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 5px;">
                                             <label for="email_app_password_5" style="font-weight: bold;">Inbox #5 App Password / IMAP Key</label>
-                                            <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none;"> How to get an App Password?</a>
+                                            <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none;">🔑 How to get an App Password?</a>
                                         </div>
                                         <input type="password" id="email_app_password_5" value="{client_data.get("email_app_password_5", "") or ""}" placeholder="e.g. abcd efgh ijkl mnop">
                                     </div>
@@ -1717,14 +1717,14 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                 <div class="webhook-desc">Paste this dynamic endpoint into your CRM or Zapier workflow to push lead updates to LeadGrove:</div>
                                 <div class="webhook-input-group">
                                     <input type="text" class="webhook-input" id="crm-webhook" readonly value="" data-suffix="/webhooks/crm?client_id={active_client_id}">
-                                    <button type="button" onclick="copyText('crm-webhook', 'crm-copy-btn')" id="crm-copy-btn" class="btn-copy"> Copy Webhook URL</button>
+                                    <button type="button" onclick="copyText('crm-webhook', 'crm-copy-btn')" id="crm-copy-btn" class="btn-copy">📋 Copy Webhook URL</button>
                                 </div>
                             </div>
                             
                             <!-- Billing webhook (Available if Accounting active) -->
                             <div class="webhook-card" id="billing-webhook-card" style="display: none; margin-top: 15px;">
                                 <div class="webhook-title" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
-                                    <span id="settings-billing-webhook-title"> QuickBooks / Xero Billing Webhook</span>
+                                    <span id="settings-billing-webhook-title">💳 QuickBooks / Xero Billing Webhook</span>
                                     
                                     <!-- Check Logs Hover Link -->
                                     <span class="tooltip-icon" style="font-size: 11px; font-weight: bold; margin-left: auto; cursor: help;">
@@ -1738,34 +1738,34 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                 <div class="webhook-desc">Link your paid transaction updates directly using this endpoint to register closed invoice values:</div>
                                 <div class="webhook-input-group">
                                     <input type="text" class="webhook-input" id="billing-webhook" readonly value="" data-suffix="/webhooks/billing?client_id={active_client_id}">
-                                    <button type="button" onclick="copyText('billing-webhook', 'billing-copy-btn')" id="billing-copy-btn" class="btn-copy"> Copy Webhook URL</button>
+                                    <button type="button" onclick="copyText('billing-webhook', 'billing-copy-btn')" id="billing-copy-btn" class="btn-copy">📋 Copy Webhook URL</button>
                                 </div>
                             </div>
                             
                             <!-- Email Forwarder (Available if Email active) -->
                             <div class="webhook-card" id="email-webhook-card" style="display: none; margin-top: 15px;">
-                                <div class="webhook-title"> Inbound Invoice & Booking Email</div>
+                                <div class="webhook-title">📧 Inbound Invoice & Booking Email</div>
                                 <div class="webhook-desc">Set up auto-forwarding from your email inbox to send receipts or booking alerts directly to our system for Claude to audit:</div>
                                 <div class="webhook-input-group">
                                     <input type="text" class="webhook-input" id="email-webhook" readonly value="" data-suffix="conversions-{active_client_id}@your-agency.com">
-                                    <button type="button" onclick="copyText('email-webhook', 'em-copy-btn')" id="em-copy-btn" class="btn-copy"> Copy Email Address</button>
+                                    <button type="button" onclick="copyText('email-webhook', 'em-copy-btn')" id="em-copy-btn" class="btn-copy">📋 Copy Email Address</button>
                                 </div>
                             </div>
                             
                             <!-- SECTION 5: Active Webhooks read-only deck -->
-                            <div class="section-title" style="margin-top: 30px;"> Live Webhooks & Integration URLs</div>
+                            <div class="section-title" style="margin-top: 30px;">🔑 Live Webhooks & Integration URLs</div>
                             
                             <!-- SECTION A: Google Sheets Export & Ad Platform Scheduled Pulls (Google & Microsoft Ads) -->
                             <div class="webhook-card" id="sheets-export-webhook-card" style="border-left: 4px solid #34A853;">
                                 <div class="webhook-title" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; color: #1e7e34;">
-                                    <span> Section A: Google Sheets Export & Ad Platform Scheduled Pulls (Google & Microsoft Ads)</span>
+                                    <span>📊 Section A: Google Sheets Export & Ad Platform Scheduled Pulls (Google & Microsoft Ads)</span>
                                     
                                     <!-- Interactive Speech Bubble Tooltip for Google Sheets & Scheduled Pull Setup -->
                                     <span class="tooltip-icon" style="font-size: 16px; cursor: help; color: #1e7e34; margin-left: auto;">
-                                        
+                                        💬
                                         <span class="tooltip-text" style="width: 410px; max-width: 88vw; background-color: #ffffff; color: #333333; border: 2px solid #34A853; border-radius: 8px; padding: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); font-size: 12px; line-height: 1.5; bottom: 125%; right: 0; left: auto; margin-left: 0;">
                                             <div style="font-size: 13px; font-weight: bold; color: #1e7e34; margin-bottom: 8px; border-bottom: 1px solid #c8e6c9; padding-bottom: 5px; display: flex; align-items: center; gap: 6px;">
-                                                 Google Sheets Export & Ad Platform Scheduled Pull Guide
+                                                📗 Google Sheets Export & Ad Platform Scheduled Pull Guide
                                             </div>
                                             
                                             <strong style="color: #1b5e20;">1. Exporting & Editing Data in Google Sheets:</strong>
@@ -1823,7 +1823,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                 <div class="webhook-desc">Use this live feed URL in Google Sheets via <code>=IMPORTDATA("...")</code> to view and edit conversion data, then configure <strong>Google Ads & Microsoft Ads</strong> to automatically pull data from that Google Sheet on a recurring schedule!</div>
                                 <div class="webhook-input-group">
                                     <input type="text" class="webhook-input" id="sheets-feed-webhook" readonly value="" data-suffix="/feeds/google-conversions.csv?client_id={active_client_id}">
-                                    <button type="button" onclick="copyText('sheets-feed-webhook', 'sheets-feed-copy-btn')" id="sheets-feed-copy-btn" class="btn-copy" style="background-color: #34A853;"> Copy Google Sheets Feed URL</button>
+                                    <button type="button" onclick="copyText('sheets-feed-webhook', 'sheets-feed-copy-btn')" id="sheets-feed-copy-btn" class="btn-copy" style="background-color: #34A853;">📋 Copy Google Sheets Feed URL</button>
                                 </div>
                             </div>
 
@@ -1834,7 +1834,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                     
                                     <!-- Interactive Speech Bubble Tooltip for Zapier CAPI Export Setup -->
                                     <span class="tooltip-icon" style="font-size: 16px; cursor: help; color: #FF4F00; margin-left: auto;">
-                                        
+                                        💬
                                         <span class="tooltip-text" style="width: 420px; max-width: 88vw; background-color: #ffffff; color: #333333; border: 2px solid #FF4F00; border-radius: 8px; padding: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); font-size: 12px; line-height: 1.5; bottom: 125%; right: 0; left: auto; margin-left: 0;">
                                             <div style="font-size: 13px; font-weight: bold; color: #E65100; margin-bottom: 8px; border-bottom: 1px solid #ffe0b2; padding-bottom: 5px; display: flex; align-items: center; gap: 6px;">
                                                 ⚡ Zapier Multi-Network CAPI Export Guide
@@ -1863,37 +1863,37 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                                     </thead>
                                                     <tbody>
                                                         <tr>
-                                                            <td style="border: 1px solid #eee; padding: 3px; font-weight: bold;"> TikTok Ads</td>
+                                                            <td style="border: 1px solid #eee; padding: 3px; font-weight: bold;">🎵 TikTok Ads</td>
                                                             <td style="border: 1px solid #eee; padding: 3px; font-family: monospace; color: #c62828;">ttclid</td>
                                                             <td style="border: 1px solid #eee; padding: 3px;">TikTok Offline Events</td>
                                                         </tr>
                                                         <tr style="background: #fafafa;">
-                                                            <td style="border: 1px solid #eee; padding: 3px; font-weight: bold;"> LinkedIn Ads</td>
+                                                            <td style="border: 1px solid #eee; padding: 3px; font-weight: bold;">🔗 LinkedIn Ads</td>
                                                             <td style="border: 1px solid #eee; padding: 3px; font-family: monospace; color: #1565c0;">li_fat_id</td>
                                                             <td style="border: 1px solid #eee; padding: 3px;">LinkedIn Conversions</td>
                                                         </tr>
                                                         <tr>
-                                                            <td style="border: 1px solid #eee; padding: 3px; font-weight: bold;"> Pinterest Ads</td>
+                                                            <td style="border: 1px solid #eee; padding: 3px; font-weight: bold;">📌 Pinterest Ads</td>
                                                             <td style="border: 1px solid #eee; padding: 3px; font-family: monospace; color: #b71c1c;">pin_clid</td>
                                                             <td style="border: 1px solid #eee; padding: 3px;">Pinterest Conversions</td>
                                                         </tr>
                                                         <tr style="background: #fafafa;">
-                                                            <td style="border: 1px solid #eee; padding: 3px; font-weight: bold;"> Snapchat Ads</td>
+                                                            <td style="border: 1px solid #eee; padding: 3px; font-weight: bold;">👻 Snapchat Ads</td>
                                                             <td style="border: 1px solid #eee; padding: 3px; font-family: monospace; color: #f57f17;">scclid</td>
                                                             <td style="border: 1px solid #eee; padding: 3px;">Snapchat CAPI Event</td>
                                                         </tr>
                                                         <tr>
-                                                            <td style="border: 1px solid #eee; padding: 3px; font-weight: bold;"> X (Twitter) Ads</td>
+                                                            <td style="border: 1px solid #eee; padding: 3px; font-weight: bold;">🐦 X (Twitter) Ads</td>
                                                             <td style="border: 1px solid #eee; padding: 3px; font-family: monospace; color: #333;">twclid</td>
                                                             <td style="border: 1px solid #eee; padding: 3px;">X Ads Conversion Event</td>
                                                         </tr>
                                                         <tr style="background: #fafafa;">
-                                                            <td style="border: 1px solid #eee; padding: 3px; font-weight: bold;"> ChatGPT Ads</td>
+                                                            <td style="border: 1px solid #eee; padding: 3px; font-weight: bold;">🧠 ChatGPT Ads</td>
                                                             <td style="border: 1px solid #eee; padding: 3px; font-family: monospace; color: #00796b;">gptclid</td>
                                                             <td style="border: 1px solid #eee; padding: 3px;">Webhooks POST Custom</td>
                                                         </tr>
                                                         <tr style="color: #FF4500;">
-                                                            <td style="border: 1px solid #eee; padding: 3px; font-weight: bold;"> Reddit Ads</td>
+                                                            <td style="border: 1px solid #eee; padding: 3px; font-weight: bold;">🔴 Reddit Ads</td>
                                                             <td style="border: 1px solid #eee; padding: 3px; font-family: monospace; color: #FF4500;">rdt_cid</td>
                                                             <td style="border: 1px solid #eee; padding: 3px;">Reddit Conversions API</td>
                                                         </tr>
@@ -1901,14 +1901,14 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                                 </table>
                                             </div>
 
-                                            <p style="margin: 0; font-size: 10px; color: #666; font-style: italic;"> LeadGrove automatically includes hashed customer emails and phone numbers for high CAPI match rates!</p>
+                                            <p style="margin: 0; font-size: 10px; color: #666; font-style: italic;">💡 LeadGrove automatically includes hashed customer emails and phone numbers for high CAPI match rates!</p>
                                         </span>
                                     </span>
                                 </div>
                                 <div class="webhook-desc">Export LeadGrove conversion data to your personal Zapier account via Webhooks or Google Sheets triggers, and automatically forward conversion signals to <strong>TikTok Ads, LinkedIn, Pinterest, Snapchat, X (Twitter), and ChatGPT Ads</strong> via their Conversion APIs!</div>
                                 <div class="webhook-input-group">
                                     <input type="text" class="webhook-input" id="zapier-export-webhook" readonly value="" data-suffix="/webhooks/crm?client_id={active_client_id}">
-                                    <button type="button" onclick="copyText('zapier-export-webhook', 'zapier-export-copy-btn')" id="zapier-export-copy-btn" class="btn-copy" style="background-color: #FF4F00;"> Copy Zapier Export Webhook URL</button>
+                                    <button type="button" onclick="copyText('zapier-export-webhook', 'zapier-export-copy-btn')" id="zapier-export-copy-btn" class="btn-copy" style="background-color: #FF4F00;">📋 Copy Zapier Export Webhook URL</button>
                                 </div>
                             </div>
 
@@ -1919,7 +1919,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                     
                                     <!-- Interactive Speech Bubble Tooltip for Direct HTTP Imports -->
                                     <span class="tooltip-icon" style="font-size: 16px; cursor: help; color: #1a237e; margin-left: auto;">
-                                        
+                                        💬
                                         <span class="tooltip-text" style="width: 410px; max-width: 88vw; background-color: #ffffff; color: #333333; border: 2px solid #1a237e; border-radius: 8px; padding: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); font-size: 12px; line-height: 1.5; bottom: 125%; right: 0; left: auto; margin-left: 0;">
                                             <div style="font-size: 13px; font-weight: bold; color: #1a237e; margin-bottom: 8px; border-bottom: 1px solid #c5cae9; padding-bottom: 5px; display: flex; align-items: center; gap: 6px;">
                                                 ⚡ Direct HTTP Scheduled Import Instructions
@@ -1949,11 +1949,11 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                 <div class="webhook-desc">Directly fetch live conversion feeds straight from LeadGrove via HTTP scheduled imports in <strong>Google Ads, Microsoft Ads, and Meta Ads</strong> without needing an intermediate spreadsheet!</div>
                                 <div class="webhook-input-group" style="margin-bottom: 10px;">
                                     <input type="text" class="webhook-input" id="direct-http-conversions-webhook" readonly value="" data-suffix="/feeds/google-conversions.csv?client_id={active_client_id}">
-                                    <button type="button" onclick="copyText('direct-http-conversions-webhook', 'direct-http-conv-copy-btn')" id="direct-http-conv-copy-btn" class="btn-copy" style="background-color: #1a237e;"> Copy Standard Conversions HTTP URL</button>
+                                    <button type="button" onclick="copyText('direct-http-conversions-webhook', 'direct-http-conv-copy-btn')" id="direct-http-conv-copy-btn" class="btn-copy" style="background-color: #1a237e;">📋 Copy Standard Conversions HTTP URL</button>
                                 </div>
                                 <div class="webhook-input-group">
                                     <input type="text" class="webhook-input" id="direct-http-adjustments-webhook" readonly value="" data-suffix="/feeds/google-adjustments.csv?client_id={active_client_id}">
-                                    <button type="button" onclick="copyText('direct-http-adjustments-webhook', 'direct-http-adj-copy-btn')" id="direct-http-adj-copy-btn" class="btn-copy" style="background-color: #37474F;"> Copy Adjustments Feed HTTP URL</button>
+                                    <button type="button" onclick="copyText('direct-http-adjustments-webhook', 'direct-http-adj-copy-btn')" id="direct-http-adj-copy-btn" class="btn-copy" style="background-color: #37474F;">📋 Copy Adjustments Feed HTTP URL</button>
                                 </div>
                             </div>
                             
@@ -1963,7 +1963,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                 <div class="webhook-desc" id="settings-call-webhook-desc">{webhook_card_desc}</div>
                                 <div class="webhook-input-group">
                                     <input type="text" class="webhook-input" id="callrail-webhook" readonly value="" data-suffix="{webhook_suffix}">
-                                    <button type="button" onclick="copyText('callrail-webhook', 'cr-copy-btn')" id="cr-copy-btn" class="btn-copy"> Copy</button>
+                                    <button type="button" onclick="copyText('callrail-webhook', 'cr-copy-btn')" id="cr-copy-btn" class="btn-copy">📋 Copy</button>
                                 </div>
                             </div>
                             
@@ -1978,7 +1978,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             <!-- Header -->
                             <div class="modal-header" style="background: #1a237e; color: white; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;">
                                 <h3 style="margin: 0; font-size: 18px; color: #1a237e; display: flex; align-items: center; gap: 8px;">
-                                     Generate a Secure App Password
+                                    🔐 Generate a Secure App Password
                                 </h3>
                                 <span class="modal-close" onclick="closeAppPasswordModal()" style="font-size: 24px; font-weight: bold; cursor: pointer; color: white; opacity: 0.8;">&times;</span>
                             </div>
@@ -1992,13 +1992,13 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                 <!-- Provider Tabs -->
                                 <div style="display: flex; border-bottom: 2px solid #e0e0e0; margin-bottom: 15px; flex-wrap: wrap;">
                                     <button type="button" id="tab-btn-google" class="tab-btn active" onclick="switchModalTab('google')">
-                                         Google Workspace / Gmail
+                                        📁 Google Workspace / Gmail
                                     </button>
                                     <button type="button" id="tab-btn-ms" class="tab-btn" onclick="switchModalTab('ms')">
-                                         Microsoft 365 / Outlook
+                                        📁 Microsoft 365 / Outlook
                                     </button>
                                     <button type="button" id="tab-btn-imap" class="tab-btn" onclick="switchModalTab('imap')">
-                                         Custom IMAP / cPanel / Other
+                                        🌐 Custom IMAP / cPanel / Other
                                     </button>
                                 </div>
 
@@ -2038,7 +2038,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                 <!-- Security Footnote -->
                                 <div style="background-color: #f1f8e9; border-left: 4px solid #2e7d32; padding: 12px; margin-top: 20px; border-radius: 4px;">
                                     <p style="margin: 0; font-size: 11px; line-height: 1.4; color: #1b5e20;">
-                                         <strong>Strict Privacy Guard:</strong> This code grants read-only IMAP credentials. It does not access your emails, calendars, or account dashboards. You can revoke it instantly at any time in your security settings.
+                                        🔒 <strong>Strict Privacy Guard:</strong> This code grants read-only IMAP credentials. It does not access your emails, calendars, or account dashboards. You can revoke it instantly at any time in your security settings.
                                     </p>
                                 </div>
                             </div>
@@ -2061,7 +2061,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                 <hr style="border: 0; height: 1px; background: #eaeaea; margin: 40px 0;">
 
                 <div class="section-title" style="margin-bottom: 20px; color: #1a237e; font-size: 20px; font-weight: bold; display: flex; align-items: center; gap: 8px;">
-                     Account Collaborators & Invitations
+                    👥 Account Collaborators & Invitations
                 </div>
                 <p style="color: #666; font-size: 13px; margin-top: -10px; margin-bottom: 20px;">
                     Invite and manage team members who can access this client's tracking dashboard.
@@ -2089,7 +2089,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                 <hr style="border: 0; height: 1px; background: #eaeaea; margin: 40px 0;">
 
                 <div class="section-title" style="margin-bottom: 20px; color: #1a237e; font-size: 20px; font-weight: bold; display: flex; align-items: center; gap: 8px;">
-                     Configuration Change History Log
+                    📜 Configuration Change History Log
                 </div>
                 <p style="color: #666; font-size: 13px; margin-top: -10px; margin-bottom: 20px;">
                     Audit trail of all updates and changes made within this client's configuration section.
@@ -2136,11 +2136,11 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     </button>
                     
                     <div id="invite-link-container" style="display: none; margin-top: 20px; background: white; padding: 15px; border-radius: 6px; border: 1px dashed #2e7d32;">
-                        <span style="font-weight: bold; color: #2e7d32; font-size: 13px; display: block; margin-bottom: 5px;"> Invitation Link Generated!</span>
+                        <span style="font-weight: bold; color: #2e7d32; font-size: 13px; display: block; margin-bottom: 5px;">🎉 Invitation Link Generated!</span>
                         <p style="color: #555; font-size: 12px; margin: 0 0 10px 0;">Copy this link and send it directly to your collaborator to register:</p>
                         <div style="display: flex; gap: 8px;">
                             <input type="text" id="invite-url-output" readonly style="flex: 1; padding: 8px; border-radius: 4px; border: 1px solid #ced4da; font-family: monospace; font-size: 11px; background-color: #f8f9fa;">
-                            <button type="button" onclick="copyText('invite-url-output', 'invite-copy-btn')" id="invite-copy-btn" class="btn-copy" style="margin: 0; width: auto; font-size: 12px; background-color: #2e7d32; color: white; padding: 0 12px; border: none; border-radius: 4px; cursor: pointer;"> Copy Link</button>
+                            <button type="button" onclick="copyText('invite-url-output', 'invite-copy-btn')" id="invite-copy-btn" class="btn-copy" style="margin: 0; width: auto; font-size: 12px; background-color: #2e7d32; color: white; padding: 0 12px; border: none; border-radius: 4px; cursor: pointer;">📋 Copy Link</button>
                         </div>
                     </div>
                 </div>
@@ -2397,21 +2397,21 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         crBox.style.display = 'flex';
                         ctmBox.style.display = 'none';
                         wcBox.style.display = 'none';
-                        if (titleEl) titleEl.innerHTML = " CallRail CallCompleted Webhook";
+                        if (titleEl) titleEl.innerHTML = "📞 CallRail CallCompleted Webhook";
                         if (descEl) descEl.innerHTML = "Paste this dynamic endpoint into CallRail Integration Settings to sync automated call recordings and transcripts:";
                         ctSuffix = "/webhooks/callrail?client_id={active_client_id}";
                     }} else if (provider === 'calltrackingmetrics') {{
                         crBox.style.display = 'none';
                         ctmBox.style.display = 'flex';
                         wcBox.style.display = 'none';
-                        if (titleEl) titleEl.innerHTML = " CallTrackingMetrics Transcription Webhook";
+                        if (titleEl) titleEl.innerHTML = "📞 CallTrackingMetrics Transcription Webhook";
                         if (descEl) descEl.innerHTML = "Paste this dynamic endpoint into CallTrackingMetrics webhook setup to sync automated call recordings and transcripts:";
                         ctSuffix = "/webhooks/calltrackingmetrics?client_id={active_client_id}";
                     }} else if (provider === 'whatconverts') {{
                         crBox.style.display = 'none';
                         ctmBox.style.display = 'none';
                         wcBox.style.display = 'flex';
-                        if (titleEl) titleEl.innerHTML = " WhatConverts CallCompleted Webhook";
+                        if (titleEl) titleEl.innerHTML = "📞 WhatConverts CallCompleted Webhook";
                         if (descEl) descEl.innerHTML = "Paste this dynamic endpoint into WhatConverts webhook setup to sync automated call recordings and transcripts:";
                         ctSuffix = "/webhooks/whatconverts?client_id={active_client_id}";
                     }}
@@ -2434,7 +2434,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     const sotSelect = document.getElementById('source_of_truth');
                     const sotVal = sotSelect ? sotSelect.value : '';
                     if (qualHeadingEl && (sotVal === 'ai_rating' || !sotVal)) {{
-                        qualHeadingEl.innerHTML = " Qualified Leads (" + providerName + " Transcripts & Forms)";
+                        qualHeadingEl.innerHTML = "🎯 Qualified Leads (" + providerName + " Transcripts & Forms)";
                     }}
                 }}
                 
@@ -2463,16 +2463,16 @@ def view_settings(request: Request, client_id: Optional[int] = None):
 
                     if (funnelWonHeading && funnelWonSource) {{
                             if (value === 'crm') {{
-                                funnelWonHeading.innerHTML = ' Won Deals & Closed Revenue (Live CRM Webhook Pipeline)';
+                                funnelWonHeading.innerHTML = '💰 Won Deals & Closed Revenue (Live CRM Webhook Pipeline)';
                                 funnelWonSource.innerHTML = 'Source: <strong>Live CRM Webhooks (HubSpot / Salesforce / Zoho / ServiceTitan)</strong> → Match Method: <strong>Phone & Email Session Pair</strong>';
                             }} else if (value === 'email') {{
-                                funnelWonHeading.innerHTML = ' Won Deals & Closed Revenue (Automated Email Sales Log Scanner)';
+                                funnelWonHeading.innerHTML = '💰 Won Deals & Closed Revenue (Automated Email Sales Log Scanner)';
                                 funnelWonSource.innerHTML = 'Source: <strong>Email Sales Scanner / Order Confirmations</strong> → Match Method: <strong>Phone & Email Session Pair</strong>';
                             }} else if (value === 'accounting') {{
-                                funnelWonHeading.innerHTML = ' Won Deals & Closed Revenue (QuickBooks / Xero Invoices)';
+                                funnelWonHeading.innerHTML = '💰 Won Deals & Closed Revenue (QuickBooks / Xero Invoices)';
                                 funnelWonSource.innerHTML = 'Source: <strong>Accounting Webhooks (QuickBooks / Xero Paid Invoices)</strong> → Match Method: <strong>Phone & Email Session Pair</strong>';
                             }} else {{
-                                funnelWonHeading.innerHTML = ' Won Deals & Closed Revenue (Manual CSV / Spreadsheet Upload)';
+                                funnelWonHeading.innerHTML = '💰 Won Deals & Closed Revenue (Manual CSV / Spreadsheet Upload)';
                                 funnelWonSource.innerHTML = 'Source: <strong>Manual CSV / Spreadsheet Sales Log Upload</strong> → Match Method: <strong>Phone & Email Session Pair</strong>';
                             }}
                         }}
@@ -2497,7 +2497,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             const btnSubmit = document.getElementById('btn-settings-submit');
                             if (btnSubmit) {{
                                 btnSubmit.classList.remove('btn-pulse-save');
-                                btnSubmit.innerHTML = ' Save Configuration Changes';
+                                btnSubmit.innerHTML = '💾 Save Configuration Changes';
                             }}
                             parsedExclusions = [];
                         }}
@@ -2528,7 +2528,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #4285F4; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #4285F4; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                     Google Ads Goal Setup (ID: ${{googleAds}})
+                                    🔍 Google Ads Goal Setup (ID: ${{googleAds}})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>Google Ads account</strong>.</li>
@@ -2536,8 +2536,8 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                     <li style="margin-bottom: 8px;">Click <strong>+ New conversion action</strong>, select <strong>Import</strong>, choose <strong>Other data sources or CRMs</strong>, select <strong>Track conversions from clicks</strong>, and click <strong>Continue</strong>.</li>
                                     <li style="margin-bottom: 8px;"><strong>Goal 1 (Qualification):</strong> Set Goal Name to <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>. Under Category, choose <strong>Qualified Lead</strong>. Set Value to use a default value of <code>$1.00</code>.</li>
                                     <li style="margin-bottom: 8px;"><strong>Goal 2 (Offline Sale):</strong> Create a second conversion import action. Set Goal Name to <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>. Under Category, choose <strong>Purchase</strong> or <strong>Converted Lead</strong>. Set Value to <strong>Use different values for each conversion</strong> (defaulting to <code>$0.00</code>).</li>
-                                    <li style="margin-bottom: 8px; background: #fff8e1; border-left: 3px solid #ffa000; padding: 8px 10px; border-radius: 4px; color: #5d4037;"> <strong>Recommended Conversion Settings:</strong> Under <strong>Count</strong>, select <strong>Every</strong> conversion (so multiple sales/leads from the same user are tracked). Always select the <strong>longest allowable conversion window</strong> (e.g., 90-day click-through window) each time to maximize historical match depth.</li>
-                                    <li style="margin-bottom: 8px; background: #e8f5e9; border-left: 3px solid #2e7d32; padding: 8px 10px; border-radius: 4px; color: #1b5e20;"> <strong>Hands-Free Automated Sync (Optional):</strong> Want Google Ads to pull conversions automatically without manual CSV uploads? Go to <strong>Goals ➡️ Conversions ➡️ Uploads ➡️ Schedules</strong>, click <strong>+</strong>, select <strong>HTTPS</strong> as Source, and paste your live LeadGrove feed URL: <code style="background: #fff; padding: 2px 5px; border-radius: 3px; border: 1px solid #a5d6a7;">https://your-agency-app.onrender.com/feeds/google-conversions.csv?client_id=[id]</code>! (For automated retractions & restatements, set up a second schedule under the Adjustments tab using: <code style="background: #fff; padding: 2px 5px; border-radius: 3px; border: 1px solid #b0bec5;">https://your-agency-app.onrender.com/feeds/google-adjustments.csv?client_id=[id]</code>).</li>
+                                    <li style="margin-bottom: 8px; background: #fff8e1; border-left: 3px solid #ffa000; padding: 8px 10px; border-radius: 4px; color: #5d4037;">💡 <strong>Recommended Conversion Settings:</strong> Under <strong>Count</strong>, select <strong>Every</strong> conversion (so multiple sales/leads from the same user are tracked). Always select the <strong>longest allowable conversion window</strong> (e.g., 90-day click-through window) each time to maximize historical match depth.</li>
+                                    <li style="margin-bottom: 8px; background: #e8f5e9; border-left: 3px solid #2e7d32; padding: 8px 10px; border-radius: 4px; color: #1b5e20;">🚀 <strong>Hands-Free Automated Sync (Optional):</strong> Want Google Ads to pull conversions automatically without manual CSV uploads? Go to <strong>Goals ➡️ Conversions ➡️ Uploads ➡️ Schedules</strong>, click <strong>+</strong>, select <strong>HTTPS</strong> as Source, and paste your live LeadGrove feed URL: <code style="background: #fff; padding: 2px 5px; border-radius: 3px; border: 1px solid #a5d6a7;">https://your-agency-app.onrender.com/feeds/google-conversions.csv?client_id=[id]</code>! (For automated retractions & restatements, set up a second schedule under the Adjustments tab using: <code style="background: #fff; padding: 2px 5px; border-radius: 3px; border: 1px solid #b0bec5;">https://your-agency-app.onrender.com/feeds/google-adjustments.csv?client_id=[id]</code>).</li>
                                 </ol>
                             </div>
                         `);
@@ -2546,7 +2546,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #10a37f; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #10a37f; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                     ChatGPT Ads Goal Setup (ID: ${{chatgptAds}})
+                                    🧠 ChatGPT Ads Goal Setup (ID: ${{chatgptAds}})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>ChatGPT Ads Campaign Manager</strong>.</li>
@@ -2561,7 +2561,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #FF4500; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #FF4500; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                     Reddit Ads Goal Setup (ID: ${{redditAds}})
+                                    🔴 Reddit Ads Goal Setup (ID: ${{redditAds}})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>Reddit Ads Manager</strong>.</li>
@@ -2578,7 +2578,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #1877F2; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #1877F2; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                     Meta / Facebook Ads Goal Setup (Pixel: ${{facebookAds}})
+                                    🔵 Meta / Facebook Ads Goal Setup (Pixel: ${{facebookAds}})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>Meta Events Manager</strong>.</li>
@@ -2593,7 +2593,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #10a37f; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #10a37f; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                     ChatGPT Ads Goal Setup (ID: ${{chatgptAds}})
+                                    🧠 ChatGPT Ads Goal Setup (ID: ${{chatgptAds}})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>ChatGPT Ads Campaign Manager</strong>.</li>
@@ -2608,7 +2608,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #FF4500; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #FF4500; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                     Reddit Ads Goal Setup (ID: ${{redditAds}})
+                                    🔴 Reddit Ads Goal Setup (ID: ${{redditAds}})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>Reddit Ads Manager</strong>.</li>
@@ -2625,7 +2625,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #0A66C2; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #0A66C2; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                     LinkedIn Ads Goal Setup (Account: ${{linkedinAds}})
+                                    🔗 LinkedIn Ads Goal Setup (Account: ${{linkedinAds}})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into <strong>LinkedIn Campaign Manager</strong>.</li>
@@ -2644,7 +2644,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #10a37f; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #10a37f; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                     ChatGPT Ads Goal Setup (ID: ${{chatgptAds}})
+                                    🧠 ChatGPT Ads Goal Setup (ID: ${{chatgptAds}})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>ChatGPT Ads Campaign Manager</strong>.</li>
@@ -2659,7 +2659,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #FF4500; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #FF4500; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                     Reddit Ads Goal Setup (ID: ${{redditAds}})
+                                    🔴 Reddit Ads Goal Setup (ID: ${{redditAds}})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>Reddit Ads Manager</strong>.</li>
@@ -2676,7 +2676,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #00A4EF; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #00A4EF; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                     Microsoft (Bing) Ads Goal Setup (ID: ${{microsoftAds}})
+                                    🟢 Microsoft (Bing) Ads Goal Setup (ID: ${{microsoftAds}})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>Microsoft Advertising Dashboard</strong>.</li>
@@ -2692,7 +2692,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #10a37f; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #10a37f; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                     ChatGPT Ads Goal Setup (ID: ${{chatgptAds}})
+                                    🧠 ChatGPT Ads Goal Setup (ID: ${{chatgptAds}})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>ChatGPT Ads Campaign Manager</strong>.</li>
@@ -2707,7 +2707,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #FF4500; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #FF4500; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                     Reddit Ads Goal Setup (ID: ${{redditAds}})
+                                    🔴 Reddit Ads Goal Setup (ID: ${{redditAds}})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>Reddit Ads Manager</strong>.</li>
@@ -2724,7 +2724,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #010101; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #010101; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                     TikTok Ads Goal Setup (Pixel: ${{tiktokAds}})
+                                    🎵 TikTok Ads Goal Setup (Pixel: ${{tiktokAds}})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>TikTok Ads Manager</strong>.</li>
@@ -2743,7 +2743,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #10a37f; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #10a37f; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                     ChatGPT Ads Goal Setup (ID: ${{chatgptAds}})
+                                    🧠 ChatGPT Ads Goal Setup (ID: ${{chatgptAds}})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>ChatGPT Ads Campaign Manager</strong>.</li>
@@ -2758,7 +2758,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #FF4500; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #FF4500; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                     Reddit Ads Goal Setup (ID: ${{redditAds}})
+                                    🔴 Reddit Ads Goal Setup (ID: ${{redditAds}})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>Reddit Ads Manager</strong>.</li>
@@ -2775,7 +2775,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #15202B; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #15202B; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                     X (Twitter) Ads Goal Setup (Pixel: ${{twitterAds}})
+                                    🐦 X (Twitter) Ads Goal Setup (Pixel: ${{twitterAds}})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>X Ads Manager</strong>.</li>
@@ -2794,7 +2794,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #10a37f; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #10a37f; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                     ChatGPT Ads Goal Setup (ID: ${{chatgptAds}})
+                                    🧠 ChatGPT Ads Goal Setup (ID: ${{chatgptAds}})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>ChatGPT Ads Campaign Manager</strong>.</li>
@@ -2809,7 +2809,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #FF4500; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #FF4500; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                     Reddit Ads Goal Setup (ID: ${{redditAds}})
+                                    🔴 Reddit Ads Goal Setup (ID: ${{redditAds}})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>Reddit Ads Manager</strong>.</li>
@@ -2826,7 +2826,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #FFFC00; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #000; background: #FFFC00; display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 14px;">
-                                     Snapchat Ads Goal Setup (ID: ${{snapchatAds}})
+                                    👻 Snapchat Ads Goal Setup (ID: ${{snapchatAds}})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>Snapchat Ads Manager</strong>.</li>
@@ -2842,7 +2842,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #E60023; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #E60023; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                     Pinterest Ads Goal Setup (Tag: ${{pinterestAds}})
+                                    📌 Pinterest Ads Goal Setup (Tag: ${{pinterestAds}})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>Pinterest Ads Manager</strong>.</li>
@@ -2861,7 +2861,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #10a37f; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #10a37f; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                     ChatGPT Ads Goal Setup (ID: ${{chatgptAds}})
+                                    🧠 ChatGPT Ads Goal Setup (ID: ${{chatgptAds}})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>ChatGPT Ads Campaign Manager</strong>.</li>
@@ -2876,7 +2876,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #FF4500; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #FF4500; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                     Reddit Ads Goal Setup (ID: ${{redditAds}})
+                                    🔴 Reddit Ads Goal Setup (ID: ${{redditAds}})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>Reddit Ads Manager</strong>.</li>
@@ -2940,22 +2940,22 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     const funnelQualRule = document.getElementById('funnel-qual-rule');
                     if (funnelQualHeading && funnelQualRule) {{
                         if (['hubspot', 'salesforce', 'zoho', 'servicetitan', 'housecallpro', 'gohighlevel', 'pipedrive'].includes(sot)) {{
-                            funnelQualHeading.innerHTML = ' Qualified Leads (' + selectedText + ' Stage Sync)';
+                            funnelQualHeading.innerHTML = '🎯 Qualified Leads (' + selectedText + ' Stage Sync)';
                             funnelQualRule.innerHTML = 'Configured Lead Rule: <strong>"Syncs qualified lead tags & deal stage transitions from ' + selectedText + ' Webhook"</strong>';
                         }} else if (sot === 'email') {{
-                            funnelQualHeading.innerHTML = ' Qualified Leads (Email Sales & Lead Scanner)';
+                            funnelQualHeading.innerHTML = '🎯 Qualified Leads (Email Sales & Lead Scanner)';
                             funnelQualRule.innerHTML = 'Configured Lead Rule: <strong>"Parses incoming lead notification emails & automated qualification reports"</strong>';
                         }} else if (['quickbooks', 'xero', 'zoho_books', 'netsuite', 'sage', 'freshbooks'].includes(sot)) {{
-                            funnelQualHeading.innerHTML = ' Qualified Leads (' + selectedText + ' Integration)';
+                            funnelQualHeading.innerHTML = '🎯 Qualified Leads (' + selectedText + ' Integration)';
                             funnelQualRule.innerHTML = 'Configured Lead Rule: <strong>"Qualifies leads upon initial invoice creation or customer onboarding in ' + selectedText + '"</strong>';
                         }} else if (['google_sheets', 'zapier'].includes(sot)) {{
-                            funnelQualHeading.innerHTML = ' Qualified Leads (' + selectedText + ' Feed)';
+                            funnelQualHeading.innerHTML = '🎯 Qualified Leads (' + selectedText + ' Feed)';
                             funnelQualRule.innerHTML = 'Configured Lead Rule: <strong>"Qualifies leads matching custom status rows in ' + selectedText + '"</strong>';
                         }} else {{
                             const promptInput = document.getElementById('prompt');
                             let promptVal = (promptInput && promptInput.value && promptInput.value.trim()) ? promptInput.value.trim() : 'Standard Criteria: Inquiring about core services, requesting a quote, or scheduling an appointment';
                             if (promptVal.length > 90) promptVal = promptVal.substring(0, 87) + '...';
-                            funnelQualHeading.innerHTML = ' Qualified Leads (CallRail Transcripts & Forms)';
+                            funnelQualHeading.innerHTML = '🎯 Qualified Leads (CallRail Transcripts & Forms)';
                             funnelQualRule.innerHTML = 'Configured AI Audit Rule: <strong>"' + promptVal + '"</strong>';
                         }}
                     }}
@@ -2978,16 +2978,16 @@ def view_settings(request: Request, client_id: Optional[int] = None):
 
                     if (funnelWonHeading && funnelWonSource) {{
                         if (['hubspot', 'salesforce', 'zoho', 'servicetitan', 'housecallpro', 'gohighlevel', 'pipedrive'].includes(sot)) {{
-                            funnelWonHeading.innerHTML = ' Won Deals & Closed Revenue (' + selectedText + ' Webhook Pipeline)';
+                            funnelWonHeading.innerHTML = '💰 Won Deals & Closed Revenue (' + selectedText + ' Webhook Pipeline)';
                             funnelWonSource.innerHTML = 'Source: <strong>' + selectedText + ' Webhook</strong> → Match Method: <strong>Phone & Email Session Pair</strong>';
                         }} else if (sot === 'email') {{
-                            funnelWonHeading.innerHTML = ' Won Deals & Closed Revenue (Automated Email Sales Log Scanner)';
+                            funnelWonHeading.innerHTML = '💰 Won Deals & Closed Revenue (Automated Email Sales Log Scanner)';
                             funnelWonSource.innerHTML = 'Source: <strong>Email Sales Scanner / Order Confirmations</strong> → Match Method: <strong>Phone & Email Session Pair</strong>';
                         }} else if (['quickbooks', 'xero', 'zoho_books', 'netsuite', 'sage', 'freshbooks', 'google_sheets', 'zapier'].includes(sot)) {{
-                            funnelWonHeading.innerHTML = ' Won Deals & Closed Revenue (' + selectedText + ' Integration)';
+                            funnelWonHeading.innerHTML = '💰 Won Deals & Closed Revenue (' + selectedText + ' Integration)';
                             funnelWonSource.innerHTML = 'Source: <strong>' + selectedText + ' Integration Webhook</strong> → Match Method: <strong>Phone & Email Session Pair</strong>';
                         }} else {{
-                            funnelWonHeading.innerHTML = ' Won Deals & Closed Revenue (Manual CSV / Spreadsheet Upload)';
+                            funnelWonHeading.innerHTML = '💰 Won Deals & Closed Revenue (Manual CSV / Spreadsheet Upload)';
                             funnelWonSource.innerHTML = 'Source: <strong>Manual CSV / Spreadsheet Sales Log Upload</strong> → Match Method: <strong>Phone & Email Session Pair</strong>';
                         }}
                     }}
@@ -2998,7 +2998,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         crmTitleSpan.innerText = "⚙️ " + selectedText + " Webhook";
                     }}
                     if (billingTitleSpan) {{
-                        billingTitleSpan.innerText = " " + selectedText + " Webhook";
+                        billingTitleSpan.innerText = "💳 " + selectedText + " Webhook";
                     }}
                     
                     const dealBox = document.getElementById('sot-deal-tags-box');
@@ -3199,7 +3199,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     const btnSubmit = document.getElementById('btn-settings-submit');
                     if (btnSubmit) {{
                         btnSubmit.classList.add('btn-pulse-save');
-                        btnSubmit.innerHTML = ` Save Changes (Includes ${{list.length}} Uploaded Exclusions!)`;
+                        btnSubmit.innerHTML = `💾 Save Changes (Includes ${{list.length}} Uploaded Exclusions!)`;
                     }}
                 }}
 
@@ -3242,7 +3242,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     copyBtn.innerText = "Copied!";
                     copyBtn.style.backgroundColor = "#1b5e20";
                     setTimeout(() => {{
-                        copyBtn.innerText = " Copy";
+                        copyBtn.innerText = "📋 Copy";
                         copyBtn.style.backgroundColor = "#2e7d32";
                     }}, 2000);
                 }}
@@ -3489,7 +3489,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             alertBox.className = 'alert alert-success';
                             alertBox.style.display = 'block';
                             btnSubmit.disabled = false;
-                            btnSubmit.innerText = ' Save Configuration Changes';
+                            btnSubmit.innerText = '💾 Save Configuration Changes';
                             window.scrollTo({{ top: 0, behavior: 'smooth' }});
                         }} else {{
                             throw new Error(data.detail || 'An unexpected error occurred.');
@@ -3499,7 +3499,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         alertBox.className = 'alert alert-error';
                         alertBox.style.display = 'block';
                         btnSubmit.disabled = false;
-                        btnSubmit.innerText = ' Save Configuration Changes';
+                        btnSubmit.innerText = '💾 Save Configuration Changes';
                         window.scrollTo({{ top: 0, behavior: 'smooth' }});
                     }}
                 }}
@@ -3706,430 +3706,7 @@ def create_user_invitation(request: Request, invite: UserInvite):
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
-@router.post("/dashboard/upload-sales")
-async def dashboard_upload_sales(
-    request: Request,
-    file: UploadFile = File(...),
-    client_id: int = Form(...)
-):
-    email = is_authenticated(request)
-    if not email:
-        raise HTTPException(status_code=401, detail="Session expired. Please log in again.")
-    user_role, user_client_id = get_user_role_and_client(email)
-    if user_role != "full":
-        raise HTTPException(status_code=403, detail="Unauthorized: Only managers and administrators can upload sales reports.")
-    if user_client_id is not None and client_id != user_client_id:
-        raise HTTPException(status_code=403, detail="Unauthorized: You do not have permission to upload sales for this client.")
-        
-    contents = await file.read()
-    import io
-    try:
-        if file.filename.endswith(".csv"):
-            df = pd.read_csv(io.BytesIO(contents))
-        else:
-            df = pd.read_excel(io.BytesIO(contents))
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to read file: {e}")
-        
-    columns = list(df.columns)
-    phone_col, email_col, value_col, name_col, company_col = find_dynamic_columns_custom(columns)
-    
-    if not phone_col and not email_col:
-        raise HTTPException(status_code=400, detail=f"Mapping Failure: Could not locate a valid phone or email contact column in headers: {columns}")
-        
-    stats = {"processed": 0, "successful_matches": 0, "organic_logged": 0, "errors": 0}
-    
-    conn = db_router.connect()
-    cursor = conn.cursor()
-    
-    try:
-        for _, row in df.iterrows():
-            stats["processed"] += 1
-            
-            raw_phone = str(row[phone_col]) if phone_col and pd.notna(row[phone_col]) else ""
-            raw_email = str(row[email_col]) if email_col and pd.notna(row[email_col]) else ""
-            raw_value = row[value_col] if value_col and pd.notna(row[value_col]) else 0.0
-            raw_name = str(row[name_col]).strip() if name_col and pd.notna(row[name_col]) else ""
-            raw_company = str(row[company_col]).strip() if company_col and pd.notna(row[company_col]) else ""
-            
-            norm_phone = normalize_phone(raw_phone)
-            norm_email = normalize_email(raw_email)
-            
-            try:
-                clean_val_str = re.sub(r"[^\d.]", "", str(raw_value))
-                value = float(clean_val_str) if clean_val_str else 0.0
-            except (ValueError, TypeError):
-                value = 0.0
-                
-            if not norm_phone and not norm_email and not raw_name and not raw_company:
-                stats["errors"] += 1
-                continue
-                
-            matching_session_id = None
-            match_reason = ""
-            match_fuzzy = "NO"
-            certainty_score = 100
-            current_status = None
-            
-            # Tier 1: Search by Phone Match
-            if norm_phone:
-                cursor.execute("""
-                    SELECT id, gclid, fbclid, msclkid, li_fat_id, sale_closed, value 
-                    FROM sessions 
-                    WHERE client_id = ? AND phone = ?
-                    ORDER BY created_at DESC LIMIT 1
-                """, (client_id, norm_phone))
-                row_match = cursor.fetchone()
-                if row_match:
-                    matching_session_id, g, fb, ms, li, sale_closed, val = row_match
-                    current_status = (sale_closed, val)
-                    match_reason = f"Successfully matched closed transaction via spreadsheet upload (Phone Match: {norm_phone})."
-                    
-            # Tier 2: Search by Email Match
-            if not matching_session_id and norm_email:
-                cursor.execute("""
-                    SELECT id, gclid, fbclid, msclkid, li_fat_id, sale_closed, value 
-                    FROM sessions 
-                    WHERE client_id = ? AND email = ?
-                    ORDER BY created_at DESC LIMIT 1
-                """, (client_id, norm_email))
-                row_match = cursor.fetchone()
-                if row_match:
-                    matching_session_id, g, fb, ms, li, sale_closed, val = row_match
-                    current_status = (sale_closed, val)
-                    match_reason = f"Successfully matched closed transaction via spreadsheet upload (Email Match: {norm_email})."
-                    
-            # Tier 3 & 4: Fuzzy Match against Active Sessions
-            if not matching_session_id:
-                cursor.execute("""
-                    SELECT id, phone, email, name, company, gclid, fbclid, msclkid, li_fat_id, sale_closed, value 
-                    FROM sessions 
-                    WHERE client_id = ? AND (sale_closed IS NULL OR sale_closed = 'NO')
-                    ORDER BY created_at DESC
-                """)
-                unclosed_sessions = cursor.fetchall()
-                
-                best_match_id = None
-                best_score = 0
-                best_reason = ""
-                best_click_vals = None
-                
-                for sess in unclosed_sessions:
-                    s_id, s_phone, s_email, s_name, s_company, s_g, s_fb, s_ms, s_li, s_closed, s_val = sess
-                    
-                    # Fuzzy Company Matching (Tier 3)
-                    if raw_company and s_company:
-                        score = calculate_company_similarity(raw_company, s_company)
-                        if score >= 0.85 and int(score * 100) > best_score:
-                            best_score = int(score * 100)
-                            best_match_id = s_id
-                            best_reason = f"Successfully matched closed transaction via Fuzzy Company Match ('{raw_company.strip()}' ➡️ '{s_company.strip()}')."
-                            best_click_vals = (s_closed, s_val)
-                            
-                    # Fuzzy Name Matching (Tier 4)
-                    if raw_name and s_name:
-                        score = check_name_transposition(raw_name, s_name)
-                        if score >= 0.80 and int(score * 100) > best_score:
-                            best_score = int(score * 100)
-                            best_match_id = s_id
-                            best_reason = f"Successfully matched closed transaction via Fuzzy Name Match ('{raw_name.strip()}' ➡️ '{s_name.strip()}')."
-                            best_click_vals = (s_closed, s_val)
-                            
-                if best_match_id:
-                    matching_session_id = best_match_id
-                    s_closed, s_val = best_click_vals
-                    current_status = (s_closed, s_val)
-                    match_fuzzy = "YES"
-                    certainty_score = best_score
-                    match_reason = best_reason
-                    
-            # Update database
-            if not matching_session_id:
-                cursor.execute("""
-                    INSERT INTO sessions (
-                        client_id, phone, email, name, company, source, qualified, sale_closed, value, reason, model_used, match_fuzzy, certainty_score
-                    ) VALUES (?, ?, ?, ?, ?, 'dashboard_upload', 'NO', 'YES', ?, ?, 'Dashboard Spreadsheet Ingest', 'NO', 100)
-                """, (
-                    client_id,
-                    norm_phone or None,
-                    norm_email or None,
-                    raw_name or "Dashboard Export Lead",
-                    raw_company or None,
-                    value,
-                    "Organic transaction saved: No corresponding historical click-session detected.",
-                ))
-                stats["organic_logged"] += 1
-            else:
-                if current_status and current_status[0] == "YES" and current_status[1] >= value:
-                    continue
-                    
-                cursor.execute("""
-                    UPDATE sessions SET 
-                        sale_closed = 'YES',
-                        value = ?,
-                        reason = ?,
-                        model_used = 'Dashboard Spreadsheet Ingest',
-                        match_fuzzy = ?,
-                        certainty_score = ?
-                    WHERE id = ?
-                """, (value, match_reason, match_fuzzy, certainty_score, matching_session_id))
-                stats["successful_matches"] += 1
-                
-        conn.commit()
-    except Exception as e:
-        conn.rollback()
-        raise HTTPException(status_code=500, detail=f"Database upload error: {str(e)}")
-    finally:
-        conn.close()
-        
-    return {"status": "success", "stats": stats}
 
-
-@router.post("/dashboard/settings")
-def update_client_settings(request: Request, client: ClientUpdate):
-    email = is_authenticated(request)
-    if not email:
-        raise HTTPException(status_code=401, detail="Session expired. Please log in again.")
-    user_role, user_client_id = get_user_role_and_client(email)
-    if user_role != "full":
-        raise HTTPException(status_code=403, detail="Unauthorized: Client setting modifications are restricted to managers and administrators.")
-    if user_client_id is not None and client.id != user_client_id:
-        raise HTTPException(status_code=403, detail="Unauthorized: You do not have permission to modify settings for this client account.")
-    """Endpoint to handle questionnaire form settings update."""
-    try:
-        conn = db_router.connect()
-        cursor = conn.cursor()
-        
-        # Extract column names dynamically
-        cursor.execute("PRAGMA table_info(clients)")
-        cols = [col[1] for col in cursor.fetchall()]
-        
-        # Verify client exists and fetch old settings using explicit columns order to avoid zip misalignment on PostgreSQL
-        cols_formatted = ", ".join([f'"{c}"' for c in cols])
-        cursor.execute(f"SELECT {cols_formatted} FROM clients WHERE id = ?", (client.id,))
-        client_row = cursor.fetchone()
-        if not client_row:
-            raise HTTPException(status_code=404, detail="Client not found")
-            
-        old_data = dict(zip(cols, client_row))
-        
-        # Field label mappings for change history log
-        FIELD_LABELS = {
-            "name": "Client Business Name",
-            "call_tracking_provider": "Call Tracking Provider",
-            "callrail_account_id": "CallRail Account ID",
-            "callrail_company_id": "CallRail Client ID",
-            "ctm_account_id": "CallTrackingMetrics Account ID",
-            "ctm_profile_id": "CallTrackingMetrics Client ID",
-            "wc_account_id": "WhatConverts Account ID",
-            "wc_profile_id": "WhatConverts Client ID",
-            "google_ads_customer_id": "Google Ads Customer ID",
-            "facebook_ads_id": "Facebook Ads Pixel/Account ID",
-            "linkedin_ads_id": "LinkedIn Ads Account ID",
-            "microsoft_ads_id": "Microsoft Ads Account ID",
-            "tiktok_ads_id": "TikTok Ads Pixel/Account ID",
-            "twitter_ads_id": "X (Twitter) Ads Pixel ID",
-            "pinterest_ads_id": "Pinterest Ads ID",
-            "snapchat_ads_id": "Snapchat Ads Pixel ID",
-            "chatgpt_ads_id": "ChatGPT Ads ID",
-            "reddit_ads_id": "Reddit Ads Account / Pixel ID",
-            "lead_gen_method": "Lead Gen Method",
-            "qualification_criteria": "Qualification Criteria Option",
-            "source_of_truth": "Single Source of Truth",
-            "email_provider": "Email Provider",
-            "email_account": "Email Integration Account #1",
-            "email_app_password": "Email Integration App Password #1",
-            "email_account_2": "Email Integration Account #2",
-            "email_app_password_2": "Email Integration App Password #2",
-            "email_account_3": "Email Integration Account #3",
-            "email_app_password_3": "Email Integration App Password #3",
-            "email_account_4": "Email Integration Account #4",
-            "email_app_password_4": "Email Integration App Password #4",
-            "email_account_5": "Email Integration Account #5",
-            "email_app_password_5": "Email Integration App Password #5",
-            "crm_deal_tags": "CRM Deal Tags",
-            "crm_won_deal_tags": "CRM Won Deal Tags",
-            "crm_value_field": "Google Sheet Transaction Value Column",
-            "crm_lead_tags": "CRM Lead Qualification Tags",
-            "lead_count_rule": "Lead Count Optimization Rule",
-            "exclude_past_customers": "Exclude Past Customers Setting"
-        }
-        
-        new_data = {
-            "name": client.name,
-            "call_tracking_provider": client.call_tracking_provider or "callrail",
-            "callrail_account_id": client.callrail_account_id or "",
-            "callrail_company_id": client.callrail_company_id or "",
-            "ctm_account_id": client.ctm_account_id or "",
-            "ctm_profile_id": client.ctm_profile_id or "",
-            "wc_account_id": client.wc_account_id or "",
-            "wc_profile_id": client.wc_profile_id or "",
-            "google_ads_customer_id": client.google_ads_customer_id,
-            "facebook_ads_id": client.facebook_ads_id or "",
-            "linkedin_ads_id": client.linkedin_ads_id or "",
-            "microsoft_ads_id": client.microsoft_ads_id or "",
-            "tiktok_ads_id": client.tiktok_ads_id or "",
-            "twitter_ads_id": client.twitter_ads_id or "",
-            "pinterest_ads_id": client.pinterest_ads_id or "",
-            "snapchat_ads_id": client.snapchat_ads_id or "",
-            "chatgpt_ads_id": client.chatgpt_ads_id or "",
-            "reddit_ads_id": client.reddit_ads_id or "",
-            "lead_gen_method": client.lead_gen_method,
-            "qualification_criteria": client.qualification_criteria,
-            "source_of_truth": client.source_of_truth,
-            "email_provider": client.email_provider or "",
-            "email_account": client.email_account or "",
-            "email_app_password": client.email_app_password or "",
-            "email_account_2": client.email_account_2 or "",
-            "email_app_password_2": client.email_app_password_2 or "",
-            "email_account_3": client.email_account_3 or "",
-            "email_app_password_3": client.email_app_password_3 or "",
-            "email_account_4": client.email_account_4 or "",
-            "email_app_password_4": client.email_app_password_4 or "",
-            "email_account_5": client.email_account_5 or "",
-            "email_app_password_5": client.email_app_password_5 or "",
-            "crm_deal_tags": client.crm_deal_tags or "",
-            "crm_won_deal_tags": client.crm_won_deal_tags or "",
-            "crm_value_field": getattr(client, 'crm_value_field', '') or "",
-            "crm_lead_tags": client.crm_lead_tags or "",
-            "lead_count_rule": client.lead_count_rule,
-            "exclude_past_customers": client.exclude_past_customers
-        }
-
-        # Scan each field and write updates to client_config_history
-        for field, label in FIELD_LABELS.items():
-            old_val = str(old_data.get(field) or "").strip()
-            new_val = str(new_data.get(field) or "").strip()
-            if old_val != new_val:
-                cursor.execute("""
-                    INSERT INTO client_config_history (client_id, changed_by, feature_name, old_value, new_value)
-                    VALUES (?, ?, ?, ?, ?)
-                """, (client.id, email, label, old_val, new_val))
-            
-        # Update settings
-        cursor.execute("""
-            UPDATE clients SET
-                name = ?,
-                callrail_account_id = ?,
-                callrail_company_id = ?,
-                google_ads_customer_id = ?,
-                facebook_ads_id = ?,
-                linkedin_ads_id = ?,
-                microsoft_ads_id = ?,
-                tiktok_ads_id = ?,
-                twitter_ads_id = ?,
-                pinterest_ads_id = ?,
-                snapchat_ads_id = ?,
-                chatgpt_ads_id = ?,
-                reddit_ads_id = ?,
-                lead_gen_method = ?,
-                qualification_criteria = ?,
-                source_of_truth = ?,
-                email_provider = ?,
-                email_account = ?,
-                email_app_password = ?,
-                email_account_2 = ?,
-                email_app_password_2 = ?,
-                email_account_3 = ?,
-                email_app_password_3 = ?,
-                email_account_4 = ?,
-                email_app_password_4 = ?,
-                email_account_5 = ?,
-                email_app_password_5 = ?,
-                crm_deal_tags = ?,
-                crm_won_deal_tags = ?,
-                crm_value_field = ?,
-                crm_lead_tags = ?,
-                lead_count_rule = ?,
-                exclude_past_customers = ?,
-                call_tracking_provider = ?,
-                ctm_account_id = ?,
-                ctm_profile_id = ?,
-                wc_account_id = ?,
-                wc_profile_id = ?
-            WHERE id = ?
-        """, (
-            str(client.name or ""),
-            client.callrail_account_id or None,
-            client.callrail_company_id or None,
-            str(client.google_ads_customer_id or ""),
-            str(client.facebook_ads_id or ""),
-            str(client.linkedin_ads_id or ""),
-            str(client.microsoft_ads_id or ""),
-            str(client.tiktok_ads_id or ""),
-            str(client.twitter_ads_id or ""),
-            str(client.pinterest_ads_id or ""),
-            str(client.snapchat_ads_id or ""),
-            str(client.chatgpt_ads_id or ""),
-            str(getattr(client, 'reddit_ads_id', '') or ""),
-            str(client.lead_gen_method or "both"),
-            str(client.qualification_criteria or "ai_rules"),
-            str(client.source_of_truth or "manual"),
-            str(client.email_provider or ""),
-            str(client.email_account or ""),
-            str(client.email_app_password or ""),
-            str(client.email_account_2 or ""),
-            str(client.email_app_password_2 or ""),
-            str(client.email_account_3 or ""),
-            str(client.email_app_password_3 or ""),
-            str(client.email_account_4 or ""),
-            str(client.email_app_password_4 or ""),
-            str(client.email_account_5 or ""),
-            str(client.email_app_password_5 or ""),
-            str(client.crm_deal_tags or ""),
-            str(client.crm_won_deal_tags or ""),
-            str(getattr(client, 'crm_value_field', '') or ""),
-            str(client.crm_lead_tags or ""),
-            str(client.lead_count_rule or "all"),
-            str(client.exclude_past_customers or "NO"),
-            str(client.call_tracking_provider or "callrail"),
-            str(client.ctm_account_id or ""),
-            str(client.ctm_profile_id or ""),
-            str(client.wc_account_id or ""),
-            str(client.wc_profile_id or ""),
-            int(client.id)
-        ))
-        
-        # Handle excluded customers updates if a new list was uploaded
-        if client.excluded_customers is not None and len(client.excluded_customers) > 0:
-            if getattr(client, 'exclusion_action', 'append') == 'replace':
-                cursor.execute("DELETE FROM excluded_customers WHERE client_id = ?", (client.id,))
-                
-            for cust in client.excluded_customers:
-                normalized_p = normalize_phone(cust.phone)
-                email_clean = cust.email.strip().lower() if cust.email else ""
-                
-                # Check for duplicates before inserting in append mode
-                if getattr(client, 'exclusion_action', 'append') == 'append':
-                    exists = False
-                    if normalized_p:
-                        cursor.execute("SELECT id FROM excluded_customers WHERE client_id = ? AND phone = ?", (client.id, normalized_p))
-                        if cursor.fetchone():
-                            exists = True
-                    if not exists and email_clean:
-                        cursor.execute("SELECT id FROM excluded_customers WHERE client_id = ? AND email = ?", (client.id, email_clean))
-                        if cursor.fetchone():
-                            exists = True
-                    if exists:
-                        continue # Skip duplicate record
-                        
-                cursor.execute("""
-                    INSERT INTO excluded_customers (client_id, first_name, last_name, email, phone, company_name)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (
-                    client.id,
-                    cust.first_name,
-                    cust.last_name,
-                    email_clean,
-                    normalized_p,
-                    cust.company_name
-                ))
-        
-        conn.commit()
-        conn.close()
-        return {"status": "success", "message": f"Settings for '{client.name}' updated successfully!"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database update error: {str(e)}")
 
 @router.get("/dashboard/add-client", response_class=HTMLResponse)
 def add_client_page(request: Request):
@@ -4155,15 +3732,15 @@ def add_client_page(request: Request):
         next_id = 1
     admin_link_html = ""
     if email in ADMIN_EMAILS:
-        admin_link_html = ' | <a href="/admin/users" style="color: #2e7d32; text-decoration: none; font-weight: bold; margin-left: 5px;">️ Admin User Directory</a>'
+        admin_link_html = ' | <a href="/admin/users" style="color: #2e7d32; text-decoration: none; font-weight: bold; margin-left: 5px;">🛡️ Admin User Directory</a>'
         
     user_header_bar = f"""
     <div style="display: flex; justify-content: space-between; align-items: center; background-color: #f1f3f4; padding: 10px 15px; border-radius: 6px; margin-bottom: 20px; font-size: 13px;">
         <div>
-            <span style="color: #666; font-weight: bold;"> Active Session:</span> <span style="font-weight: bold; color: #1a237e;">{email}</span>
+            <span style="color: #666; font-weight: bold;">👤 Active Session:</span> <span style="font-weight: bold; color: #1a237e;">{email}</span>
             {admin_link_html}
         </div>
-        <a href="/logout" style="color: #c62828; text-decoration: none; font-weight: bold; display: flex; align-items: center; gap: 4px;"> Log Out</a>
+        <a href="/logout" style="color: #c62828; text-decoration: none; font-weight: bold; display: flex; align-items: center; gap: 4px;">🚪 Log Out</a>
     </div>
     """
 
@@ -4172,7 +3749,7 @@ def add_client_page(request: Request):
     <!DOCTYPE html>
     <html>
         <head>
-            <title>Onboard New Client </title>
+            <title>Onboard New Client 👤</title>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <style>
@@ -4348,7 +3925,7 @@ def add_client_page(request: Request):
         </head>
         <body>
             <div class="container">
-                <h1 id="heading-title">Onboard Client Account </h1>
+                <h1 id="heading-title">Onboard Client Account 👤</h1>
                 <p class="subtitle" id="heading-subtitle">Agency Setup & Software Mapping Pipeline</p>
                 
                 <!-- Step Progress -->
@@ -4369,7 +3946,7 @@ def add_client_page(request: Request):
                     <!-- STEP 1: Accounts & Tracking channels -->
                     <div class="wizard-step active" id="step-panel-1">
                         <div class="instructions">
-                             <strong>Step 1: General Profile & Ad Accounts</strong><br>
+                            🚀 <strong>Step 1: General Profile & Ad Accounts</strong><br>
                             Enter the general company properties and the advertising account IDs to sync conversions and metrics.
                         </div>
                         
@@ -4480,7 +4057,7 @@ def add_client_page(request: Request):
                                 <div style="display: flex; align-items: center; gap: 6px;">
                                     <label for="twitter_ads_id" style="margin-bottom: 0;">X (Twitter) Ads Pixel ID</label>
                                     <span class="tooltip-icon">
-                                        
+                                        💬
                                         <span class="tooltip-text" style="width: 250px;">
                                             ⚠️ <strong>Manual UTM required:</strong> To track X click IDs (twclid) via CallRail/form submissions, you must manually append <code>?twclid={{click_id}}</code> to your X Ad destination URLs.
                                         </span>
@@ -4497,7 +4074,7 @@ def add_client_page(request: Request):
                     <!-- STEP 2: Lead Gen & Qualification -->
                     <div class="wizard-step" id="step-panel-2">
                         <div class="instructions">
-                             <strong>Step 2: Lead Generation & Qualification Preferences</strong><br>
+                            🧠 <strong>Step 2: Lead Generation & Qualification Preferences</strong><br>
                             Tell us how this client receives and identifies a qualified lead so that Claude's sales auditing aligns perfectly.
                         </div>
                         
@@ -4531,22 +4108,22 @@ def add_client_page(request: Request):
                         <div class="form-group">
                             <label for="qualification_criteria" style="display: inline-flex; align-items: center; gap: 5px;">
                                 How do you qualify a lead?
-                                <span class="tooltip">
+                                <span class="tooltip">💬
                                     <span class="tooltiptext">Define a lead stage that is &quot;good enough&quot;, and would be happy with paying for all day long from your Ads. This is the minimum standard the system will go for when optimizing your Ads.</span>
                                 </span>
                             </label>
                             <select id="qualification_criteria">
-                                <option value="C"> Option C: Someone who books an appointment (Local Services Default)</option>
-                                <option value="A"> Option A: Someone that I have a conversation with</option>
-                                <option value="B"> Option B: Someone who shows strong buying interest</option>
-                                <option value="D"> Option D: Someone who books a demo</option>
-                                <option value="E"> Option E: Someone who requests a quote</option>
-                                <option value="F"> Option F: Someone who we send a proposal</option>
-                                <option value="H"> Option H: Someone who has qualified insurance</option>
-                                <option value="I"> Option I: Someone who is credit pre-qualified</option>
+                                <option value="C">👤 Option C: Someone who books an appointment (Local Services Default)</option>
+                                <option value="A">👤 Option A: Someone that I have a conversation with</option>
+                                <option value="B">👤 Option B: Someone who shows strong buying interest</option>
+                                <option value="D">👤 Option D: Someone who books a demo</option>
+                                <option value="E">👤 Option E: Someone who requests a quote</option>
+                                <option value="F">👤 Option F: Someone who we send a proposal</option>
+                                <option value="H">👤 Option H: Someone who has qualified insurance</option>
+                                <option value="I">👤 Option I: Someone who is credit pre-qualified</option>
                             </select>
                             <small style="color: #666; font-size: 11px; margin-top: 4px; display: block;">
-                                 This choice dynamically feeds directly into <strong>Claude 4.5 Haiku's prompt</strong> to customize auditing.
+                                💡 This choice dynamically feeds directly into <strong>Claude 4.5 Haiku's prompt</strong> to customize auditing.
                             </small>
                         </div>
                     </div>
@@ -4554,7 +4131,7 @@ def add_client_page(request: Request):
                     <!-- STEP 3: Source of Truth & CRM -->
                     <div class="wizard-step" id="step-panel-3">
                         <div class="instructions">
-                             <strong>Step 3: Single Source of Truth & Integration Mapping</strong><br>
+                            📁 <strong>Step 3: Single Source of Truth & Integration Mapping</strong><br>
                             Identify where your conversion status lives. Your platform scans this resource to upload revenue data to Ad Networks.
                         </div>
                         
@@ -4600,7 +4177,7 @@ def add_client_page(request: Request):
                         
                                                 <div id="sot-hubspot-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #fff8e1; border-left: 4px solid #ffb300; padding: 15px; border-radius: 4px; color: #5d4037; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                 <strong>HubSpot Private App Quick Setup Guide:</strong><br>
+                                💡 <strong>HubSpot Private App Quick Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #4e342e;">
                                     <li>Log into HubSpot as a <strong>Super Admin</strong>.</li>
                                     <li>Go to <strong>Settings (Gear Icon) &gt; Integrations &gt; Private Apps</strong>.</li>
@@ -4617,14 +4194,14 @@ def add_client_page(request: Request):
                                     <label style="font-size: 11px; font-weight: bold; color: #5d4037; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
                                     <div class="webhook-input-group">
                                         <input type="text" class="webhook-input" id="wiz-sot-hubspot-instructions-box-input" readonly value="" data-suffix="/webhooks/crm?client_id={next_id}">
-                                        <button type="button" onclick="copyText('wiz-sot-hubspot-instructions-box-input', 'wiz-sot-hubspot-instructions-box-btn')" id="wiz-sot-hubspot-instructions-box-btn" class="btn-copy"> Copy Webhook URL</button>
+                                        <button type="button" onclick="copyText('wiz-sot-hubspot-instructions-box-input', 'wiz-sot-hubspot-instructions-box-btn')" id="wiz-sot-hubspot-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         <div id="sot-salesforce-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #e3f2fd; border-left: 4px solid #1e88e5; padding: 15px; border-radius: 4px; color: #0d47a1; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                 <strong>Salesforce Outbound Flow Setup Guide:</strong><br>
+                                💡 <strong>Salesforce Outbound Flow Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #1565c0;">
                                 <li>In Salesforce Setup, go to <strong>Named Credentials &gt; External Credentials</strong> tab, click <strong>New</strong>. Label <code>LeadGroove External Credential</code>, Name <code>LeadGroove_External_Credential</code>, Protocol <strong>Custom</strong>. Save, scroll to <em>Principals</em>, click <strong>New</strong> and define a principal named <code>LeadGroove_Principal</code>.</li>
                                 <li>Create a <strong>Permission Set</strong> in Setup named <code>LeadGroove Webhook Access</code>. In it, click <strong>External Credential Principal Access</strong>, enable your new credential and principal, and assign this permission set to any integrating users.</li>
@@ -4636,14 +4213,14 @@ def add_client_page(request: Request):
                                     <label style="font-size: 11px; font-weight: bold; color: #0d47a1; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
                                     <div class="webhook-input-group">
                                         <input type="text" class="webhook-input" id="wiz-sot-salesforce-instructions-box-input" readonly value="" data-suffix="/webhooks/crm?client_id={next_id}">
-                                        <button type="button" onclick="copyText('wiz-sot-salesforce-instructions-box-input', 'wiz-sot-salesforce-instructions-box-btn')" id="wiz-sot-salesforce-instructions-box-btn" class="btn-copy"> Copy Webhook URL</button>
+                                        <button type="button" onclick="copyText('wiz-sot-salesforce-instructions-box-input', 'wiz-sot-salesforce-instructions-box-btn')" id="wiz-sot-salesforce-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         <div id="sot-zoho-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #e8f5e9; border-left: 4px solid #2e7d32; padding: 15px; border-radius: 4px; color: #1b5e20; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                 <strong>Zoho CRM Outbound Webhook Setup Guide:</strong><br>
+                                💡 <strong>Zoho CRM Outbound Webhook Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #2e7d32;">
                                 <li>Click the <strong>Setup (Gear Icon)</strong> in the top-right corner of your Zoho CRM dashboard.</li>
                                 <li>Under <strong>Automation</strong>, click on <strong>Actions</strong>, then select the <strong>Webhooks</strong> tab at the top.</li>
@@ -4654,14 +4231,14 @@ def add_client_page(request: Request):
                                     <label style="font-size: 11px; font-weight: bold; color: #1b5e20; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
                                     <div class="webhook-input-group">
                                         <input type="text" class="webhook-input" id="wiz-sot-zoho-instructions-box-input" readonly value="" data-suffix="/webhooks/crm?client_id={next_id}">
-                                        <button type="button" onclick="copyText('wiz-sot-zoho-instructions-box-input', 'wiz-sot-zoho-instructions-box-btn')" id="wiz-sot-zoho-instructions-box-btn" class="btn-copy"> Copy Webhook URL</button>
+                                        <button type="button" onclick="copyText('wiz-sot-zoho-instructions-box-input', 'wiz-sot-zoho-instructions-box-btn')" id="wiz-sot-zoho-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         <div id="sot-servicetitan-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #f3f4f6; border-left: 4px solid #4b5563; padding: 15px; border-radius: 4px; color: #1f2937; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                 <strong>ServiceTitan Webhooks V2 Quick Setup Guide:</strong><br>
+                                💡 <strong>ServiceTitan Webhooks V2 Quick Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #374151;">
                                     <li>Navigate to the <strong>ServiceTitan Developer Portal</strong> at <a href="https://developer.servicetitan.io" target="_blank" style="color: #1a237e; font-weight: bold; text-decoration: none;">developer.servicetitan.io</a>.</li>
                                     <li>Click <strong>Create and Manage Applications ➡️ Create New App</strong>. Name it <code>LeadGroove Webhook Sync</code> and set scopes <code>crm.objects.leads.read</code> / <code>jpm.objects.jobs.read</code>.</li>
@@ -4671,14 +4248,14 @@ def add_client_page(request: Request):
                                     <label style="font-size: 11px; font-weight: bold; color: #1f2937; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
                                     <div class="webhook-input-group">
                                         <input type="text" class="webhook-input" id="wiz-sot-servicetitan-instructions-box-input" readonly value="" data-suffix="/webhooks/crm?client_id={next_id}">
-                                        <button type="button" onclick="copyText('wiz-sot-servicetitan-instructions-box-input', 'wiz-sot-servicetitan-instructions-box-btn')" id="wiz-sot-servicetitan-instructions-box-btn" class="btn-copy"> Copy Webhook URL</button>
+                                        <button type="button" onclick="copyText('wiz-sot-servicetitan-instructions-box-input', 'wiz-sot-servicetitan-instructions-box-btn')" id="wiz-sot-servicetitan-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         <div id="sot-gohighlevel-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #e8eaf6; border-left: 4px solid #3f51b5; padding: 15px; border-radius: 4px; color: #1a237e; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                 <strong>GoHighLevel (GHL) Workflow Webhook Setup Guide:</strong><br>
+                                💡 <strong>GoHighLevel (GHL) Workflow Webhook Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #1a237e;">
                                 <li>Log into your <strong>GoHighLevel Sub-Account / Agency Portal</strong>.</li>
                                 <li>Go to <strong>Automation ➡️ Workflows</strong> and click <strong>+ Create Workflow</strong>.</li>
@@ -4690,14 +4267,14 @@ def add_client_page(request: Request):
                                     <label style="font-size: 11px; font-weight: bold; color: #1a237e; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
                                     <div class="webhook-input-group">
                                         <input type="text" class="webhook-input" id="wiz-sot-gohighlevel-instructions-box-input" readonly value="" data-suffix="/webhooks/crm?client_id={next_id}">
-                                        <button type="button" onclick="copyText('wiz-sot-gohighlevel-instructions-box-input', 'wiz-sot-gohighlevel-instructions-box-btn')" id="wiz-sot-gohighlevel-instructions-box-btn" class="btn-copy"> Copy Webhook URL</button>
+                                        <button type="button" onclick="copyText('wiz-sot-gohighlevel-instructions-box-input', 'wiz-sot-gohighlevel-instructions-box-btn')" id="wiz-sot-gohighlevel-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         <div id="sot-housecallpro-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #fff3e0; border-left: 4px solid #e65100; padding: 15px; border-radius: 4px; color: #e65100; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                 <strong>Housecall Pro Webhooks Quick Setup Guide:</strong><br>
+                                💡 <strong>Housecall Pro Webhooks Quick Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #e65100;">
                                     <li>Sign in as an <strong>Admin</strong> user in Housecall Pro.</li>
                                     <li>Go to <strong>My Apps ➡️ All Apps</strong>, search for <strong>Webhooks</strong>, and click to open.</li>
@@ -4708,14 +4285,14 @@ def add_client_page(request: Request):
                                     <label style="font-size: 11px; font-weight: bold; color: #e65100; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
                                     <div class="webhook-input-group">
                                         <input type="text" class="webhook-input" id="wiz-sot-housecallpro-instructions-box-input" readonly value="" data-suffix="/webhooks/crm?client_id={next_id}">
-                                        <button type="button" onclick="copyText('wiz-sot-housecallpro-instructions-box-input', 'wiz-sot-housecallpro-instructions-box-btn')" id="wiz-sot-housecallpro-instructions-box-btn" class="btn-copy"> Copy Webhook URL</button>
+                                        <button type="button" onclick="copyText('wiz-sot-housecallpro-instructions-box-input', 'wiz-sot-housecallpro-instructions-box-btn')" id="wiz-sot-housecallpro-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         <div id="sot-quickbooks-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #e3f2fd; border-left: 4px solid #0288d1; padding: 15px; border-radius: 4px; color: #01579b; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                 <strong>QuickBooks Online Webhooks Setup Guide:</strong><br>
+                                💡 <strong>QuickBooks Online Webhooks Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #0277bd;">
                                     <li>Log into the <strong>Intuit Developer Portal</strong> at <a href="https://developer.intuit.com" target="_blank" style="color: #1a237e; font-weight: bold; text-decoration: none;">developer.intuit.com</a>.</li>
                                     <li>Go to <strong>Production Settings ➡️ Webhooks</strong> in your App sidebar.</li>
@@ -4726,14 +4303,14 @@ def add_client_page(request: Request):
                                     <label style="font-size: 11px; font-weight: bold; color: #01579b; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
                                     <div class="webhook-input-group">
                                         <input type="text" class="webhook-input" id="wiz-sot-quickbooks-instructions-box-input" readonly value="" data-suffix="/webhooks/billing?client_id={next_id}">
-                                        <button type="button" onclick="copyText('wiz-sot-quickbooks-instructions-box-input', 'wiz-sot-quickbooks-instructions-box-btn')" id="wiz-sot-quickbooks-instructions-box-btn" class="btn-copy"> Copy Webhook URL</button>
+                                        <button type="button" onclick="copyText('wiz-sot-quickbooks-instructions-box-input', 'wiz-sot-quickbooks-instructions-box-btn')" id="wiz-sot-quickbooks-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         <div id="sot-xero-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #e0f7fa; border-left: 4px solid #00b0ff; padding: 15px; border-radius: 4px; color: #006064; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                 <strong>Xero Webhooks Setup Guide:</strong><br>
+                                💡 <strong>Xero Webhooks Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #00838f;">
                                     <li>Log into <strong>Xero Developer Portal</strong> under My Apps, select your App, and open the <strong>Webhooks</strong> tab.</li>
                                     <li>Paste your live endpoint below into the <strong>Send notifications to</strong> field.</li>
@@ -4743,14 +4320,14 @@ def add_client_page(request: Request):
                                     <label style="font-size: 11px; font-weight: bold; color: #006064; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
                                     <div class="webhook-input-group">
                                         <input type="text" class="webhook-input" id="wiz-sot-xero-instructions-box-input" readonly value="" data-suffix="/webhooks/billing?client_id={next_id}">
-                                        <button type="button" onclick="copyText('wiz-sot-xero-instructions-box-input', 'wiz-sot-xero-instructions-box-btn')" id="wiz-sot-xero-instructions-box-btn" class="btn-copy"> Copy Webhook URL</button>
+                                        <button type="button" onclick="copyText('wiz-sot-xero-instructions-box-input', 'wiz-sot-xero-instructions-box-btn')" id="wiz-sot-xero-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         <div id="sot-zoho_books-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #e8f5e9; border-left: 4px solid #2e7d32; padding: 15px; border-radius: 4px; color: #1b5e20; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                 <strong>Zoho Books Webhooks Setup Guide:</strong><br>
+                                💡 <strong>Zoho Books Webhooks Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #1b5e20;">
                                     <li>Go to <strong>Settings ➡️ Developer Space ➡️ Webhooks</strong> in Zoho Books and click <strong>+ New Webhook</strong>.</li>
                                     <li>Paste your custom endpoint below into <strong>URL to Notify</strong>, set Module to <strong>Invoices</strong>, and select event <strong>Invoice Paid</strong>!</li>
@@ -4759,14 +4336,14 @@ def add_client_page(request: Request):
                                     <label style="font-size: 11px; font-weight: bold; color: #1b5e20; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
                                     <div class="webhook-input-group">
                                         <input type="text" class="webhook-input" id="wiz-sot-zoho_books-instructions-box-input" readonly value="" data-suffix="/webhooks/billing?client_id={next_id}">
-                                        <button type="button" onclick="copyText('wiz-sot-zoho_books-instructions-box-input', 'wiz-sot-zoho_books-instructions-box-btn')" id="wiz-sot-zoho_books-instructions-box-btn" class="btn-copy"> Copy Webhook URL</button>
+                                        <button type="button" onclick="copyText('wiz-sot-zoho_books-instructions-box-input', 'wiz-sot-zoho_books-instructions-box-btn')" id="wiz-sot-zoho_books-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         <div id="sot-netsuite-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #eceff1; border-left: 4px solid #455a64; padding: 15px; border-radius: 4px; color: #263238; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                 <strong>NetSuite SuiteScript Integration Guide:</strong><br>
+                                💡 <strong>NetSuite SuiteScript Integration Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #37474f;">
                                     <li>Deploy a <strong>SuiteScript 2.x User Event Script</strong> on `Invoice` or `CustomerPayment` records.</li>
                                     <li>On `afterSubmit`, trigger an outbound HTTP POST to your web receiver endpoint below.</li>
@@ -4775,14 +4352,14 @@ def add_client_page(request: Request):
                                     <label style="font-size: 11px; font-weight: bold; color: #263238; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
                                     <div class="webhook-input-group">
                                         <input type="text" class="webhook-input" id="wiz-sot-netsuite-instructions-box-input" readonly value="" data-suffix="/webhooks/billing?client_id={next_id}">
-                                        <button type="button" onclick="copyText('wiz-sot-netsuite-instructions-box-input', 'wiz-sot-netsuite-instructions-box-btn')" id="wiz-sot-netsuite-instructions-box-btn" class="btn-copy"> Copy Webhook URL</button>
+                                        <button type="button" onclick="copyText('wiz-sot-netsuite-instructions-box-input', 'wiz-sot-netsuite-instructions-box-btn')" id="wiz-sot-netsuite-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         <div id="sot-sage-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #fff3e0; border-left: 4px solid #e65100; padding: 15px; border-radius: 4px; color: #e65100; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                 <strong>Sage Accounting Webhooks Setup Guide:</strong><br>
+                                💡 <strong>Sage Accounting Webhooks Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #e65100;">
                                     <li>In Sage Developer Portal, configure webhooks and paste your dynamic endpoint URL below.</li>
                                     <li>Subscribe to <code>sales_invoice.paid</code> and <code>payment_received</code>!</li>
@@ -4791,14 +4368,14 @@ def add_client_page(request: Request):
                                     <label style="font-size: 11px; font-weight: bold; color: #e65100; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
                                     <div class="webhook-input-group">
                                         <input type="text" class="webhook-input" id="wiz-sot-sage-instructions-box-input" readonly value="" data-suffix="/webhooks/billing?client_id={next_id}">
-                                        <button type="button" onclick="copyText('wiz-sot-sage-instructions-box-input', 'wiz-sot-sage-instructions-box-btn')" id="wiz-sot-sage-instructions-box-btn" class="btn-copy"> Copy Webhook URL</button>
+                                        <button type="button" onclick="copyText('wiz-sot-sage-instructions-box-input', 'wiz-sot-sage-instructions-box-btn')" id="wiz-sot-sage-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         <div id="sot-freshbooks-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #f3e5f5; border-left: 4px solid #4a148c; padding: 15px; border-radius: 4px; color: #4a148c; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                 <strong>FreshBooks Billing Webhooks Guide:</strong><br>
+                                💡 <strong>FreshBooks Billing Webhooks Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #4a148c;">
                                     <li>Subscribe to webhook notifications in FreshBooks Developer Center and paste your endpoint below.</li>
                                     <li>Set trigger event to <code>invoice.payment.create</code>.</li>
@@ -4807,14 +4384,14 @@ def add_client_page(request: Request):
                                     <label style="font-size: 11px; font-weight: bold; color: #4a148c; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
                                     <div class="webhook-input-group">
                                         <input type="text" class="webhook-input" id="wiz-sot-freshbooks-instructions-box-input" readonly value="" data-suffix="/webhooks/billing?client_id={next_id}">
-                                        <button type="button" onclick="copyText('wiz-sot-freshbooks-instructions-box-input', 'wiz-sot-freshbooks-instructions-box-btn')" id="wiz-sot-freshbooks-instructions-box-btn" class="btn-copy"> Copy Webhook URL</button>
+                                        <button type="button" onclick="copyText('wiz-sot-freshbooks-instructions-box-input', 'wiz-sot-freshbooks-instructions-box-btn')" id="wiz-sot-freshbooks-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         <div id="sot-google_sheets-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #efebe9; border-left: 4px solid #4e342e; padding: 15px; border-radius: 4px; color: #4e342e; font-size: 13px; line-height: 1.5; margin-bottom: 0; text-align: left;">
-                                 <strong>Google Sheets (Live Sync via Apps Script) Setup Guide:</strong><br>
+                                💡 <strong>Google Sheets (Live Sync via Apps Script) Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 8px; margin-bottom: 8px; line-height: 1.6; font-size: 12px; color: #4e342e;">
                                     <li><strong>Define Lead & Won Deal Tags Above:</strong> Enter status tags in the <em>Qualified Lead Tags</em> and <em>Won Deal Tags</em> boxes above (e.g. <code>appointment-booked</code> or <code>closed-won</code>).</li>
                                     <li><strong>Format Row 1 Column Headings:</strong> Ensure your Google Sheet contains these standard Row 1 headers:
@@ -4832,14 +4409,14 @@ def add_client_page(request: Request):
                                     <label style="font-size: 11px; font-weight: bold; color: #4e342e; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
                                     <div class="webhook-input-group">
                                         <input type="text" class="webhook-input" id="wiz-sot-google_sheets-instructions-box-input" readonly value="" data-suffix="/webhooks/crm?client_id={next_id}">
-                                        <button type="button" onclick="copyText('wiz-sot-google_sheets-instructions-box-input', 'wiz-sot-google_sheets-instructions-box-btn')" id="wiz-sot-google_sheets-instructions-box-btn" class="btn-copy"> Copy Webhook URL</button>
+                                        <button type="button" onclick="copyText('wiz-sot-google_sheets-instructions-box-input', 'wiz-sot-google_sheets-instructions-box-btn')" id="wiz-sot-google_sheets-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
                                     </div>
                                 </div>
                             </div>
                         </div>
                                                 <div id="sot-zapier-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #f57c00; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #fff3e0; border-left: 4px solid #ff9800; padding: 15px; border-radius: 4px; color: #e65100; font-size: 13px; line-height: 1.6; margin-bottom: 0; text-align: left;">
-                                 <strong>Webhooks by Zapier Custom Setup Guide:</strong><br>
+                                💡 <strong>Webhooks by Zapier Custom Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 10px; margin-bottom: 10px; line-height: 1.8; font-size: 12px; color: #e65100;">
                                     <li><strong>Indicate Conversion Tags Above:</strong> In the fields above, enter the exact tags or statuses (e.g. <code>appointment-booked</code>, <code>closed-won</code>, <code>paid</code>) that signify a <strong>Qualified Lead</strong> and a <strong>Won Deal</strong> in your pipeline.</li>
                                     <li><strong>Create a Zap in Zapier:</strong> Set your <strong>Trigger</strong> app (e.g. Stripe, PayPal, Typeform, Calendly, or custom CRM).</li>
@@ -4861,7 +4438,7 @@ def add_client_page(request: Request):
                                     </div>
                                     <div style="display: flex; align-items: center; justify-content: space-around; gap: 8px; flex-wrap: wrap; text-align: center; margin-bottom: 12px;">
                                         <div style="background: #fff8e1; border: 1px solid #ffe0b2; border-radius: 6px; padding: 10px; min-width: 120px; flex: 1;">
-                                            <div style="font-size: 18px;"></div>
+                                            <div style="font-size: 18px;">📥</div>
                                             <div style="font-weight: bold; font-size: 11px; color: #e65100;">1. Trigger App</div>
                                             <div style="font-size: 10px; color: #795548;">CRM, Form, Stripe</div>
                                         </div>
@@ -4873,7 +4450,7 @@ def add_client_page(request: Request):
                                         </div>
                                         <div style="font-size: 16px; color: #ff9800; font-weight: bold;">➔</div>
                                         <div style="background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 6px; padding: 10px; min-width: 120px; flex: 1;">
-                                            <div style="font-size: 18px;"></div>
+                                            <div style="font-size: 18px;">🎯</div>
                                             <div style="font-weight: bold; font-size: 11px; color: #2e7d32;">3. LeadGrove Engine</div>
                                             <div style="font-size: 10px; color: #388e3c;">Ad Network Uploads</div>
                                         </div>
@@ -4895,14 +4472,14 @@ def add_client_page(request: Request):
                                     <label style="font-size: 11px; font-weight: bold; color: #f57f17; display: block; margin-bottom: 5px;">⚡ YOUR TARGET WEBHOOK ENDPOINT URL:</label>
                                     <div class="webhook-input-group">
                                         <input type="text" class="webhook-input" id="wiz-sot-zapier-instructions-box-input" readonly value="" data-suffix="/webhooks/crm?client_id={next_id}">
-                                        <button type="button" onclick="copyText('wiz-sot-zapier-instructions-box-input', 'wiz-sot-zapier-instructions-box-btn')" id="wiz-sot-zapier-instructions-box-btn" class="btn-copy"> Copy Webhook URL</button>
+                                        <button type="button" onclick="copyText('wiz-sot-zapier-instructions-box-input', 'wiz-sot-zapier-instructions-box-btn')" id="wiz-sot-zapier-instructions-box-btn" class="btn-copy">📋 Copy Webhook URL</button>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         <div id="sot-monthly-email-instructions-box" class="conditional-box" style="background-color: #fafafa; border: 1px dashed #ccc; border-radius: 8px; padding: 20px; margin-top: 15px; display: none;">
                             <div style="background-color: #e8eaf6; border-left: 4px solid #1a237e; padding: 15px; border-radius: 4px; color: #1a237e; font-size: 13px; line-height: 1.6; margin-bottom: 0; text-align: left;">
-                                 <strong>Monthly Sales Spreadsheet Email Ingestion Setup Guide:</strong><br>
+                                💡 <strong>Monthly Sales Spreadsheet Email Ingestion Setup Guide:</strong><br>
                                 <ol style="padding-left: 20px; margin-top: 10px; margin-bottom: 10px; line-height: 1.8; font-size: 12px; color: #1a237e;">
                                     <li><strong>Setup Email Forwarding:</strong> Set up automated forwarding or email your monthly sales spreadsheet directly to:<br>
                                         <div style="margin-top: 6px; margin-bottom: 6px; background: white; padding: 10px; border-radius: 6px; border: 1px solid #c5cae9; display: inline-block;">
@@ -4954,7 +4531,7 @@ def add_client_page(request: Request):
                                 <!-- Dynamic Instructions per VoIP Provider -->
 
                                 <div id="voip-inst-dialpad" class="voip-inst-card" style="display: none; background-color: #f3e5f5; border-left: 4px solid #7b1fa2; padding: 14px; border-radius: 4px; color: #4a148c; font-size: 12px; line-height: 1.5;">
-                                     <strong>Dialpad (Ai Recap) Setup Instructions:</strong><br>
+                                    💡 <strong>Dialpad (Ai Recap) Setup Instructions:</strong><br>
                                     1. In Dialpad Admin Settings, go to <strong>Integrations ➡️ Webhooks ➡️ Add Webhook</strong>.<br>
                                     2. Set Target URL to your endpoint below, and check events <strong>"call_completed"</strong> and <strong>"transcript_ready"</strong>.<br>
                                     3. Dialpad's native AI transcripts will automatically stream to LeadGrove for Claude auditing!
@@ -4962,13 +4539,13 @@ def add_client_page(request: Request):
                                         <label style="font-size: 11px; font-weight: bold; color: #4a148c; display: block; margin-bottom: 4px;">⚡ DIALPAD WEBHOOK ENDPOINT URL:</label>
                                         <div class="webhook-input-group">
                                             <input type="text" class="webhook-input" id="voip-endpoint-dialpad" readonly value="" data-suffix="/webhooks/voip?client_id={next_id}">
-                                            <button type="button" onclick="copyText('voip-endpoint-dialpad', 'voip-btn-dialpad')" id="voip-btn-dialpad" class="btn-copy"> Copy Webhook URL</button>
+                                            <button type="button" onclick="copyText('voip-endpoint-dialpad', 'voip-btn-dialpad')" id="voip-btn-dialpad" class="btn-copy">📋 Copy Webhook URL</button>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div id="voip-inst-ringcentral" class="voip-inst-card" style="display: none; background-color: #e0f7fa; border-left: 4px solid #0097a7; padding: 14px; border-radius: 4px; color: #006064; font-size: 12px; line-height: 1.5;">
-                                     <strong>RingCentral Setup Instructions:</strong><br>
+                                    💡 <strong>RingCentral Setup Instructions:</strong><br>
                                     1. In RingCentral Admin Console, go to <strong>Integrations / Webhooks ➡️ Create Subscription</strong>.<br>
                                     2. Set Notification Event to <strong>"Telephony Session / Call Log"</strong> and paste target URL below.<br>
                                     3. RingCentral inbound & outbound calls will sync automatically with LeadGrove lead timelines!
@@ -4976,13 +4553,13 @@ def add_client_page(request: Request):
                                         <label style="font-size: 11px; font-weight: bold; color: #006064; display: block; margin-bottom: 4px;">⚡ RINGCENTRAL WEBHOOK ENDPOINT URL:</label>
                                         <div class="webhook-input-group">
                                             <input type="text" class="webhook-input" id="voip-endpoint-rc" readonly value="" data-suffix="/webhooks/voip?client_id={next_id}">
-                                            <button type="button" onclick="copyText('voip-endpoint-rc', 'voip-btn-rc')" id="voip-btn-rc" class="btn-copy"> Copy Webhook URL</button>
+                                            <button type="button" onclick="copyText('voip-endpoint-rc', 'voip-btn-rc')" id="voip-btn-rc" class="btn-copy">📋 Copy Webhook URL</button>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div id="voip-inst-zoom_phone" class="voip-inst-card" style="display: none; background-color: #e3f2fd; border-left: 4px solid #1e88e5; padding: 14px; border-radius: 4px; color: #0d47a1; font-size: 12px; line-height: 1.5;">
-                                     <strong>Zoom Phone Setup Instructions:</strong><br>
+                                    💡 <strong>Zoom Phone Setup Instructions:</strong><br>
                                     1. In Zoom Marketplace, go to <strong>Develop ➡️ Build App ➡️ Webhook Only</strong>.<br>
                                     2. Subscribe to Event Notifications: <strong>"phone.callee_ended"</strong> & <strong>"phone.recording_completed"</strong>.<br>
                                     3. Set Webhook Endpoint URL to the link below to stream Zoom call logs directly to LeadGrove!
@@ -4990,13 +4567,13 @@ def add_client_page(request: Request):
                                         <label style="font-size: 11px; font-weight: bold; color: #0d47a1; display: block; margin-bottom: 4px;">⚡ ZOOM PHONE WEBHOOK ENDPOINT URL:</label>
                                         <div class="webhook-input-group">
                                             <input type="text" class="webhook-input" id="voip-endpoint-zoom" readonly value="" data-suffix="/webhooks/voip?client_id={next_id}">
-                                            <button type="button" onclick="copyText('voip-endpoint-zoom', 'voip-btn-zoom')" id="voip-btn-zoom" class="btn-copy"> Copy Webhook URL</button>
+                                            <button type="button" onclick="copyText('voip-endpoint-zoom', 'voip-btn-zoom')" id="voip-btn-zoom" class="btn-copy">📋 Copy Webhook URL</button>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div id="voip-inst-openphone" class="voip-inst-card" style="display: none; background-color: #f1f8e9; border-left: 4px solid #33691e; padding: 14px; border-radius: 4px; color: #1b5e20; font-size: 12px; line-height: 1.5;">
-                                     <strong>OpenPhone Setup Instructions:</strong><br>
+                                    💡 <strong>OpenPhone Setup Instructions:</strong><br>
                                     1. In OpenPhone Settings, go to <strong>Integrations ➡️ Webhooks ➡️ Add Webhook</strong>.<br>
                                     2. Paste target URL below and check events: <strong>"call.completed"</strong> and <strong>"call.transcript.completed"</strong>.<br>
                                     3. Sales rep follow-up calls will instantly pair with original lead click IDs!
@@ -5004,13 +4581,13 @@ def add_client_page(request: Request):
                                         <label style="font-size: 11px; font-weight: bold; color: #1b5e20; display: block; margin-bottom: 4px;">⚡ OPENPHONE WEBHOOK ENDPOINT URL:</label>
                                         <div class="webhook-input-group">
                                             <input type="text" class="webhook-input" id="voip-endpoint-openphone" readonly value="" data-suffix="/webhooks/voip?client_id={next_id}">
-                                            <button type="button" onclick="copyText('voip-endpoint-openphone', 'voip-btn-openphone')" id="voip-btn-openphone" class="btn-copy"> Copy Webhook URL</button>
+                                            <button type="button" onclick="copyText('voip-endpoint-openphone', 'voip-btn-openphone')" id="voip-btn-openphone" class="btn-copy">📋 Copy Webhook URL</button>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div id="voip-inst-nextiva" class="voip-inst-card" style="display: none; background-color: #e8eaf6; border-left: 4px solid #283593; padding: 14px; border-radius: 4px; color: #1a237e; font-size: 12px; line-height: 1.5;">
-                                     <strong>Nextiva Setup Instructions:</strong><br>
+                                    💡 <strong>Nextiva Setup Instructions:</strong><br>
                                     1. Log into Nextiva Voice Admin Portal ➡️ <strong>Integrations / Analytics ➡️ Webhooks</strong>.<br>
                                     2. Click <strong>Add Webhook</strong>, set Target URL to your endpoint below, and subscribe to <strong>"Call Completed"</strong>.<br>
                                     3. Ensure Call Recording & Speech-to-Text Transcriptions are enabled for your team extensions!
@@ -5018,13 +4595,13 @@ def add_client_page(request: Request):
                                         <label style="font-size: 11px; font-weight: bold; color: #1a237e; display: block; margin-bottom: 4px;">⚡ NEXTIVA WEBHOOK ENDPOINT URL:</label>
                                         <div class="webhook-input-group">
                                             <input type="text" class="webhook-input" id="voip-endpoint-nextiva" readonly value="" data-suffix="/webhooks/voip?client_id={next_id}">
-                                            <button type="button" onclick="copyText('voip-endpoint-nextiva', 'voip-btn-nextiva')" id="voip-btn-nextiva" class="btn-copy"> Copy Webhook URL</button>
+                                            <button type="button" onclick="copyText('voip-endpoint-nextiva', 'voip-btn-nextiva')" id="voip-btn-nextiva" class="btn-copy">📋 Copy Webhook URL</button>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div id="voip-inst-vonage" class="voip-inst-card" style="display: none; background-color: #fff3e0; border-left: 4px solid #e65100; padding: 14px; border-radius: 4px; color: #e65100; font-size: 12px; line-height: 1.5;">
-                                     <strong>Vonage Business Setup Instructions:</strong><br>
+                                    💡 <strong>Vonage Business Setup Instructions:</strong><br>
                                     1. Log into Vonage Business Communications (VBC) Admin Portal ➡️ <strong>Integration Suite ➡️ Webhooks</strong>.<br>
                                     2. Create a new webhook subscription, paste your Target URL below, and select event <strong>"call.completed"</strong>.<br>
                                     3. Ensure Automatic Call Recording is enabled so call logs and audio stream directly to LeadGrove!
@@ -5032,13 +4609,13 @@ def add_client_page(request: Request):
                                         <label style="font-size: 11px; font-weight: bold; color: #e65100; display: block; margin-bottom: 4px;">⚡ VONAGE WEBHOOK ENDPOINT URL:</label>
                                         <div class="webhook-input-group">
                                             <input type="text" class="webhook-input" id="voip-endpoint-vonage" readonly value="" data-suffix="/webhooks/voip?client_id={next_id}">
-                                            <button type="button" onclick="copyText('voip-endpoint-vonage', 'voip-btn-vonage')" id="voip-btn-vonage" class="btn-copy"> Copy Webhook URL</button>
+                                            <button type="button" onclick="copyText('voip-endpoint-vonage', 'voip-btn-vonage')" id="voip-btn-vonage" class="btn-copy">📋 Copy Webhook URL</button>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div id="voip-inst-ooma" class="voip-inst-card" style="display: none; background-color: #e0f2f1; border-left: 4px solid #00695c; padding: 14px; border-radius: 4px; color: #004d40; font-size: 12px; line-height: 1.5;">
-                                     <strong>Ooma Office Setup Instructions:</strong><br>
+                                    💡 <strong>Ooma Office Setup Instructions:</strong><br>
                                     1. Log into Ooma Office Manager (office.ooma.com) ➡️ <strong>System ➡️ Integrations & API Webhooks</strong>.<br>
                                     2. Click <strong>Add Webhook</strong>, paste your target endpoint below, and set trigger to <strong>"Call Ended"</strong>.<br>
                                     3. Confirm Call Recording is activated for your extension group so recordings & transcripts are captured!
@@ -5046,13 +4623,13 @@ def add_client_page(request: Request):
                                         <label style="font-size: 11px; font-weight: bold; color: #004d40; display: block; margin-bottom: 4px;">⚡ OOMA OFFICE WEBHOOK ENDPOINT URL:</label>
                                         <div class="webhook-input-group">
                                             <input type="text" class="webhook-input" id="voip-endpoint-ooma" readonly value="" data-suffix="/webhooks/voip?client_id={next_id}">
-                                            <button type="button" onclick="copyText('voip-endpoint-ooma', 'voip-btn-ooma')" id="voip-btn-ooma" class="btn-copy"> Copy Webhook URL</button>
+                                            <button type="button" onclick="copyText('voip-endpoint-ooma', 'voip-btn-ooma')" id="voip-btn-ooma" class="btn-copy">📋 Copy Webhook URL</button>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div id="voip-inst-grasshopper" class="voip-inst-card" style="display: none; background-color: #f3e5f5; border-left: 4px solid #6a1b9a; padding: 14px; border-radius: 4px; color: #4a148c; font-size: 12px; line-height: 1.5;">
-                                     <strong>Grasshopper Setup Instructions:</strong><br>
+                                    💡 <strong>Grasshopper Setup Instructions:</strong><br>
                                     1. Log into Grasshopper Admin Portal ➡️ <strong>Settings ➡️ Integrations & Webhooks</strong>.<br>
                                     2. Enable Call Webhook Notifications and paste your dynamic target endpoint URL below.<br>
                                     3. Ensure Voicemail & Call Transcriptions are toggled ON so call data streams automatically to LeadGrove!
@@ -5060,13 +4637,13 @@ def add_client_page(request: Request):
                                         <label style="font-size: 11px; font-weight: bold; color: #4a148c; display: block; margin-bottom: 4px;">⚡ GRASSHOPPER WEBHOOK ENDPOINT URL:</label>
                                         <div class="webhook-input-group">
                                             <input type="text" class="webhook-input" id="voip-endpoint-grasshopper" readonly value="" data-suffix="/webhooks/voip?client_id={next_id}">
-                                            <button type="button" onclick="copyText('voip-endpoint-grasshopper', 'voip-btn-grasshopper')" id="voip-btn-grasshopper" class="btn-copy"> Copy Webhook URL</button>
+                                            <button type="button" onclick="copyText('voip-endpoint-grasshopper', 'voip-btn-grasshopper')" id="voip-btn-grasshopper" class="btn-copy">📋 Copy Webhook URL</button>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div id="voip-inst-custom_voip" class="voip-inst-card" style="display: none; background-color: #eceff1; border-left: 4px solid #455a64; padding: 14px; border-radius: 4px; color: #263238; font-size: 12px; line-height: 1.5;">
-                                     <strong>Custom VoIP / Other Setup Instructions:</strong><br>
+                                    💡 <strong>Custom VoIP / Other Setup Instructions:</strong><br>
                                     1. In your VoIP provider's developer console or Zapier Integration, configure an HTTP POST Webhook.<br>
                                     2. Set target destination URL to the endpoint below.<br>
                                     3. Ensure call recording URLs and customer phone parameters are included in the payload!
@@ -5074,7 +4651,7 @@ def add_client_page(request: Request):
                                         <label style="font-size: 11px; font-weight: bold; color: #263238; display: block; margin-bottom: 4px;">⚡ CUSTOM VOIP WEBHOOK ENDPOINT URL:</label>
                                         <div class="webhook-input-group">
                                             <input type="text" class="webhook-input" id="voip-endpoint-custom" readonly value="" data-suffix="/webhooks/voip?client_id={next_id}">
-                                            <button type="button" onclick="copyText('voip-endpoint-custom', 'voip-btn-custom')" id="voip-btn-custom" class="btn-copy"> Copy Webhook URL</button>
+                                            <button type="button" onclick="copyText('voip-endpoint-custom', 'voip-btn-custom')" id="voip-btn-custom" class="btn-copy">📋 Copy Webhook URL</button>
                                         </div>
                                     </div>
                                 </div>
@@ -5098,7 +4675,7 @@ def add_client_page(request: Request):
                                     
                                     <!-- Speech Bubble Tooltip -->
                                     <span class="tooltip-icon">
-                                        
+                                        💬
                                         <span class="tooltip-text">
                                             As a secondary option, you can also have AI monitor your incoming emails by cc'ing a copy of every email correspondence to:<br>
                                             <strong class="wizard-forwarding-email" style="color: #81c784; word-break: break-all;">conversions-[id]@your-agency.com</strong><br>
@@ -5124,7 +4701,7 @@ def add_client_page(request: Request):
                                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 5px;">
                                     <label for="email_app_password" style="font-weight: bold; margin-bottom: 0;">Inbox #1 App Password / IMAP Key</label>
                                     <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none; display: flex; align-items: center; gap: 4px;">
-                                         How to get an App Password?
+                                        🔑 How to get an App Password?
                                     </a>
                                 </div>
                                 <input type="password" id="email_app_password" placeholder="e.g. abcd efgh ijkl mnop">
@@ -5139,7 +4716,7 @@ def add_client_page(request: Request):
                                 <div class="form-group" style="margin-top: 10px;">
                                     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 5px;">
                                         <label for="email_app_password_2" style="font-weight: bold;">Inbox #2 App Password / IMAP Key</label>
-                                        <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none;"> How to get an App Password?</a>
+                                        <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none;">🔑 How to get an App Password?</a>
                                     </div>
                                     <input type="password" id="email_app_password_2" placeholder="e.g. abcd efgh ijkl mnop">
                                 </div>
@@ -5154,7 +4731,7 @@ def add_client_page(request: Request):
                                 <div class="form-group" style="margin-top: 10px;">
                                     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 5px;">
                                         <label for="email_app_password_3" style="font-weight: bold;">Inbox #3 App Password / IMAP Key</label>
-                                        <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none;"> How to get an App Password?</a>
+                                        <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none;">🔑 How to get an App Password?</a>
                                     </div>
                                     <input type="password" id="email_app_password_3" placeholder="e.g. abcd efgh ijkl mnop">
                                 </div>
@@ -5169,7 +4746,7 @@ def add_client_page(request: Request):
                                 <div class="form-group" style="margin-top: 10px;">
                                     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 5px;">
                                         <label for="email_app_password_4" style="font-weight: bold;">Inbox #4 App Password / IMAP Key</label>
-                                        <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none;"> How to get an App Password?</a>
+                                        <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none;">🔑 How to get an App Password?</a>
                                     </div>
                                     <input type="password" id="email_app_password_4" placeholder="e.g. abcd efgh ijkl mnop">
                                 </div>
@@ -5184,7 +4761,7 @@ def add_client_page(request: Request):
                                 <div class="form-group" style="margin-top: 10px;">
                                     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 5px;">
                                         <label for="email_app_password_5" style="font-weight: bold;">Inbox #5 App Password / IMAP Key</label>
-                                        <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none;"> How to get an App Password?</a>
+                                        <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none;">🔑 How to get an App Password?</a>
                                     </div>
                                     <input type="password" id="email_app_password_5" placeholder="e.g. abcd efgh ijkl mnop">
                                 </div>
@@ -5201,7 +4778,7 @@ def add_client_page(request: Request):
                     <!-- STEP 4: Conversion & Deduplication Rules -->
                     <div class="wizard-step" id="step-panel-4">
                         <div class="instructions">
-                             <strong>Step 4: Smart Deduplication & Conversion Control</strong><br>
+                            💰 <strong>Step 4: Smart Deduplication & Conversion Control</strong><br>
                             Define parameters for repeat conversions to ensure you only bid on optimal, unique customer value.
                         </div>
                         
@@ -5248,16 +4825,16 @@ def add_client_page(request: Request):
                         <!-- EXCLUSION UPLOAD PANEL -->
                         <div id="exclusion-upload-box" class="conditional-box" style="display: none; padding: 20px; margin-top: 15px;">
                             <div class="instructions" style="background-color: #f1f8e9; border-left-color: #2e7d32; color: #2e7d32; margin-bottom: 15px; font-size: 13px; line-height: 1.5; padding: 15px;">
-                                 <strong>Upload Past Customers to Ignore:</strong><br>
+                                📂 <strong>Upload Past Customers to Ignore:</strong><br>
                                 Upload your list of customers, to use to ignore future conversion triggering. Only one piece of information is needed for each user in order to do this, but more data points for each user is best, for higher match rates. Here is a sample sheet that you can use to fill in, or you can provide your own sheet that have "first name, last name, email, phone number, company name" as the column headers.
                             </div>
                             <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 15px; flex-wrap: wrap;">
-                                <button type="button" onclick="triggerSampleSheetDownload()" class="btn-copy" style="background-color: #1a237e; padding: 8px 15px; font-size: 12px; cursor: pointer;"> Download Sample Sheet (.CSV)</button>
+                                <button type="button" onclick="triggerSampleSheetDownload()" class="btn-copy" style="background-color: #1a237e; padding: 8px 15px; font-size: 12px; cursor: pointer;">📥 Download Sample Sheet (.CSV)</button>
                                 <input type="file" id="exclusion-file-input" accept=".csv" onchange="handleExclusionFileUpload(event)" style="display: none;">
-                                <button type="button" onclick="document.getElementById('exclusion-file-input').click()" class="btn-copy" style="background-color: #2e7d32; padding: 8px 15px; font-size: 12px; cursor: pointer;"> Choose File & Upload (.CSV)</button>
+                                <button type="button" onclick="document.getElementById('exclusion-file-input').click()" class="btn-copy" style="background-color: #2e7d32; padding: 8px 15px; font-size: 12px; cursor: pointer;">📤 Choose File & Upload (.CSV)</button>
                             </div>
                             <div style="margin-top: 15px; margin-bottom: 15px; background: #fff; padding: 12px; border: 1px solid #e0e0e0; border-radius: 6px;">
-                                <label style="font-weight: bold; font-size: 12px; margin-bottom: 8px; display: block; color: #1a237e;"> Exclusions Upload Strategy:</label>
+                                <label style="font-weight: bold; font-size: 12px; margin-bottom: 8px; display: block; color: #1a237e;">🔄 Exclusions Upload Strategy:</label>
                                 <div style="display: flex; gap: 20px; align-items: center;">
                                     <label style="font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 12px; margin: 0;">
                                         <input type="radio" name="exclusion_upload_action" value="append" checked style="cursor: pointer;">
@@ -5276,12 +4853,12 @@ def add_client_page(request: Request):
                     <!-- STEP 5: Ad Goals & Conversions Setup -->
                     <div class="wizard-step" id="step-panel-5">
                         <div class="instructions">
-                             <strong>Step 5: Ad Accounts Goal & Conversion Setup</strong><br>
+                            🎯 <strong>Step 5: Ad Accounts Goal & Conversion Setup</strong><br>
                             To allow conversion uploads to sync successfully, you must create these 2 matching goals/events inside your active ad networks. Use these exact, standardized goal names for consistency across all systems.
                         </div>
                         
                         <div style="background: #fff8e1; border-left: 4px solid #ffb300; padding: 15px; border-radius: 6px; color: #5d4037; font-size: 13px; line-height: 1.5; margin-bottom: 25px;">
-                             <strong>Ad Platform Goal Consistency Rule:</strong><br>
+                            📋 <strong>Ad Platform Goal Consistency Rule:</strong><br>
                             Make sure you name these 2 custom conversions or offline goals <strong>EXACTLY</strong> as shown below in your ad managers. Our CSV spreadsheet exports write these specific, standardized names in every row to trigger conversion syncs!
                         </div>
                         
@@ -5299,7 +4876,7 @@ def add_client_page(request: Request):
                 
                 <!-- Dynamic Setup Webhook Screen (Hidden initially) -->
                 <div id="success-screen" style="display: none; text-align: center;">
-                    <div style="font-size: 50px; margin-bottom: 15px;"></div>
+                    <div style="font-size: 50px; margin-bottom: 15px;">🎉</div>
                     <h2 style="color: #2e7d32; margin-top: 0;">Client Onboarded Successfully!</h2>
                     <p style="color: #555; font-size: 14px; margin-bottom: 25px;">
                         The account configuration file for <strong id="registered-client-name"></strong> has been created.
@@ -5307,12 +4884,12 @@ def add_client_page(request: Request):
                     
                     <!-- Call Tracking Step (Always Shown) -->
                     <div class="instructions" style="text-align: left; background-color: #e8eaf6; border-left: 4px solid #1a237e; margin-bottom: 10px;">
-                         <strong id="call-tracking-provider-title">Step 2: Configure CallRail Integration</strong><br>
+                        📞 <strong id="call-tracking-provider-title">Step 2: Configure CallRail Integration</strong><br>
                         Your live call tracking webhook endpoint is ready. Copy this link and paste it into <span id="call-tracking-provider-span">CallRail</span>:
                     </div>
                     <div style="display: flex; gap: 8px; margin-bottom: 15px;">
                         <input type="text" id="webhook-url-input" readonly style="flex: 1; padding: 10px; border-radius: 6px; border: 1px solid #ced4da; font-family: monospace; font-size: 12px; background-color: #f8f9fa;">
-                        <button type="button" onclick="copyWebhookUrl('webhook-url-input', 'copy-btn')" id="copy-btn" class="btn-submit" style="margin: 0; width: auto; white-space: nowrap; padding: 0 15px; font-size: 14px; background-color: #2e7d32;"> Copy URL</button>
+                        <button type="button" onclick="copyWebhookUrl('webhook-url-input', 'copy-btn')" id="copy-btn" class="btn-submit" style="margin: 0; width: auto; white-space: nowrap; padding: 0 15px; font-size: 14px; background-color: #2e7d32;">📋 Copy URL</button>
                     </div>
                     <div id="call-tracking-instructions-reminder" class="instructions" style="text-align: left; background-color: #fff3cd; border-left-color: #ffc107; color: #856404; font-size: 11px; margin-top: -10px; margin-bottom: 25px; padding: 12px 15px;">
                         ⚠️ <strong>CallRail Setup Checklist (Inbound & Outbound Call Recording & Transcripts):</strong><br>
@@ -5330,22 +4907,22 @@ def add_client_page(request: Request):
                         </div>
                         <div style="display: flex; gap: 8px; margin-bottom: 20px;">
                             <input type="text" id="sot-webhook-input" readonly style="flex: 1; padding: 10px; border-radius: 6px; border: 1px solid #ced4da; font-family: monospace; font-size: 12px; background-color: #f8f9fa;">
-                            <button type="button" onclick="copyWebhookUrl('sot-webhook-input', 'sot-copy-btn')" id="sot-copy-btn" class="btn-submit" style="margin: 0; width: auto; white-space: nowrap; padding: 0 15px; font-size: 14px; background-color: #2e7d32;"> Copy URL</button>
+                            <button type="button" onclick="copyWebhookUrl('sot-webhook-input', 'sot-copy-btn')" id="sot-copy-btn" class="btn-submit" style="margin: 0; width: auto; white-space: nowrap; padding: 0 15px; font-size: 14px; background-color: #2e7d32;">📋 Copy URL</button>
                         </div>
                     </div>
 
                     <!-- Email Forwarding Connection Step (Shown conditionally) -->
                     <div id="sot-email-instructions-box" style="display: none; margin-top: 25px;">
                         <div class="instructions" style="text-align: left; background-color: #e8f5e9; border-left: 4px solid #2e7d32; color: #1b5e20; margin-bottom: 10px;">
-                             <strong>Step 3: Set Up Email Forwarding</strong><br>
+                            📧 <strong>Step 3: Set Up Email Forwarding</strong><br>
                             To allow conversion auditing, set up an email auto-forwarding rule in your inbox. Forward any matching customer invoice or booking confirmation alerts to this custom system email:
                         </div>
                         <div style="display: flex; gap: 8px; margin-bottom: 15px;">
                             <input type="text" id="sot-email-address" readonly style="flex: 1; padding: 10px; border-radius: 6px; border: 1px solid #ced4da; font-family: monospace; font-size: 12px; background-color: #f8f9fa;">
-                            <button type="button" onclick="copyWebhookUrl('sot-email-address', 'sot-email-copy-btn')" id="sot-email-copy-btn" class="btn-submit" style="margin: 0; width: auto; white-space: nowrap; padding: 0 15px; font-size: 14px; background-color: #2e7d32;"> Copy Email</button>
+                            <button type="button" onclick="copyWebhookUrl('sot-email-address', 'sot-email-copy-btn')" id="sot-email-copy-btn" class="btn-submit" style="margin: 0; width: auto; white-space: nowrap; padding: 0 15px; font-size: 14px; background-color: #2e7d32;">📋 Copy Email</button>
                         </div>
                         <div class="instructions" style="text-align: left; background-color: #fff3cd; border-left-color: #ffc107; color: #856404; font-size: 11px; margin-top: -10px; margin-bottom: 25px; padding: 8px 12px;">
-                             <strong>Tip:</strong> Create a rule in Gmail or Outlook to forward emails with subject keywords like "invoice" or "booking confirmation" automatically.
+                            💡 <strong>Tip:</strong> Create a rule in Gmail or Outlook to forward emails with subject keywords like "invoice" or "booking confirmation" automatically.
                         </div>
                     </div>
                     
@@ -5353,16 +4930,16 @@ def add_client_page(request: Request):
                     <!-- Real-Time CRM Exclusions Step (Shown conditionally) -->
                     <div id="exclusion-instructions-box" style="display: none; margin-top: 25px;">
                         <div class="instructions" style="text-align: left; background-color: #f1f8e9; border-left: 4px solid #2e7d32; color: #2e7d32; margin-bottom: 10px;">
-                             <strong>Step 4: Connect CRM for Real-Time Exclusions</strong><br>
+                            🔄 <strong>Step 4: Connect CRM for Real-Time Exclusions</strong><br>
                             You enabled past customer exclusions! Copy this exclusion webhook URL and paste it into HubSpot, ServiceTitan, Salesforce, Zoho, or Zapier. Whenever a contact is added or a deal is won in your CRM, trigger a POST request to this URL to automatically add their contact info to our exclusion list in real-time:
                         </div>
                         <div style="display: flex; gap: 8px; margin-bottom: 15px;">
                             <input type="text" id="exclusion-webhook-url-input" readonly style="flex: 1; padding: 10px; border-radius: 6px; border: 1px solid #ced4da; font-family: monospace; font-size: 12px; background-color: #f8f9fa;">
-                            <button type="button" onclick="copyWebhookUrl('exclusion-webhook-url-input', 'exclusion-copy-btn')" id="exclusion-copy-btn" class="btn-submit" style="margin: 0; width: auto; white-space: nowrap; padding: 0 15px; font-size: 14px; background-color: #2e7d32;"> Copy Webhook</button>
+                            <button type="button" onclick="copyWebhookUrl('exclusion-webhook-url-input', 'exclusion-copy-btn')" id="exclusion-copy-btn" class="btn-submit" style="margin: 0; width: auto; white-space: nowrap; padding: 0 15px; font-size: 14px; background-color: #2e7d32;">📋 Copy Webhook</button>
                         </div>
                     </div>
 
-                    <a href="/dashboard" class="btn-submit" style="display: block; text-decoration: none; text-align: center; line-height: 20px; background-color: #1a237e; color: white !important; margin-top: 30px;"> Proceed to Dashboard</a>
+                    <a href="/dashboard" class="btn-submit" style="display: block; text-decoration: none; text-align: center; line-height: 20px; background-color: #1a237e; color: white !important; margin-top: 30px;">📊 Proceed to Dashboard</a>
                 </div>
                 
 
@@ -5372,7 +4949,7 @@ def add_client_page(request: Request):
                         <!-- Header -->
                         <div class="modal-header" style="background: #1a237e; color: white; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;">
                             <h3 style="margin: 0; font-size: 18px; color: #1a237e; display: flex; align-items: center; gap: 8px;">
-                                 Generate a Secure App Password
+                                🔐 Generate a Secure App Password
                             </h3>
                             <span class="modal-close" onclick="closeAppPasswordModal()" style="font-size: 24px; font-weight: bold; cursor: pointer; color: white; opacity: 0.8;">&times;</span>
                         </div>
@@ -5386,13 +4963,13 @@ def add_client_page(request: Request):
                             <!-- Provider Tabs -->
                             <div style="display: flex; border-bottom: 2px solid #e0e0e0; margin-bottom: 15px; flex-wrap: wrap;">
                                 <button type="button" id="tab-btn-google" class="tab-btn active" onclick="switchModalTab('google')">
-                                     Google Workspace / Gmail
+                                    📁 Google Workspace / Gmail
                                 </button>
                                 <button type="button" id="tab-btn-ms" class="tab-btn" onclick="switchModalTab('ms')">
-                                     Microsoft 365 / Outlook
+                                    📁 Microsoft 365 / Outlook
                                 </button>
                                 <button type="button" id="tab-btn-imap" class="tab-btn" onclick="switchModalTab('imap')">
-                                     Custom IMAP / cPanel / Other
+                                    🌐 Custom IMAP / cPanel / Other
                                 </button>
                             </div>
 
@@ -5432,7 +5009,7 @@ def add_client_page(request: Request):
                             <!-- Security Footnote -->
                             <div style="background-color: #f1f8e9; border-left: 4px solid #2e7d32; padding: 12px; margin-top: 20px; border-radius: 4px;">
                                 <p style="margin: 0; font-size: 11px; line-height: 1.4; color: #1b5e20;">
-                                     <strong>Strict Privacy Guard:</strong> This code grants read-only IMAP credentials. It does not access your emails, calendars, or account dashboards. You can revoke it instantly at any time in your security settings.
+                                    🔒 <strong>Strict Privacy Guard:</strong> This code grants read-only IMAP credentials. It does not access your emails, calendars, or account dashboards. You can revoke it instantly at any time in your security settings.
                                 </p>
                             </div>
                         </div>
@@ -5592,7 +5169,7 @@ def add_client_page(request: Request):
                     prevBtn.style.visibility = currentStep === 1 ? 'hidden' : 'visible';
                     
                     if (currentStep === totalSteps) {
-                        nextBtn.innerText = ' Complete Onboarding';
+                        nextBtn.innerText = '🚀 Complete Onboarding';
                         nextBtn.className = 'btn-nav success';
                         nextBtn.onclick = submitWizard;
                     } else {
@@ -5689,7 +5266,7 @@ def add_client_page(request: Request):
                     const nextBtn = document.getElementById('next-btn');
                     if (nextBtn) {
                         nextBtn.classList.add('btn-pulse-save');
-                        nextBtn.innerHTML = ` Complete Onboarding (With ${list.length} Exclusions!)`;
+                        nextBtn.innerHTML = `🚀 Complete Onboarding (With ${list.length} Exclusions!)`;
                     }
                 }
 
@@ -5750,7 +5327,7 @@ def add_client_page(request: Request):
                             if (nextBtn) {
                                 nextBtn.classList.remove('btn-pulse-save');
                                 if (currentStep === totalSteps) {
-                                    nextBtn.innerHTML = ' Complete Onboarding';
+                                    nextBtn.innerHTML = '🚀 Complete Onboarding';
                                 }
                             }
                             parsedExclusions = [];
@@ -5782,7 +5359,7 @@ def add_client_page(request: Request):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #4285F4; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #4285F4; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                     Google Ads Goal Setup (ID: ${googleAds})
+                                    🔍 Google Ads Goal Setup (ID: ${googleAds})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>Google Ads account</strong>.</li>
@@ -5790,8 +5367,8 @@ def add_client_page(request: Request):
                                     <li style="margin-bottom: 8px;">Click <strong>+ New conversion action</strong>, select <strong>Import</strong>, choose <strong>Other data sources or CRMs</strong>, select <strong>Track conversions from clicks</strong>, and click <strong>Continue</strong>.</li>
                                     <li style="margin-bottom: 8px;"><strong>Goal 1 (Qualification):</strong> Set Goal Name to <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Qualified Lead</code>. Under Category, choose <strong>Qualified Lead</strong>. Set Value to use a default value of <code>$1.00</code>.</li>
                                     <li style="margin-bottom: 8px;"><strong>Goal 2 (Offline Sale):</strong> Create a second conversion import action. Set Goal Name to <code style="background: #f1f3f4; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace;">LeadGroove Offline Sale</code>. Under Category, choose <strong>Purchase</strong> or <strong>Converted Lead</strong>. Set Value to <strong>Use different values for each conversion</strong> (defaulting to <code>$0.00</code>).</li>
-                                    <li style="margin-bottom: 8px; background: #fff8e1; border-left: 3px solid #ffa000; padding: 8px 10px; border-radius: 4px; color: #5d4037;"> <strong>Recommended Conversion Settings:</strong> Under <strong>Count</strong>, select <strong>Every</strong> conversion (so multiple sales/leads from the same user are tracked). Always select the <strong>longest allowable conversion window</strong> (e.g., 90-day click-through window) each time to maximize historical match depth.</li>
-                                    <li style="margin-bottom: 8px; background: #e8f5e9; border-left: 3px solid #2e7d32; padding: 8px 10px; border-radius: 4px; color: #1b5e20;"> <strong>Hands-Free Automated Sync (Optional):</strong> Want Google Ads to pull conversions automatically without manual CSV uploads? Go to <strong>Goals ➡️ Conversions ➡️ Uploads ➡️ Schedules</strong>, click <strong>+</strong>, select <strong>HTTPS</strong> as Source, and paste your live LeadGrove feed URL: <code style="background: #fff; padding: 2px 5px; border-radius: 3px; border: 1px solid #a5d6a7;">https://your-agency-app.onrender.com/feeds/google-conversions.csv?client_id=[id]</code>! (For automated retractions & restatements, set up a second schedule under the Adjustments tab using: <code style="background: #fff; padding: 2px 5px; border-radius: 3px; border: 1px solid #b0bec5;">https://your-agency-app.onrender.com/feeds/google-adjustments.csv?client_id=[id]</code>).</li>
+                                    <li style="margin-bottom: 8px; background: #fff8e1; border-left: 3px solid #ffa000; padding: 8px 10px; border-radius: 4px; color: #5d4037;">💡 <strong>Recommended Conversion Settings:</strong> Under <strong>Count</strong>, select <strong>Every</strong> conversion (so multiple sales/leads from the same user are tracked). Always select the <strong>longest allowable conversion window</strong> (e.g., 90-day click-through window) each time to maximize historical match depth.</li>
+                                    <li style="margin-bottom: 8px; background: #e8f5e9; border-left: 3px solid #2e7d32; padding: 8px 10px; border-radius: 4px; color: #1b5e20;">🚀 <strong>Hands-Free Automated Sync (Optional):</strong> Want Google Ads to pull conversions automatically without manual CSV uploads? Go to <strong>Goals ➡️ Conversions ➡️ Uploads ➡️ Schedules</strong>, click <strong>+</strong>, select <strong>HTTPS</strong> as Source, and paste your live LeadGrove feed URL: <code style="background: #fff; padding: 2px 5px; border-radius: 3px; border: 1px solid #a5d6a7;">https://your-agency-app.onrender.com/feeds/google-conversions.csv?client_id=[id]</code>! (For automated retractions & restatements, set up a second schedule under the Adjustments tab using: <code style="background: #fff; padding: 2px 5px; border-radius: 3px; border: 1px solid #b0bec5;">https://your-agency-app.onrender.com/feeds/google-adjustments.csv?client_id=[id]</code>).</li>
                                 </ol>
                             </div>
                         `);
@@ -5800,7 +5377,7 @@ def add_client_page(request: Request):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #10a37f; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #10a37f; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                     ChatGPT Ads Goal Setup (ID: ${chatgptAds})
+                                    🧠 ChatGPT Ads Goal Setup (ID: ${chatgptAds})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>ChatGPT Ads Campaign Manager</strong>.</li>
@@ -5817,7 +5394,7 @@ def add_client_page(request: Request):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #1877F2; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #1877F2; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                     Meta / Facebook Ads Goal Setup (Pixel: ${facebookAds})
+                                    🔵 Meta / Facebook Ads Goal Setup (Pixel: ${facebookAds})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>Meta Events Manager</strong>.</li>
@@ -5832,7 +5409,7 @@ def add_client_page(request: Request):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #10a37f; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #10a37f; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                     ChatGPT Ads Goal Setup (ID: ${chatgptAds})
+                                    🧠 ChatGPT Ads Goal Setup (ID: ${chatgptAds})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>ChatGPT Ads Campaign Manager</strong>.</li>
@@ -5849,7 +5426,7 @@ def add_client_page(request: Request):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #0A66C2; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #0A66C2; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                     LinkedIn Ads Goal Setup (Account: ${linkedinAds})
+                                    🔗 LinkedIn Ads Goal Setup (Account: ${linkedinAds})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into <strong>LinkedIn Campaign Manager</strong>.</li>
@@ -5868,7 +5445,7 @@ def add_client_page(request: Request):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #10a37f; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #10a37f; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                     ChatGPT Ads Goal Setup (ID: ${chatgptAds})
+                                    🧠 ChatGPT Ads Goal Setup (ID: ${chatgptAds})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>ChatGPT Ads Campaign Manager</strong>.</li>
@@ -5885,7 +5462,7 @@ def add_client_page(request: Request):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #00A4EF; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #00A4EF; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                     Microsoft (Bing) Ads Goal Setup (ID: ${microsoftAds})
+                                    🟢 Microsoft (Bing) Ads Goal Setup (ID: ${microsoftAds})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>Microsoft Advertising Dashboard</strong>.</li>
@@ -5901,7 +5478,7 @@ def add_client_page(request: Request):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #10a37f; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #10a37f; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                     ChatGPT Ads Goal Setup (ID: ${chatgptAds})
+                                    🧠 ChatGPT Ads Goal Setup (ID: ${chatgptAds})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>ChatGPT Ads Campaign Manager</strong>.</li>
@@ -5918,7 +5495,7 @@ def add_client_page(request: Request):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #010101; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #010101; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                     TikTok Ads Goal Setup (Pixel: ${tiktokAds})
+                                    🎵 TikTok Ads Goal Setup (Pixel: ${tiktokAds})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>TikTok Ads Manager</strong>.</li>
@@ -5937,7 +5514,7 @@ def add_client_page(request: Request):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #10a37f; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #10a37f; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                     ChatGPT Ads Goal Setup (ID: ${chatgptAds})
+                                    🧠 ChatGPT Ads Goal Setup (ID: ${chatgptAds})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>ChatGPT Ads Campaign Manager</strong>.</li>
@@ -5954,7 +5531,7 @@ def add_client_page(request: Request):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #15202B; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #15202B; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                     X (Twitter) Ads Goal Setup (Pixel: ${twitterAds})
+                                    🐦 X (Twitter) Ads Goal Setup (Pixel: ${twitterAds})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>X Ads Manager</strong>.</li>
@@ -5973,7 +5550,7 @@ def add_client_page(request: Request):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #10a37f; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #10a37f; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                     ChatGPT Ads Goal Setup (ID: ${chatgptAds})
+                                    🧠 ChatGPT Ads Goal Setup (ID: ${chatgptAds})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>ChatGPT Ads Campaign Manager</strong>.</li>
@@ -5990,7 +5567,7 @@ def add_client_page(request: Request):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #FFFC00; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #000; background: #FFFC00; display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 14px;">
-                                     Snapchat Ads Goal Setup (ID: ${snapchatAds})
+                                    👻 Snapchat Ads Goal Setup (ID: ${snapchatAds})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>Snapchat Ads Manager</strong>.</li>
@@ -6006,7 +5583,7 @@ def add_client_page(request: Request):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #E60023; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #E60023; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                     Pinterest Ads Goal Setup (Tag: ${pinterestAds})
+                                    📌 Pinterest Ads Goal Setup (Tag: ${pinterestAds})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>Pinterest Ads Manager</strong>.</li>
@@ -6025,7 +5602,7 @@ def add_client_page(request: Request):
                         blocks.push(`
                             <div style="background: #fdfdfd; border: 1px solid #e0e0e0; border-left: 4px solid #10a37f; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
                                 <h4 style="margin-top: 0; color: #10a37f; display: flex; align-items: center; gap: 8px; font-size: 14px;">
-                                     ChatGPT Ads Goal Setup (ID: ${chatgptAds})
+                                    🧠 ChatGPT Ads Goal Setup (ID: ${chatgptAds})
                                 </h4>
                                 <ol style="padding-left: 20px; font-size: 13px; line-height: 1.6; margin: 0; color: #333;">
                                     <li style="margin-bottom: 8px;">Log into your <strong>ChatGPT Ads Campaign Manager</strong>.</li>
@@ -6332,7 +5909,7 @@ def add_client_page(request: Request):
                                 sotBox.style.display = 'block';
                             } else if (['quickbooks', 'xero', 'zoho_books', 'netsuite', 'sage', 'freshbooks', 'google_sheets', 'zapier'].includes(payload.source_of_truth)) {
                                 const displayName = payload.source_of_truth.replace('_', ' ').toUpperCase();
-                                sotLabel.innerHTML = ` <strong>Step 3: Connect Your ${displayName} Integration Webhook</strong><br>Copy this webhook URL and paste it into your developer or integration settings console to sync transactions instantly:`;
+                                sotLabel.innerHTML = `💳 <strong>Step 3: Connect Your ${displayName} Integration Webhook</strong><br>Copy this webhook URL and paste it into your developer or integration settings console to sync transactions instantly:`;
                                 sotUrlInput.value = `${window.location.origin}/webhooks/billing?client_id=${data.client_id}`;
                                 sotBox.style.display = 'block';
                             } else if (payload.source_of_truth === 'email') {
@@ -6349,7 +5926,7 @@ def add_client_page(request: Request):
                     } catch (error) {
                         showErrorAlert('Error: ' + error.message);
                         nextBtn.disabled = false;
-                        nextBtn.innerText = ' Complete Onboarding';
+                        nextBtn.innerText = '🚀 Complete Onboarding';
                     }
                 }
                 
@@ -6360,11 +5937,11 @@ def add_client_page(request: Request):
                     navigator.clipboard.writeText(copyText.value);
                     
                     const copyBtn = document.getElementById(btnId);
-                    let originalText = " Copy URL";
+                    let originalText = "📋 Copy URL";
                     if (inputId === "sot-email-address") {
-                        originalText = " Copy Email";
+                        originalText = "📋 Copy Email";
                     } else if (inputId === "exclusion-webhook-url-input") {
-                        originalText = " Copy Webhook";
+                        originalText = "📋 Copy Webhook";
                     }
                     copyBtn.innerText = "✅ Copied!";
                     copyBtn.style.backgroundColor = "#1b5e20";
@@ -6705,1168 +6282,6 @@ def create_client(request: Request, client: ClientCreate):
         raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database insertion error: {str(e)}")
-
-
-@router.post("/dashboard/adjust-sale")
-def adjust_offline_sale(request: Request, adjustment: SaleAdjustment):
-    email = is_authenticated(request)
-    if not email:
-        raise HTTPException(status_code=401, detail="Session expired. Please log in again.")
-    user_role, user_client_id = get_user_role_and_client(email)
-    if user_role != "full":
-        raise HTTPException(status_code=403, detail="Unauthorized: Only managers and administrators can perform conversion adjustments.")
-        
-    try:
-        conn = db_router.connect()
-        cursor = conn.cursor()
-        
-        # Check if session exists and belongs to user_client_id (if restricted)
-        cursor.execute("SELECT id, client_id, sale_closed, value, gclid FROM sessions WHERE id = ?", (adjustment.session_id,))
-        row = cursor.fetchone()
-        if not row:
-            conn.close()
-            raise HTTPException(status_code=404, detail="Session record not found.")
-            
-        sess_id, client_id, sale_closed, orig_value, gclid = row
-        if user_client_id is not None and client_id != user_client_id:
-            conn.close()
-            raise HTTPException(status_code=403, detail="Unauthorized: This session does not belong to your client account.")
-            
-        if sale_closed != 'YES':
-            conn.close()
-            raise HTTPException(status_code=400, detail="Only closed sales conversions can be adjusted.")
-            
-        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        cursor.execute("""
-            UPDATE sessions SET
-                adjusted = 'YES',
-                adjustment_type = ?,
-                adjusted_value = ?,
-                adjusted_at = ?
-            WHERE id = ?
-        """, (adjustment.adjustment_type, adjustment.adjusted_value, now_str, adjustment.session_id))
-        
-        # Insert audit history
-        adj_label = "Google Ads Conversion Adjustment"
-        old_val = f"Closed Sale Value: ${orig_value:.2f}"
-        new_val = f"Retracted/Canceled" if adjustment.adjustment_type == 'RETRACT' else f"Restated Value: ${adjustment.adjusted_value:.2f}"
-        cursor.execute("""
-            INSERT INTO client_config_history (client_id, changed_by, feature_name, old_value, new_value)
-            VALUES (?, ?, ?, ?, ?)
-        """, (client_id, email, adj_label, old_val, new_val))
-        
-        conn.commit()
-        conn.close()
-        return {"status": "success", "message": "Sale adjustment saved successfully!"}
-    except HTTPException as he:
-        raise he
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {e}")
-
-
-@router.get("/dashboard/export/microsoft-adjustments")
-def export_microsoft_adjustments(request: Request, client_id: int):
-    email = is_authenticated(request)
-    if not email:
-        return RedirectResponse(url="/login", status_code=303)
-    """
-    Exports adjusted conversions for Microsoft Advertising into a compliant 
-    Microsoft Ads Offline Conversion Adjustments CSV format.
-    """
-    try:
-        conn = db_router.connect()
-        cursor = conn.cursor()
-        
-        # Verify client exists
-        cursor.execute("SELECT name, microsoft_ads_id FROM clients WHERE id = ?", (client_id,))
-        client_row = cursor.fetchone()
-        if not client_row:
-            raise HTTPException(status_code=400, detail="Invalid client ID")
-        
-        client_name = client_row[0]
-        microsoft_id = client_row[1] or ""
-        
-        # Pull adjusted records belonging to this client that have a MSCLKID
-        cursor.execute("""
-            SELECT msclkid, adjustment_type, adjusted_value, adjusted_at, created_at
-            FROM sessions
-            WHERE client_id = ? AND msclkid IS NOT NULL AND msclkid != '' AND adjusted = 'YES'
-            ORDER BY adjusted_at DESC
-        """, (client_id,))
-        rows = cursor.fetchall()
-        conn.close()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {e}")
-
-    # Generate CSV in memory
-    output = io.StringIO()
-    writer = csv.writer(output)
-    
-    # Microsoft Ads Adjustments headers
-    writer.writerow(["Microsoft Click ID", "Conversion Name", "Conversion Time", "Adjustment Type", "Adjustment Time", "Adjusted Value", "Adjusted Value Currency", "Microsoft Account ID"])
-    
-    for r in rows:
-        msclkid, adj_type, adj_value, adj_at, orig_created_at = r
-        orig_conv_time = f"{orig_created_at} +0000" if orig_created_at else ""
-        adj_time = f"{adj_at} +0000" if adj_at else ""
-        
-        # Original conversion name matches "LeadGroove Offline Sale"
-        conv_name = "LeadGroove Offline Sale"
-        
-        val_str = f"{adj_value:.2f}" if adj_type == 'RESTATE' else ""
-        curr_str = "USD" if adj_type == 'RESTATE' else ""
-        
-        writer.writerow([msclkid, conv_name, orig_conv_time, adj_type, adj_time, val_str, curr_str, microsoft_id])
-            
-    output.seek(0)
-    safe_filename = re.sub(r'\s+', '-', client_name.strip().lower())
-    
-    headers = {
-        'Content-Disposition': f'attachment; filename="microsoft_ads_adjustments_{safe_filename}.csv"',
-        'Content-Type': 'text/csv'
-    }
-    return StreamingResponse(output, headers=headers)
-
-@router.get("/feeds/google-adjustments.csv")
-@router.get("/feeds/adjustments.csv")
-def feed_google_adjustments(request: Request, client_id: int = 1, feed_key: Optional[str] = None):
-    """
-    Live Automated CSV Feed for Google Sheets =IMPORTDATA() and Google Ads Scheduled Fetch (Adjustments/Retractions).
-    Returns real-time, Google Ads-compliant conversion adjustments CSV data for a specific client account.
-    """
-    try:
-        conn = db_router.connect()
-        cursor = conn.cursor()
-        
-        # Verify client exists
-        cursor.execute("SELECT name, google_ads_customer_id FROM clients WHERE id = ?", (client_id,))
-        client_row = cursor.fetchone()
-        if not client_row:
-            raise HTTPException(status_code=400, detail="Invalid client ID")
-        
-        client_name = client_row[0]
-        google_ads_id = client_row[1] or ""
-        
-        # Pull adjusted records belonging to this client that have a GCLID
-        cursor.execute("""
-            SELECT gclid, adjustment_type, adjusted_value, adjusted_at, created_at
-            FROM sessions
-            WHERE client_id = ? AND gclid IS NOT NULL AND gclid != '' AND adjusted = 'YES'
-            ORDER BY adjusted_at DESC
-        """, (client_id,))
-        rows = cursor.fetchall()
-        conn.close()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {e}")
-
-    # Generate CSV in memory
-    output = io.StringIO()
-    writer = csv.writer(output)
-    
-    # 1. Google Ads template parameter header
-    ads_parameter = f"Parameters:TimeZone=+0000;customerId={google_ads_id}" if google_ads_id else "Parameters:TimeZone=+0000"
-    writer.writerow([ads_parameter])
-    
-    # 2. Google Ads Adjustments headers
-    writer.writerow(["Google Click ID", "Conversion Name", "Conversion Time", "Adjustment Type", "Adjustment Time", "Adjusted Value", "Adjusted Value Currency"])
-    
-    for r in rows:
-        gclid, adj_type, adj_value, adj_at, orig_created_at = r
-        orig_conv_time = f"{orig_created_at} +0000" if orig_created_at else ""
-        adj_time = f"{adj_at} +0000" if adj_at else ""
-        
-        conv_name = "LeadGroove Offline Sale"
-        val_str = f"{adj_value:.2f}" if adj_type == 'RESTATE' else ""
-        curr_str = "USD" if adj_type == 'RESTATE' else ""
-        
-        writer.writerow([gclid, conv_name, orig_conv_time, adj_type, adj_time, val_str, curr_str])
-        
-    output.seek(0)
-    safe_filename = re.sub(r'\s+', '-', client_name.strip().lower())
-    headers = {
-        'Content-Disposition': f'inline; filename="google_adjustments_feed_{safe_filename}.csv"',
-        'Content-Type': 'text/csv'
-    }
-    return StreamingResponse(output, headers=headers)
-
-
-
-@router.get("/dashboard/export/google-adjustments")
-def export_google_adjustments(request: Request, client_id: int):
-    email = is_authenticated(request)
-    if not email:
-        return RedirectResponse(url="/login", status_code=303)
-    """
-    Exports adjusted conversions for Google Ads into a compliant 
-    Google Ads Offline Conversion Adjustments CSV format.
-    """
-    try:
-        conn = db_router.connect()
-        cursor = conn.cursor()
-        
-        # Verify client exists
-        cursor.execute("SELECT name, google_ads_customer_id FROM clients WHERE id = ?", (client_id,))
-        client_row = cursor.fetchone()
-        if not client_row:
-            raise HTTPException(status_code=400, detail="Invalid client ID")
-        
-        client_name = client_row[0]
-        google_ads_id = client_row[1] or ""
-        
-        # Pull adjusted records belonging to this client that have a GCLID
-        cursor.execute("""
-            SELECT gclid, adjustment_type, adjusted_value, adjusted_at, created_at
-            FROM sessions
-            WHERE client_id = ? AND gclid IS NOT NULL AND gclid != '' AND adjusted = 'YES'
-            ORDER BY adjusted_at DESC
-        """, (client_id,))
-        rows = cursor.fetchall()
-        conn.close()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {e}")
-
-    # Generate CSV in memory
-    output = io.StringIO()
-    writer = csv.writer(output)
-    
-    # 1. Google Ads template parameter header with account-specific Customer ID if available
-    ads_parameter = f"Parameters:TimeZone=+0000;customerId={google_ads_id}" if google_ads_id else "Parameters:TimeZone=+0000"
-    writer.writerow([ads_parameter])
-    
-    # 2. Google Ads Adjustments headers
-    writer.writerow(["Google Click ID", "Conversion Name", "Conversion Time", "Adjustment Type", "Adjustment Time", "Adjusted Value", "Adjusted Value Currency"])
-    
-    for r in rows:
-        gclid, adj_type, adj_value, adj_at, orig_created_at = r
-        orig_conv_time = f"{orig_created_at} +0000" if orig_created_at else ""
-        adj_time = f"{adj_at} +0000" if adj_at else ""
-        
-        # Original conversion name must match exactly (which was "LeadGroove Offline Sale")
-        conv_name = "LeadGroove Offline Sale"
-        
-        val_str = f"{adj_value:.2f}" if adj_type == 'RESTATE' else ""
-        curr_str = "USD" if adj_type == 'RESTATE' else ""
-        
-        writer.writerow([gclid, conv_name, orig_conv_time, adj_type, adj_time, val_str, curr_str])
-            
-    output.seek(0)
-    safe_filename = re.sub(r'\s+', '-', client_name.strip().lower())
-    
-    headers = {
-        'Content-Disposition': f'attachment; filename="google_ads_adjustments_{safe_filename}.csv"',
-        'Content-Type': 'text/csv'
-    }
-    return StreamingResponse(output, headers=headers)
-
-
-
-# ---------------------------------------------------------
-# AUTOMATED GOOGLE SHEETS & GOOGLE ADS SCHEDULED FETCH FEEDS
-# ---------------------------------------------------------
-@router.get("/feeds/google-conversions.csv")
-@router.get("/feeds/conversions.csv")
-def feed_google_conversions(request: Request, client_id: int = 1, feed_key: Optional[str] = None):
-    """
-    Live Automated CSV Feed for Google Sheets =IMPORTDATA() and Google Ads Scheduled Fetch.
-    Returns real-time, Google Ads-compliant offline conversion CSV data for a specific client account.
-    """
-    try:
-        conn = db_router.connect()
-        cursor = conn.cursor()
-        
-        # Verify client exists
-        cursor.execute("SELECT name, google_ads_customer_id FROM clients WHERE id = ?", (client_id,))
-        client_row = cursor.fetchone()
-        if not client_row:
-            raise HTTPException(status_code=400, detail="Invalid client ID")
-        
-        client_name = client_row[0]
-        google_ads_id = client_row[1] or ""
-        
-        # Pull records that have a GCLID and are either Qualified or Closed belonging to this client
-        cursor.execute("""
-            SELECT gclid, qualified, sale_closed, value, created_at
-            FROM sessions
-            WHERE client_id = ? AND gclid IS NOT NULL AND gclid != '' AND (qualified = 'YES' OR sale_closed = 'YES')
-            ORDER BY created_at DESC
-        """, (client_id,))
-        rows = cursor.fetchall()
-        conn.close()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {e}")
-
-    # Generate CSV in memory
-    output = io.StringIO()
-    writer = csv.writer(output)
-    
-    # 1. Google Ads template parameter header
-    ads_parameter = f"Parameters:TimeZone=+0000;customerId={google_ads_id}" if google_ads_id else "Parameters:TimeZone=+0000"
-    writer.writerow([ads_parameter])
-    
-    # 2. Google Ads standard headers
-    writer.writerow(["Google Click ID", "Conversion Name", "Conversion Time", "Conversion Value", "Conversion Currency"])
-    
-    for r in rows:
-        gclid, qualified, sale_closed, value, created_at = r
-        conv_time = f"{created_at} +0000" if created_at else ""
-        
-        if sale_closed == 'YES':
-            conv_name = "LeadGroove Offline Sale"
-            conv_value = float(value or 0.0)
-        else:
-            conv_name = "LeadGroove Qualified Lead"
-            conv_value = 1.0  # Default lead qualification value
-            
-        writer.writerow([gclid, conv_name, conv_time, f"{conv_value:.2f}", "USD"])
-        
-    output.seek(0)
-    safe_filename = re.sub(r'\s+', '-', client_name.strip().lower())
-    headers = {
-        'Content-Disposition': f'inline; filename="google_conversions_feed_{safe_filename}.csv"',
-        'Content-Type': 'text/csv'
-    }
-    return StreamingResponse(output, headers=headers)
-
-
-@router.get("/dashboard/export/google")
-def export_google_conversions(request: Request, client_id: int):
-    email = is_authenticated(request)
-    if not email:
-        return RedirectResponse(url="/login", status_code=303)
-    """
-    Exports qualified and closed conversions that have a valid GCLID 
-    into a Google Ads-compliant CSV upload format, filtered by client_id.
-    """
-    try:
-        conn = db_router.connect()
-        cursor = conn.cursor()
-        
-        # Verify client exists
-        cursor.execute("SELECT name, google_ads_customer_id FROM clients WHERE id = ?", (client_id,))
-        client_row = cursor.fetchone()
-        if not client_row:
-            raise HTTPException(status_code=400, detail="Invalid client ID")
-        
-        client_name = client_row[0]
-        google_ads_id = client_row[1] or ""
-        
-        # Pull records that have a GCLID and are either Qualified or Closed belonging to this client
-        cursor.execute("""
-            SELECT gclid, qualified, sale_closed, value, created_at
-            FROM sessions
-            WHERE client_id = ? AND gclid IS NOT NULL AND gclid != '' AND (qualified = 'YES' OR sale_closed = 'YES')
-            ORDER BY created_at DESC
-        """, (client_id,))
-        rows = cursor.fetchall()
-        conn.close()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {e}")
-
-    # Generate CSV in memory
-    output = io.StringIO()
-    writer = csv.writer(output)
-    
-    # 1. Google Ads template parameter header with account-specific Customer ID if available
-    ads_parameter = f"Parameters:TimeZone=+0000;customerId={google_ads_id}" if google_ads_id else "Parameters:TimeZone=+0000"
-    writer.writerow([ads_parameter])
-    
-    # 2. Google Ads standard headers
-    writer.writerow(["Google Click ID", "Conversion Name", "Conversion Time", "Conversion Value", "Conversion Currency"])
-    
-    for r in rows:
-        gclid, qualified, sale_closed, value, created_at = r
-        conv_time = f"{created_at} +0000" if created_at else ""
-        
-        if sale_closed == 'YES':
-            conv_name = "LeadGroove Offline Sale"
-            conv_value = float(value or 0.0)
-        else:
-            conv_name = "LeadGroove Qualified Lead"
-            conv_value = 1.0  # Default lead qualification value
-            
-        writer.writerow([gclid, conv_name, conv_time, conv_value, "USD"])
-            
-    output.seek(0)
-    safe_filename = re.sub(r'\s+', '-', client_name.strip().lower())
-    
-    headers = {
-        'Content-Disposition': f'attachment; filename="google_ads_conversions_{safe_filename}.csv"',
-        'Content-Type': 'text/csv'
-    }
-    return StreamingResponse(output, headers=headers)
-
-
-@router.get("/dashboard/export/facebook")
-def export_facebook_conversions(request: Request, client_id: int):
-    email = is_authenticated(request)
-    if not email:
-        return RedirectResponse(url="/login", status_code=303)
-    """
-    Exports qualified and closed conversions (GCLID, FBCLID, etc.) with automated SHA-256
-    hashed personal identifiers alongside fbclid for maximum Meta matching rates.
-    """
-    try:
-        conn = db_router.connect()
-        cursor = conn.cursor()
-        
-        # Verify client exists
-        cursor.execute("SELECT name, facebook_ads_id FROM clients WHERE id = ?", (client_id,))
-        client_row = cursor.fetchone()
-        if not client_row:
-            raise HTTPException(status_code=400, detail="Invalid client ID")
-        
-        client_name = client_row[0]
-        pixel_id = client_row[1] or ""
-        
-        # Pull records belonging to this client that are either Qualified or Closed (with or without fbclid)
-        cursor.execute("""
-            SELECT fbclid, email, phone, name, qualified, sale_closed, value, created_at
-            FROM sessions
-            WHERE client_id = ? AND (qualified = 'YES' OR sale_closed = 'YES')
-            ORDER BY created_at DESC
-        """, (client_id,))
-        rows = cursor.fetchall()
-        conn.close()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {e}")
-
-    # Generate Facebook standard format
-    output = io.StringIO()
-    writer = csv.writer(output)
-    
-    # Headers for Meta upload (Facebook Click ID, hashed Email, hashed Phone, hashed First Name, hashed Last Name, Event Name, Event Time, Value, Currency, Pixel ID)
-    writer.writerow(["fbclid", "email", "phone", "fn", "ln", "Event Name", "Event Time", "Value", "Currency", "Pixel ID"])
-    
-    for r in rows:
-        fbclid, email_raw, phone_raw, name_raw, qualified, sale_closed, value, created_at = r
-        conv_time = f"{created_at}"
-        
-        # Normalize and hash fields using our global helpers
-        hashed_email = sha256_hash_str(email_raw) if email_raw else ""
-        hashed_phone = sha256_hash_phone_str(phone_raw) if phone_raw else ""
-        
-        first_name, last_name = "", ""
-        if name_raw:
-            parts = str(name_raw).strip().split()
-            if len(parts) == 1:
-                first_name = parts[0]
-            elif len(parts) > 1:
-                first_name = parts[0]
-                last_name = " ".join(parts[1:])
-                
-        hashed_fn = sha256_hash_str(first_name) if first_name else ""
-        hashed_ln = sha256_hash_str(last_name) if last_name else ""
-        
-        if sale_closed == 'YES':
-            event_name = "LeadGroove Offline Sale"
-            event_val = float(value or 0.0)
-        else:
-            event_name = "LeadGroove Qualified Lead"
-            event_val = 1.0
-            
-        writer.writerow([
-            fbclid or "",
-            hashed_email,
-            hashed_phone,
-            hashed_fn,
-            hashed_ln,
-            event_name,
-            conv_time,
-            f"{event_val:.2f}",
-            "USD",
-            pixel_id
-        ])
-            
-    output.seek(0)
-    safe_filename = re.sub(r'\s+', '-', client_name.strip().lower())
-    
-    headers = {
-        'Content-Disposition': f'attachment; filename="facebook_conversions_{safe_filename}.csv"',
-        'Content-Type': 'text/csv'
-    }
-    return StreamingResponse(output, headers=headers)
-
-
-@router.get("/dashboard/export/linkedin")
-def export_linkedin_conversions(request: Request, client_id: int):
-    email = is_authenticated(request)
-    if not email:
-        return RedirectResponse(url="/login", status_code=303)
-    """
-    Exports qualified and closed conversions that have a valid LI_FAT_ID
-    into a LinkedIn-compliant Offline Conversions CSV format.
-    """
-    try:
-        conn = db_router.connect()
-        cursor = conn.cursor()
-        
-        # Verify client exists
-        cursor.execute("SELECT name, linkedin_ads_id FROM clients WHERE id = ?", (client_id,))
-        client_row = cursor.fetchone()
-        if not client_row:
-            raise HTTPException(status_code=400, detail="Invalid client ID")
-        
-        client_name = client_row[0]
-        linkedin_account_id = client_row[1] or ""
-        
-        # Pull records that have a LI_FAT_ID belonging to this client
-        cursor.execute("""
-            SELECT li_fat_id, qualified, sale_closed, value, created_at
-            FROM sessions
-            WHERE client_id = ? AND li_fat_id IS NOT NULL AND li_fat_id != '' AND (qualified = 'YES' OR sale_closed = 'YES')
-            ORDER BY created_at DESC
-        """, (client_id,))
-        rows = cursor.fetchall()
-        conn.close()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {e}")
-
-    output = io.StringIO()
-    writer = csv.writer(output)
-    
-    # LinkedIn Offline Conversion headers
-    writer.writerow(["li_fat_id", "Conversion Name", "Conversion Time", "Conversion Value", "Conversion Currency", "LinkedIn Account ID"])
-    
-    for r in rows:
-        li_fat_id, qualified, sale_closed, value, created_at = r
-        conv_time = f"{created_at} +0000"
-        
-        if sale_closed == 'YES':
-            conv_name = "LeadGroove Offline Sale"
-            conv_val = float(value or 0.0)
-        else:
-            conv_name = "LeadGroove Qualified Lead"
-            conv_val = 1.0
-            
-        writer.writerow([li_fat_id, conv_name, conv_time, f"{conv_val:.2f}", "USD", linkedin_account_id])
-            
-    output.seek(0)
-    safe_filename = re.sub(r'\s+', '-', client_name.strip().lower())
-    
-    headers = {
-        'Content-Disposition': f'attachment; filename="linkedin_conversions_{safe_filename}.csv"',
-        'Content-Type': 'text/csv'
-    }
-    return StreamingResponse(output, headers=headers)
-
-
-@router.get("/dashboard/export/microsoft")
-def export_microsoft_conversions(request: Request, client_id: int):
-    email = is_authenticated(request)
-    if not email:
-        return RedirectResponse(url="/login", status_code=303)
-    """
-    Exports qualified and closed conversions that have a valid MSCLKID
-    into a Microsoft Ads-compliant Offline Conversions CSV format.
-    """
-    try:
-        conn = db_router.connect()
-        cursor = conn.cursor()
-        
-        # Verify client exists
-        cursor.execute("SELECT name, microsoft_ads_id FROM clients WHERE id = ?", (client_id,))
-        client_row = cursor.fetchone()
-        if not client_row:
-            raise HTTPException(status_code=400, detail="Invalid client ID")
-        
-        client_name = client_row[0]
-        microsoft_id = client_row[1] or ""
-        
-        # Pull records that have a MSCLKID belonging to this client
-        cursor.execute("""
-            SELECT msclkid, qualified, sale_closed, value, created_at
-            FROM sessions
-            WHERE client_id = ? AND msclkid IS NOT NULL AND msclkid != '' AND (qualified = 'YES' OR sale_closed = 'YES')
-            ORDER BY created_at DESC
-        """, (client_id,))
-        rows = cursor.fetchall()
-        conn.close()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {e}")
-
-    output = io.StringIO()
-    writer = csv.writer(output)
-    
-    # Microsoft Ads offline conversions headers
-    writer.writerow(["Microsoft Click ID", "Conversion Name", "Conversion Time", "Conversion Value", "Conversion Currency", "Microsoft Account ID"])
-    
-    for r in rows:
-        msclkid, qualified, sale_closed, value, created_at = r
-        conv_time = f"{created_at} +0000"
-        
-        if sale_closed == 'YES':
-            conv_name = "LeadGroove Offline Sale"
-            conv_val = float(value or 0.0)
-        else:
-            conv_name = "LeadGroove Qualified Lead"
-            conv_val = 1.0
-            
-        writer.writerow([msclkid, conv_name, conv_time, f"{conv_val:.2f}", "USD", microsoft_id])
-            
-    output.seek(0)
-    safe_filename = re.sub(r'\s+', '-', client_name.strip().lower())
-    
-    headers = {
-        'Content-Disposition': f'attachment; filename="microsoft_conversions_{safe_filename}.csv"',
-        'Content-Type': 'text/csv'
-    }
-    return StreamingResponse(output, headers=headers)
-
-
-@router.get("/dashboard/export/tiktok")
-def export_tiktok_conversions(request: Request, client_id: int):
-    email = is_authenticated(request)
-    if not email:
-        return RedirectResponse(url="/login", status_code=303)
-    try:
-        conn = db_router.connect()
-        cursor = conn.cursor()
-        cursor.execute("SELECT name, tiktok_ads_id FROM clients WHERE id = ?", (client_id,))
-        client_row = cursor.fetchone()
-        if not client_row:
-            raise HTTPException(status_code=400, detail="Invalid client ID")
-        client_name = client_row[0]
-        pixel_id = client_row[1] or ""
-        cursor.execute("""
-            SELECT ttclid, qualified, sale_closed, value, created_at
-            FROM sessions
-            WHERE client_id = ? AND ttclid IS NOT NULL AND ttclid != '' AND (qualified = 'YES' OR sale_closed = 'YES')
-            ORDER BY created_at DESC
-        """, (client_id,))
-        rows = cursor.fetchall()
-        conn.close()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {e}")
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(["Tiktok Click ID", "Event Name", "Event Time", "Value", "Currency", "TikTok Pixel ID"])
-    for r in rows:
-        ttclid, qualified, sale_closed, value, created_at = r
-        conv_time = f"{created_at}"
-        if sale_closed == 'YES':
-            event_name = "LeadGroove Offline Sale"
-            event_val = float(value or 0.0)
-        else:
-            event_name = "LeadGroove Qualified Lead"
-            event_val = 1.0
-        writer.writerow([ttclid, event_name, conv_time, f"{event_val:.2f}", "USD", pixel_id])
-    output.seek(0)
-    safe_filename = re.sub(r'\s+', '-', client_name.strip().lower())
-    headers = {
-        'Content-Disposition': f'attachment; filename="tiktok_conversions_{safe_filename}.csv"',
-        'Content-Type': 'text/csv'
-    }
-    return StreamingResponse(output, headers=headers)
-
-
-@router.get("/dashboard/export/twitter")
-def export_twitter_conversions(request: Request, client_id: int):
-    email = is_authenticated(request)
-    if not email:
-        return RedirectResponse(url="/login", status_code=303)
-    try:
-        conn = db_router.connect()
-        cursor = conn.cursor()
-        cursor.execute("SELECT name, twitter_ads_id FROM clients WHERE id = ?", (client_id,))
-        client_row = cursor.fetchone()
-        if not client_row:
-            raise HTTPException(status_code=400, detail="Invalid client ID")
-        client_name = client_row[0]
-        pixel_id = client_row[1] or ""
-        cursor.execute("""
-            SELECT twclid, qualified, sale_closed, value, created_at
-            FROM sessions
-            WHERE client_id = ? AND twclid IS NOT NULL AND twclid != '' AND (qualified = 'YES' OR sale_closed = 'YES')
-            ORDER BY created_at DESC
-        """, (client_id,))
-        rows = cursor.fetchall()
-        conn.close()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {e}")
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(["twclid", "Event Name", "Event Time", "Conversion Value", "Currency", "X Ads Pixel ID"])
-    for r in rows:
-        twclid, qualified, sale_closed, value, created_at = r
-        conv_time = f"{created_at}"
-        if sale_closed == 'YES':
-            event_name = "LeadGroove Offline Sale"
-            event_val = float(value or 0.0)
-        else:
-            event_name = "LeadGroove Qualified Lead"
-            event_val = 1.0
-        writer.writerow([twclid, event_name, conv_time, f"{event_val:.2f}", "USD", pixel_id])
-    output.seek(0)
-    safe_filename = re.sub(r'\s+', '-', client_name.strip().lower())
-    headers = {
-        'Content-Disposition': f'attachment; filename="x_conversions_{safe_filename}.csv"',
-        'Content-Type': 'text/csv'
-    }
-    return StreamingResponse(output, headers=headers)
-
-
-
-@router.get("/dashboard/export/snapchat")
-def export_snapchat_conversions(request: Request, client_id: int):
-    email = is_authenticated(request)
-    if not email:
-        return RedirectResponse(url="/login", status_code=303)
-    try:
-        conn = db_router.connect()
-        cursor = conn.cursor()
-        cursor.execute("SELECT name, snapchat_ads_id FROM clients WHERE id = ?", (client_id,))
-        client_row = cursor.fetchone()
-        if not client_row:
-            raise HTTPException(status_code=400, detail="Invalid client ID")
-        client_name = client_row[0]
-        pixel_id = client_row[1] or ""
-        cursor.execute("""
-            SELECT scclid, qualified, sale_closed, value, created_at
-            FROM sessions
-            WHERE client_id = ? AND scclid IS NOT NULL AND scclid != '' AND (qualified = 'YES' OR sale_closed = 'YES')
-            ORDER BY created_at DESC
-        """, (client_id,))
-        rows = cursor.fetchall()
-        conn.close()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {e}")
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(["scclid", "Event Name", "Event Time", "Value", "Currency", "Snapchat Pixel ID"])
-    for r in rows:
-        scclid, qualified, sale_closed, value, created_at = r
-        conv_time = f"{created_at}"
-        if sale_closed == 'YES':
-            event_name = "LeadGroove Offline Sale"
-            event_val = float(value or 0.0)
-        else:
-            event_name = "LeadGroove Qualified Lead"
-            event_val = 1.0
-        writer.writerow([scclid, event_name, conv_time, f"{event_val:.2f}", "USD", pixel_id])
-    output.seek(0)
-    safe_filename = re.sub(r'\s+', '-', client_name.strip().lower())
-    headers = {
-        'Content-Disposition': f'attachment; filename="snapchat_conversions_{safe_filename}.csv"',
-        'Content-Type': 'text/csv'
-    }
-    return StreamingResponse(output, headers=headers)
-
-
-@router.get("/dashboard/export/pinterest")
-def export_pinterest_conversions(request: Request, client_id: int):
-    email = is_authenticated(request)
-    if not email:
-        return RedirectResponse(url="/login", status_code=303)
-    try:
-        conn = db_router.connect()
-        cursor = conn.cursor()
-        cursor.execute("SELECT name, pinterest_ads_id FROM clients WHERE id = ?", (client_id,))
-        client_row = cursor.fetchone()
-        if not client_row:
-            raise HTTPException(status_code=400, detail="Invalid client ID")
-        client_name = client_row[0]
-        tag_id = client_row[1] or ""
-        cursor.execute("""
-            SELECT pin_clid, qualified, sale_closed, value, created_at
-            FROM sessions
-            WHERE client_id = ? AND pin_clid IS NOT NULL AND pin_clid != '' AND (qualified = 'YES' OR sale_closed = 'YES')
-            ORDER BY created_at DESC
-        """, (client_id,))
-        rows = cursor.fetchall()
-        conn.close()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {e}")
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(["pin_clid", "Event Name", "Event Time", "Value", "Currency", "Pinterest Tag ID"])
-    for r in rows:
-        pin_clid, qualified, sale_closed, value, created_at = r
-        conv_time = f"{created_at}"
-        if sale_closed == 'YES':
-            event_name = "LeadGroove Offline Sale"
-            event_val = float(value or 0.0)
-        else:
-            event_name = "LeadGroove Qualified Lead"
-            event_val = 1.0
-        writer.writerow([pin_clid, event_name, conv_time, f"{event_val:.2f}", "USD", tag_id])
-    output.seek(0)
-    safe_filename = re.sub(r'\s+', '-', client_name.strip().lower())
-    headers = {
-        'Content-Disposition': f'attachment; filename="pinterest_conversions_{safe_filename}.csv"',
-        'Content-Type': 'text/csv'
-    }
-    return StreamingResponse(output, headers=headers)
-
-
-@router.get("/dashboard/export/reddit")
-def export_reddit_conversions(request: Request, client_id: int):
-    email = is_authenticated(request)
-    if not email:
-        return RedirectResponse(url="/login", status_code=303)
-    """
-    Exports qualified and closed conversions that have a valid rdt_cid
-    into a Reddit Ads-compliant Offline Conversions CSV format.
-    """
-    try:
-        conn = db_router.connect()
-        cursor = conn.cursor()
-        
-        cursor.execute("SELECT name, reddit_ads_id FROM clients WHERE id = ?", (client_id,))
-        client_row = cursor.fetchone()
-        if not client_row:
-            raise HTTPException(status_code=400, detail="Invalid client ID")
-        
-        client_name = client_row[0]
-        pixel_id = client_row[1] or ""
-        
-        cursor.execute("""
-            SELECT rdt_cid, qualified, sale_closed, value, created_at
-            FROM sessions
-            WHERE client_id = ? AND rdt_cid IS NOT NULL AND rdt_cid != '' AND (qualified = 'YES' OR sale_closed = 'YES')
-            ORDER BY created_at DESC
-        """, (client_id,))
-        rows = cursor.fetchall()
-        conn.close()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {e}")
-
-    output = io.StringIO()
-    writer = csv.writer(output)
-    
-    writer.writerow(["rdt_cid", "Event Name", "Event Time", "Value", "Currency", "Reddit Ads ID"])
-    
-    for r in rows:
-        rdt_cid, qualified, sale_closed, value, created_at = r
-        conv_time = f"{created_at} +0000" if created_at else ""
-        
-        if sale_closed == 'YES':
-            event_name = "LeadGroove Offline Sale"
-            event_val = float(value or 0.0)
-        else:
-            event_name = "LeadGroove Qualified Lead"
-            event_val = 1.0
-            
-        writer.writerow([rdt_cid, event_name, conv_time, f"{event_val:.2f}", "USD", pixel_id])
-            
-    output.seek(0)
-    safe_filename = re.sub(r'\s+', '-', client_name.strip().lower())
-    
-    headers = {
-        'Content-Disposition': f'attachment; filename="reddit_ads_conversions_{safe_filename}.csv"',
-        'Content-Type': 'text/csv'
-    }
-    return StreamingResponse(output, headers=headers)
-
-
-@router.get("/dashboard/export/chatgpt")
-def export_chatgpt_conversions(request: Request, client_id: int):
-    email = is_authenticated(request)
-    if not email:
-        return RedirectResponse(url="/login", status_code=303)
-    try:
-        conn = db_router.connect()
-        cursor = conn.cursor()
-        cursor.execute("SELECT name, chatgpt_ads_id FROM clients WHERE id = ?", (client_id,))
-        client_row = cursor.fetchone()
-        if not client_row:
-            raise HTTPException(status_code=400, detail="Invalid client ID")
-        client_name = client_row[0]
-        pixel_id = client_row[1] or ""
-        cursor.execute("""
-            SELECT gptclid, qualified, sale_closed, value, created_at
-            FROM sessions
-            WHERE client_id = ? AND gptclid IS NOT NULL AND gptclid != '' AND (qualified = 'YES' OR sale_closed = 'YES')
-            ORDER BY created_at DESC
-        """, (client_id,))
-        rows = cursor.fetchall()
-        conn.close()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {e}")
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(["gptclid", "Event Name", "Event Time", "Value", "Currency", "ChatGPT Ads ID"])
-    for r in rows:
-        gptclid, qualified, sale_closed, value, created_at = r
-        conv_time = f"{created_at}"
-        if sale_closed == 'YES':
-            event_name = "LeadGroove Offline Sale"
-            event_val = float(value or 0.0)
-        else:
-            event_name = "LeadGroove Qualified Lead"
-            event_val = 1.0
-        writer.writerow([gptclid, event_name, conv_time, f"{event_val:.2f}", "USD", pixel_id])
-    output.seek(0)
-    safe_filename = re.sub(r'\s+', '-', client_name.strip().lower())
-    headers = {
-        'Content-Disposition': f'attachment; filename="chatgpt_conversions_{safe_filename}.csv"',
-        'Content-Type': 'text/csv'
-    }
-    return StreamingResponse(output, headers=headers)
-
-
-
-    return StreamingResponse(output, headers=headers)
-
-
-import hashlib
-
-def sha256_hash_str(val: str) -> str:
-    cleaned = str(val).strip().lower()
-    return hashlib.sha256(cleaned.encode('utf-8')).hexdigest()
-
-def sha256_hash_phone_str(val: str) -> str:
-    cleaned = re.sub(r'\D', '', str(val))
-    if len(cleaned) == 10:
-        cleaned = "1" + cleaned
-    return hashlib.sha256(cleaned.encode('utf-8')).hexdigest()
-
-def get_audience_contacts(client_id: int, segment: str = "all"):
-    conn = db_router.connect()
-    cursor = conn.cursor()
-    # Pull unique sessions with contacts and their sale_closed status
-    cursor.execute("""
-        SELECT name, phone, email, company, sale_closed
-        FROM sessions
-        WHERE client_id = ? AND (email IS NOT NULL AND email != '' OR phone IS NOT NULL AND phone != '')
-    """, (client_id,))
-    rows = cursor.fetchall()
-    conn.close()
-    
-    # Pass 1: Aggregate purchase counts per customer key
-    purchase_counts = {}
-    customer_profiles = {}
-    
-    for name, phone, email, company, sale_closed in rows:
-        norm_phone = re.sub(r'\D', '', str(phone or ""))
-        if len(norm_phone) == 10:
-            norm_phone = "1" + norm_phone
-        norm_email = str(email or "").strip().lower()
-        
-        key = (norm_phone, norm_email)
-        if not key[0] and not key[1]:
-            continue
-            
-        if key not in purchase_counts:
-            purchase_counts[key] = 0
-            customer_profiles[key] = {
-                "name": name,
-                "phone": norm_phone,
-                "email": norm_email,
-                "company": company or ""
-            }
-        else:
-            if name and (not customer_profiles[key]["name"] or customer_profiles[key]["name"] == "Unknown"):
-                customer_profiles[key]["name"] = name
-            if company and not customer_profiles[key]["company"]:
-                customer_profiles[key]["company"] = company
-
-        if sale_closed == 'YES':
-            purchase_counts[key] += 1
-            
-    # Pass 2: filter according to the requested cohort segment
-    contacts = []
-    for key, count in purchase_counts.items():
-        profile = customer_profiles[key]
-        
-        # Split names
-        first_name, last_name = "", ""
-        if profile["name"]:
-            parts = str(profile["name"]).strip().split()
-            if len(parts) == 1:
-                first_name = parts[0]
-            elif len(parts) > 1:
-                first_name = parts[0]
-                last_name = " ".join(parts[1:])
-                
-        c_dict = {
-            "first_name": first_name,
-            "last_name": last_name,
-            "phone": profile["phone"],
-            "email": profile["email"],
-            "company": profile["company"]
-        }
-        
-        if segment == "single":
-            if count == 1:
-                contacts.append(c_dict)
-        elif segment == "multi":
-            if count >= 2:
-                contacts.append(c_dict)
-        elif segment == "leads":
-            if count == 0:
-                contacts.append(c_dict)
-        else: # "all"
-            contacts.append(c_dict)
-            
-    return contacts
-
-
-@router.get("/dashboard/export/audience/google")
-def export_google_audience(request: Request, client_id: int, segment: str = "all"):
-    email = is_authenticated(request)
-    if not email:
-        return RedirectResponse(url="/login", status_code=303)
-    try:
-        conn = db_router.connect()
-        cursor = conn.cursor()
-        cursor.execute("SELECT name FROM clients WHERE id = ?", (client_id,))
-        client_row = cursor.fetchone()
-        if not client_row:
-            raise HTTPException(status_code=400, detail="Invalid client ID")
-        client_name = client_row[0]
-        conn.close()
-        
-        contacts = get_audience_contacts(client_id, segment=segment)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {e}")
-        
-    output = io.StringIO()
-    writer = csv.writer(output)
-    # Google Customer Match headers
-    writer.writerow(["Email", "Phone", "First Name", "Last Name", "Country"])
-    for c in contacts:
-        hashed_email = sha256_hash_str(c["email"]) if c["email"] else ""
-        hashed_phone = sha256_hash_phone_str(c["phone"]) if c["phone"] else ""
-        # Names can be raw for Google's browser match uploader, but we can also write them
-        writer.writerow([hashed_email, hashed_phone, c["first_name"], c["last_name"], "US"])
-        
-    output.seek(0)
-    safe_filename = re.sub(r'\s+', '-', client_name.strip().lower())
-    headers = {
-        'Content-Disposition': f'attachment; filename="google_audience_match_{segment}_{safe_filename}.csv"',
-        'Content-Type': 'text/csv'
-    }
-    return StreamingResponse(output, headers=headers)
-
-
-@router.get("/dashboard/export/audience/facebook")
-def export_facebook_audience(request: Request, client_id: int, segment: str = "all"):
-    email = is_authenticated(request)
-    if not email:
-        return RedirectResponse(url="/login", status_code=303)
-    try:
-        conn = db_router.connect()
-        cursor = conn.cursor()
-        cursor.execute("SELECT name FROM clients WHERE id = ?", (client_id,))
-        client_row = cursor.fetchone()
-        if not client_row:
-            raise HTTPException(status_code=400, detail="Invalid client ID")
-        client_name = client_row[0]
-        conn.close()
-        
-        contacts = get_audience_contacts(client_id, segment=segment)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {e}")
-        
-    output = io.StringIO()
-    writer = csv.writer(output)
-    # Meta Custom Audience headers
-    writer.writerow(["email", "phone", "fn", "ln", "country"])
-    for c in contacts:
-        hashed_email = sha256_hash_str(c["email"]) if c["email"] else ""
-        hashed_phone = sha256_hash_phone_str(c["phone"]) if c["phone"] else ""
-        hashed_fn = sha256_hash_str(c["first_name"]) if c["first_name"] else ""
-        hashed_ln = sha256_hash_str(c["last_name"]) if c["last_name"] else ""
-        writer.writerow([hashed_email, hashed_phone, hashed_fn, hashed_ln, "US"])
-        
-    output.seek(0)
-    safe_filename = re.sub(r'\s+', '-', client_name.strip().lower())
-    headers = {
-        'Content-Disposition': f'attachment; filename="meta_custom_audience_{segment}_{safe_filename}.csv"',
-        'Content-Type': 'text/csv'
-    }
-    return StreamingResponse(output, headers=headers)
-
-
-@router.get("/dashboard/export/audience/linkedin")
-def export_linkedin_audience(request: Request, client_id: int, segment: str = "all"):
-    email = is_authenticated(request)
-    if not email:
-        return RedirectResponse(url="/login", status_code=303)
-    try:
-        conn = db_router.connect()
-        cursor = conn.cursor()
-        cursor.execute("SELECT name FROM clients WHERE id = ?", (client_id,))
-        client_row = cursor.fetchone()
-        if not client_row:
-            raise HTTPException(status_code=400, detail="Invalid client ID")
-        client_name = client_row[0]
-        conn.close()
-        
-        contacts = get_audience_contacts(client_id, segment=segment)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {e}")
-        
-    output = io.StringIO()
-    writer = csv.writer(output)
-    # LinkedIn Member Match headers
-    writer.writerow(["email", "phone", "firstname", "lastname", "companyname"])
-    for c in contacts:
-        hashed_email = sha256_hash_str(c["email"]) if c["email"] else ""
-        hashed_phone = sha256_hash_phone_str(c["phone"]) if c["phone"] else ""
-        # Names can be raw, company is extremely useful for LinkedIn member match
-        writer.writerow([hashed_email, hashed_phone, c["first_name"], c["last_name"], c["company"]])
-        
-    output.seek(0)
-    safe_filename = re.sub(r'\s+', '-', client_name.strip().lower())
-    headers = {
-        'Content-Disposition': f'attachment; filename="linkedin_member_matching_{segment}_{safe_filename}.csv"',
-        'Content-Type': 'text/csv'
-    }
-    return StreamingResponse(output, headers=headers)
-
-
-@router.get("/dashboard/export/exclusions")
-def export_client_exclusions(request: Request, client_id: int):
-    email = is_authenticated(request)
-    if not email:
-        return RedirectResponse(url="/login", status_code=303)
-    """
-    Exports the current active exclusion list for a client as a CSV file.
-    """
-    try:
-        conn = db_router.connect()
-        cursor = conn.cursor()
-        
-        # Verify client exists
-        cursor.execute("SELECT name FROM clients WHERE id = ?", (client_id,))
-        client_row = cursor.fetchone()
-        if not client_row:
-            raise HTTPException(status_code=400, detail="Invalid client ID")
-        
-        client_name = client_row[0]
-        
-        # Pull excluded customers belonging to this client
-        cursor.execute("""
-            SELECT first_name, last_name, email, phone, company_name
-            FROM excluded_customers
-            WHERE client_id = ?
-            ORDER BY id ASC
-        """, (client_id,))
-        rows = cursor.fetchall()
-        conn.close()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {e}")
-
-    # Generate CSV in memory
-    output = io.StringIO()
-    writer = csv.writer(output)
-    
-    # Standard headers that match our sample sheet
-    writer.writerow(["first name", "last name", "email", "phone number", "company name"])
-    
-    for r in rows:
-        writer.writerow(r)
-            
-    output.seek(0)
-    safe_filename = re.sub(r'\\s+', '-', client_name.strip().lower())
-    
-    headers = {
-        'Content-Disposition': f'attachment; filename="exclusions_{safe_filename}.csv"',
-        'Content-Type': 'text/csv'
-    }
-    return StreamingResponse(output, headers=headers)
 
 
 
