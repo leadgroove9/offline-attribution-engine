@@ -1,0 +1,41 @@
+name: leadgroove-app
+region: nyc
+services:
+- name: web
+  github:
+    repo: your-github-username/your-repo-name  # Replace with your GitHub username/repo
+    branch: main
+    deploy_on_push: true
+  instance_count: 1
+  instance_size_slug: basic-xs  # 1GB RAM / 1 vCPU ($6/mo)
+  build_command: pip install -r requirements.txt
+  run_command: uvicorn main:app --host 0.0.0.0 --port 8000
+  http_port: 8000
+  routes:
+  - path: /
+  envs:
+  - key: DATABASE_URL
+    scope: RUN_AND_BUILD_TIME
+    value: ${db.DATABASE_URL}
+  - key: ANTHROPIC_API_KEY
+    scope: RUN_TIME
+    type: SECRET
+    value: sk-ant-your-key-here  # Set your live Anthropic API Key in DO Dashboard
+  - key: SYNC_TOKEN
+    scope: RUN_TIME
+    type: SECRET
+    value: your_secret_cron_sync_token
+  health_check:
+    http_path: /login
+    initial_delay_seconds: 15
+    period_seconds: 10
+    timeout_seconds: 5
+    success_threshold: 1
+    failure_threshold: 3
+
+databases:
+- engine: PG
+  name: db
+  num_nodes: 1
+  size: db-s-dev-database  # Managed Dev Postgres ($15/mo)
+  version: "15"
