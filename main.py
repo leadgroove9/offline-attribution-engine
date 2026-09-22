@@ -187,10 +187,9 @@ app = FastAPI(
     version="15.2.0"
 )
 
-
 @app.get("/health")
 @app.get("/healthz")
-def health_check_probe():
+def health_check():
     return {"status": "ok", "service": "LeadGroove Engine", "version": "15.2.0"}
 
 
@@ -1660,6 +1659,8 @@ def get_admin_users(request: Request):
 @app.get("/", response_class=HTMLResponse)
 def read_root(request: Request, response: Response):
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, private"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
     """Agency Portal Landing Page with Auth Check."""
     email = is_authenticated(request)
     user_header_html = ""
