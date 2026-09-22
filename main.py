@@ -1,24 +1,35 @@
 import os
-import sqlite3
+import sys
 import re
 import json
 import csv
 import io
-import pandas as pd
+import hashlib
+import uuid
+import threading
+import sqlite3
 import difflib
-from fastapi import FastAPI, Request, HTTPException, File, UploadFile, Form
-from fastapi.responses import HTMLResponse, StreamingResponse, Response, RedirectResponse
+from typing import Optional, List, Dict, Any
+from fastapi import FastAPI, Request, HTTPException, File, UploadFile, Form, Response
+from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse
 from pydantic import BaseModel
-from typing import Optional
+import pandas as pd
+
 try:
     from anthropic import Anthropic
 except ImportError:
     Anthropic = None
 
-# Initialize FastAPI App
+app = FastAPI(
+    title="Offline Attribution Engine (Multi-Tenant Multi-Channel)",
+    description="Multi-tenant agency platform for tracking offline leads/sales and AI audits across Google, Meta, LinkedIn, and Microsoft",
+    version="15.2.0"
+)
 
-import hashlib
-import uuid
+@app.get("/health")
+@app.get("/healthz")
+def root_health_check():
+    return {"status": "ok", "service": "LeadGroove Engine", "version": "15.2.0"}
 
 def hash_password(password: str) -> str:
     salt = uuid.uuid4().hex
@@ -72,7 +83,6 @@ def is_authenticated(request: Request) -> Optional[str]:
     return get_session_email(token)
 
 def get_user_role_and_client(email: str) -> tuple[str, Optional[int]]:
-    """Returns the (role, client_id) for the user. Defaults to ('full', None) if not found."""
     if not email:
         return "read", None
     conn = db_router.connect()
@@ -88,115 +98,6 @@ def get_user_role_and_client(email: str) -> tuple[str, Optional[int]]:
         conn.close()
     return "full", None
 
-
-def clean_company_name(name: str) -> str:
-    if not name:
-        return ""
-    name_clean = name.lower().strip()
-    name_clean = re.sub(r"[^\w\s]", "", name_clean)
-    noise_words = ["inc", "llc", "corp", "co", "ltd", "group", "services", "limited", "incorporated", "corporation"]
-    tokens = [w for w in name_clean.split() if w not in noise_words]
-    return " ".join(tokens)
-
-def clean_person_name(name: str) -> str:
-    if not name:
-        return ""
-    name_clean = name.lower().strip()
-    name_clean = re.sub(r"[^\w\s,]", "", name_clean)
-    return name_clean
-
-def check_name_transposition(name1: str, name2: str) -> float:
-    n1 = clean_person_name(name1)
-    n2 = clean_person_name(name2)
-    tokens1 = [t.strip() for t in n1.split(",") if t.strip()]
-    tokens2 = [t.strip() for t in n2.split(",") if t.strip()]
-    
-    if len(tokens1) > 1:
-        n1_standard = " ".join(reversed(tokens1))
-    else:
-        n1_standard = n1
-        
-    if len(tokens2) > 1:
-        n2_standard = " ".join(reversed(tokens2))
-    else:
-        n2_standard = n2
-
-    t1 = n1_standard.split()
-    t2 = n2_standard.split()
-    
-    if not t1 or not t2:
-        return 0.0
-        
-    if sorted(t1) == sorted(t2):
-        return 1.0
-        
-    if t1[-1] == t2[-1]:
-        f1, f2 = t1[0], t2[0]
-        if f1 == f2:
-            return 1.0
-        f1_clean = re.sub(r"\.", "", f1).strip()
-        f2_clean = re.sub(r"\.", "", f2).strip()
-        if f1_clean == f2_clean:
-            return 1.0
-        if len(f1_clean) == 1 and f2_clean.startswith(f1_clean):
-            return 0.90
-        if len(f2_clean) == 1 and f1_clean.startswith(f2_clean):
-            return 0.90
-        if f1_clean in f2_clean or f2_clean in f1_clean:
-            return 0.85
-            
-    return difflib.SequenceMatcher(None, n1_standard, n2_standard).ratio()
-
-def calculate_company_similarity(name1: str, name2: str) -> float:
-    c1 = clean_company_name(name1)
-    c2 = clean_company_name(name2)
-    if not c1 or not c2:
-        return 0.0
-    if c1 in c2 or c2 in c1:
-        return 1.0
-    return difflib.SequenceMatcher(None, c1, c2).ratio()
-
-def find_dynamic_columns_custom(columns: list) -> tuple:
-    phone_col = None
-    email_col = None
-    value_col = None
-    name_col = None
-    company_col = None
-    cleaned_cols = {col: re.sub(r"[\s_-]+", "", col.lower()) for col in columns}
-    for original_col, clean_col in cleaned_cols.items():
-        if not phone_col and re.search(r"(phone|tele|mobile|cell|num|contact)", clean_col):
-            phone_col = original_col
-            continue
-        if not email_col and re.search(r"(email|mail|address)", clean_col):
-            email_col = original_col
-            continue
-        if not value_col and re.search(r"(amount|value|revenue|total|price|paid|sum|invoice|sale|cost)", clean_col):
-            value_col = original_col
-            continue
-        if not name_col and re.search(r"(name|customer|client|contact|lead)", clean_col):
-            name_col = original_col
-            continue
-        if not company_col and re.search(r"(company|business|firm|org|account)", clean_col):
-            company_col = original_col
-            continue
-    return phone_col, email_col, value_col, name_col, company_col
-
-app = FastAPI(
-    title="Offline Attribution Engine (Multi-Tenant Multi-Channel)",
-    description="Multi-tenant agency platform for tracking offline leads/sales and AI audits across Google, Meta, LinkedIn, and Microsoft",
-    version="15.2.0"
-)
-
-# ---------------------------------------------------------
-# DATABASE CONFIGURATION (SQLite)
-# ---------------------------------------------------------
-
-@app.get("/health")
-@app.get("/healthz")
-def root_health_check():
-    return {"status": "ok", "service": "LeadGroove Engine", "version": "15.2.0"}
-
-
 DB_PATH = "offline_attribution.db"
 
 # ---------------------------------------------------------
@@ -211,31 +112,22 @@ class PostgreSQLCursorWrapper:
         self._fetchall_override = None
 
     def execute(self, query, params=None):
-        # Reset overrides
         self._fetchone_override = None
         self._fetchall_override = None
         
-        # 1. Map SQLite parameters placeholder (?) to PostgreSQL (%s)
-        # Be careful not to replace ? inside text strings, but simple replace works for our code's query structure
         query_formatted = query.replace("?", "%s")
+        query_formatted = re.sub(r'INTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT', 'SERIAL PRIMARY KEY', query_formatted, flags=re.IGNORECASE)
+        query_formatted = re.sub(r'AUTOINCREMENT', '', query_formatted, flags=re.IGNORECASE)
         
-        # 2. Map SQLite table creation constraints to PostgreSQL serialization schemas
-        query_formatted = query_formatted.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY")
-        query_formatted = query_formatted.replace("AUTOINCREMENT", "")
-        
-        # 3. Intercept PRAGMA table_info dynamic schema self-healing checks
         if "PRAGMA table_info(" in query:
             table_name = query.split("PRAGMA table_info(")[1].split(")")[0].strip().replace("'", "").replace('"', '')
             pg_query = f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table_name}'"
             self.cursor.execute(pg_query)
             cols = self.cursor.fetchall()
-            # Mock PRAGMA table_info columns format: (cid, name, type, notnull, dflt_value, pk)
-            # main.py does: `existing_cols = [col[1] for col in cursor.fetchall()]`
             mock_cols = [(0, col[0], 'TEXT', 0, None, 0) for col in cols]
             self._fetchall_override = lambda: mock_cols
             return self
 
-        # 4. Intercept sqlite_sequence checks used for calculating onboarding sequence IDs
         if "SELECT seq FROM sqlite_sequence" in query:
             table_name = "clients"
             if "name =" in query:
@@ -248,17 +140,15 @@ class PostgreSQLCursorWrapper:
             self._fetchone_override = lambda: (max_id,)
             return self
             
-        # 5. Fix potential PostgreSQL cast/comparison issues with Boolean/Text
-        # Also convert SQLite-style datetime(column, 'localtime') to PostgreSQL TO_CHAR(column, 'YYYY-MM-DD HH24:MI:SS')
-        import re
         query_formatted = re.sub(r"datetime\(([^,]+),\s*'localtime'\)", r"to_char(\1, 'YYYY-MM-DD HH24:MI:SS')", query_formatted, flags=re.IGNORECASE)
         
-        # Execute raw query
         self.cursor.execute(query_formatted, params)
         return self
 
     def executemany(self, query, params_list):
         query_formatted = query.replace("?", "%s")
+        query_formatted = re.sub(r'INTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT', 'SERIAL PRIMARY KEY', query_formatted, flags=re.IGNORECASE)
+        query_formatted = re.sub(r'AUTOINCREMENT', '', query_formatted, flags=re.IGNORECASE)
         self.cursor.executemany(query_formatted, params_list)
         return self
 
@@ -274,7 +164,6 @@ class PostgreSQLCursorWrapper:
 
     @property
     def lastrowid(self):
-        # PostgreSQL doesn't support cursor.lastrowid; use LASTVAL() utility sequence lookup
         try:
             self.cursor.execute("SELECT LASTVAL()")
             return self.cursor.fetchone()[0]
@@ -338,385 +227,366 @@ db_router = MockSqlite3()
 
 
 def init_db():
-    """Initializes the database in strict dependency order, creates all tables, and self-heals schemas."""
+    """Initializes the database, creates necessary tables in strict dependency order, and self-heals schemas."""
+    conn = db_router.connect()
+    cursor = conn.cursor()
+    
+    # 1. CREATE CLIENTS TABLE FIRST
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS clients (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            callrail_account_id TEXT,
+            callrail_company_id TEXT UNIQUE,
+            google_ads_customer_id TEXT,
+            facebook_ads_id TEXT,
+            linkedin_ads_id TEXT,
+            microsoft_ads_id TEXT,
+            lead_gen_method TEXT,
+            qualification_criteria TEXT,
+            source_of_truth TEXT,
+            email_provider TEXT,
+            email_account TEXT,
+            email_app_password TEXT,
+            crm_deal_tags TEXT,
+            crm_won_deal_tags TEXT,
+            crm_lead_tags TEXT,
+            lead_count_rule TEXT,
+            exclude_past_customers TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+    
+    # Self-heal clients schema
+    cursor.execute("PRAGMA table_info(clients)")
+    existing_cols = [col[1] for col in cursor.fetchall()]
+    cols_to_verify = [
+        ("sales_source", "TEXT DEFAULT 'manual'"),
+        ("facebook_ads_id", "TEXT"),
+        ("tiktok_ads_id", "TEXT"),
+        ("twitter_ads_id", "TEXT"),
+        ("pinterest_ads_id", "TEXT"),
+        ("snapchat_ads_id", "TEXT"),
+        ("chatgpt_ads_id", "TEXT"),
+        ("reddit_ads_id", "TEXT"),
+        ("linkedin_ads_id", "TEXT"),
+        ("microsoft_ads_id", "TEXT"),
+        ("lead_gen_method", "TEXT"),
+        ("qualification_criteria", "TEXT"),
+        ("source_of_truth", "TEXT"),
+        ("email_provider", "TEXT"),
+        ("email_account", "TEXT"),
+        ("email_app_password", "TEXT"),
+        ("crm_deal_tags", "TEXT"),
+        ("crm_won_deal_tags", "TEXT"),
+        ("crm_value_field", "TEXT"),
+        ("crm_lead_tags", "TEXT"),
+        ("lead_count_rule", "TEXT"),
+        ("exclude_past_customers", "TEXT"),
+        ("callrail_account_id", "TEXT"),
+        ("call_tracking_provider", "TEXT"),
+        ("ctm_account_id", "TEXT"),
+        ("ctm_profile_id", "TEXT"),
+        ("wc_account_id", "TEXT"),
+        ("wc_profile_id", "TEXT"),
+        ("email_account_2", "TEXT"),
+        ("email_app_password_2", "TEXT"),
+        ("email_account_3", "TEXT"),
+        ("email_app_password_3", "TEXT"),
+        ("email_account_4", "TEXT"),
+        ("email_app_password_4", "TEXT"),
+        ("email_account_5", "TEXT"),
+        ("email_app_password_5", "TEXT")
+    ]
+    for col_name, col_type in cols_to_verify:
+        if col_name not in existing_cols:
+            try:
+                cursor.execute(f"ALTER TABLE clients ADD COLUMN {col_name} {col_type}")
+            except Exception:
+                pass
+    conn.commit()
+
+    # Seed Mock Clients if empty
+    cursor.execute("SELECT COUNT(*) FROM clients")
+    if cursor.fetchone()[0] == 0:
+        mock_clients = [
+            ("Priority Plumbing", "comp_plumbing", "123-456-7890", "fb_plumb_99", "", "", "both", "C", "hubspot", "", "", "", "appointment-booked", "closed-won", "", "all", "NO"),
+            ("Apex HVAC & Air", "comp_hvac", "987-654-3210", "", "", "ms_hvac_88", "both", "E", "servicetitan", "", "", "", "", "", "completed-lead", "all", "NO"),
+            ("Metro Dental Care", "comp_dental", "555-123-4567", "", "li_dental_77", "", "both", "C", "email", "gmail", "bookings@metrodental.com", "", "", "", "", "maximum_one", "YES")
+        ]
+        cursor.executemany("""
+            INSERT INTO clients (
+                name, callrail_company_id, google_ads_customer_id, facebook_ads_id, linkedin_ads_id, microsoft_ads_id,
+                lead_gen_method, qualification_criteria, source_of_truth, email_provider, email_account, email_app_password,
+                crm_deal_tags, crm_won_deal_tags, crm_lead_tags, lead_count_rule, exclude_past_customers
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, mock_clients)
+        conn.commit()
+
+    # 2. CREATE USERS TABLE
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            hashed_password TEXT NOT NULL,
+            role TEXT DEFAULT 'full',
+            client_id INTEGER,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+
+    cursor.execute("PRAGMA table_info(users)")
+    existing_user_cols = [col[1] for col in cursor.fetchall()]
+    user_cols_to_verify = [("role", "TEXT DEFAULT 'full'"), ("client_id", "INTEGER")]
+    for col_name, col_type in user_cols_to_verify:
+        if col_name not in existing_user_cols:
+            try:
+                cursor.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_type}")
+            except Exception:
+                pass
+    conn.commit()
+
+    cursor.execute("SELECT COUNT(*) FROM users")
+    if cursor.fetchone()[0] == 0:
+        default_admin_email = "admin@leadgrove.net"
+        default_admin_pass = hash_password("admin123")
+        cursor.execute("""
+            INSERT INTO users (email, hashed_password, role)
+            VALUES (?, ?, 'full')
+        """, (default_admin_email, default_admin_pass))
+        conn.commit()
+
+    # 3. CREATE SESSIONS TABLE (Click Attribution)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            client_id INTEGER DEFAULT 1,
+            phone TEXT NOT NULL,
+            email TEXT,
+            name TEXT,
+            company TEXT,
+            gclid TEXT,
+            fbclid TEXT,
+            li_fat_id TEXT,
+            msclkid TEXT,
+            source TEXT,
+            qualified TEXT,
+            sale_closed TEXT,
+            value REAL DEFAULT 0.0,
+            reason TEXT,
+            model_used TEXT,
+            raw_data TEXT,
+            match_fuzzy TEXT DEFAULT 'NO',
+            certainty_score INTEGER DEFAULT 100,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (client_id) REFERENCES clients (id)
+        )
+    """)
+    conn.commit()
+
+    cursor.execute("PRAGMA table_info(sessions)")
+    existing_session_cols = [col[1] for col in cursor.fetchall()]
+    session_cols_to_verify = [
+        ("fbclid", "TEXT"),
+        ("ttclid", "TEXT"),
+        ("twclid", "TEXT"),
+        ("pin_clid", "TEXT"),
+        ("scclid", "TEXT"),
+        ("gptclid", "TEXT"),
+        ("rdt_cid", "TEXT"),
+        ("li_fat_id", "TEXT"),
+        ("msclkid", "TEXT"),
+        ("match_fuzzy", "TEXT DEFAULT 'NO'"),
+        ("certainty_score", "INTEGER DEFAULT 100"),
+        ("adjusted", "TEXT DEFAULT 'NO'"),
+        ("adjusted_value", "REAL DEFAULT 0.0"),
+        ("adjustment_type", "TEXT"),
+        ("adjusted_at", "TIMESTAMP")
+    ]
+    for col_name, col_type in session_cols_to_verify:
+        if col_name not in existing_session_cols:
+            try:
+                cursor.execute(f"ALTER TABLE sessions ADD COLUMN {col_name} {col_type}")
+            except Exception:
+                pass
+    conn.commit()
+
+    # 4. CREATE SECONDARY TABLES
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS user_invitations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            role TEXT NOT NULL,
+            client_id INTEGER,
+            token TEXT UNIQUE NOT NULL,
+            invited_by TEXT NOT NULL,
+            is_used TEXT DEFAULT 'NO',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (client_id) REFERENCES clients (id)
+        )
+    """)
+    conn.commit()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS user_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            token TEXT UNIQUE NOT NULL,
+            email TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS password_resets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT NOT NULL,
+            token TEXT UNIQUE NOT NULL,
+            is_used TEXT DEFAULT 'NO',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            expires_at TIMESTAMP
+        )
+    """)
+    conn.commit()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS client_config_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            client_id INTEGER,
+            changed_by TEXT NOT NULL,
+            feature_name TEXT NOT NULL,
+            old_value TEXT,
+            new_value TEXT,
+            changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (client_id) REFERENCES clients (id)
+        )
+    """)
+    conn.commit()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS webhook_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            client_id INTEGER,
+            source TEXT NOT NULL,
+            event_type TEXT NOT NULL,
+            status_code INTEGER DEFAULT 200,
+            payload_summary TEXT,
+            error_message TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (client_id) REFERENCES clients (id)
+        )
+    """)
+    conn.commit()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS unmatched_records (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            client_id INTEGER NOT NULL,
+            record_type TEXT DEFAULT 'sale',
+            customer_identifier TEXT,
+            amount REAL DEFAULT 0.0,
+            source_system TEXT,
+            reason TEXT,
+            status TEXT DEFAULT 'UNMATCHED',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (client_id) REFERENCES clients (id)
+        )
+    """)
+    conn.commit()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS excluded_customers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            client_id INTEGER NOT NULL,
+            first_name TEXT,
+            last_name TEXT,
+            email TEXT,
+            phone TEXT,
+            company_name TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (client_id) REFERENCES clients (id)
+        )
+    """)
+    conn.commit()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS analyzed_emails (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            client_id INTEGER,
+            subject TEXT,
+            sender TEXT,
+            recipient TEXT,
+            analyzed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS crm_webhook_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            client_id INTEGER,
+            contact_name TEXT,
+            stage TEXT,
+            amount REAL,
+            received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS billing_webhook_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            client_id INTEGER,
+            customer_name TEXT,
+            invoice_number TEXT,
+            amount REAL,
+            received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+
+    # Seed mock webhook logs & unmatched records in safe try block
     try:
-        conn = db_router.connect()
-        cursor = conn.cursor()
-
-        # 1. CREATE CLIENTS TABLE FIRST (Parent table for all foreign keys)
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS clients (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                callrail_account_id TEXT,
-                callrail_company_id TEXT UNIQUE,
-                google_ads_customer_id TEXT,
-                facebook_ads_id TEXT,
-                linkedin_ads_id TEXT,
-                microsoft_ads_id TEXT,
-                lead_gen_method TEXT,
-                qualification_criteria TEXT,
-                source_of_truth TEXT,
-                email_provider TEXT,
-                email_account TEXT,
-                email_app_password TEXT,
-                crm_deal_tags TEXT,
-                crm_won_deal_tags TEXT,
-                crm_lead_tags TEXT,
-                lead_count_rule TEXT,
-                exclude_past_customers TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        conn.commit()
-
-        # Self-heal clients schema
-        cursor.execute("PRAGMA table_info(clients)")
-        existing_cols = [col[1] for col in cursor.fetchall()]
-        cols_to_verify = [
-            ("sales_source", "TEXT DEFAULT 'manual'"),
-            ("google_ads_customer_id", "TEXT"),
-            ("facebook_ads_id", "TEXT"),
-            ("tiktok_ads_id", "TEXT"),
-            ("twitter_ads_id", "TEXT"),
-            ("pinterest_ads_id", "TEXT"),
-            ("snapchat_ads_id", "TEXT"),
-            ("chatgpt_ads_id", "TEXT"),
-            ("reddit_ads_id", "TEXT"),
-            ("linkedin_ads_id", "TEXT"),
-            ("microsoft_ads_id", "TEXT"),
-            ("lead_gen_method", "TEXT"),
-            ("qualification_criteria", "TEXT"),
-            ("source_of_truth", "TEXT"),
-            ("email_provider", "TEXT"),
-            ("email_account", "TEXT"),
-            ("email_app_password", "TEXT"),
-            ("crm_deal_tags", "TEXT"),
-            ("crm_won_deal_tags", "TEXT"),
-            ("crm_value_field", "TEXT"),
-            ("crm_lead_tags", "TEXT"),
-            ("lead_count_rule", "TEXT"),
-            ("exclude_past_customers", "TEXT"),
-            ("callrail_account_id", "TEXT"),
-            ("call_tracking_provider", "TEXT"),
-            ("ctm_account_id", "TEXT"),
-            ("ctm_profile_id", "TEXT"),
-            ("wc_account_id", "TEXT"),
-            ("wc_profile_id", "TEXT"),
-            ("email_account_2", "TEXT"),
-            ("email_app_password_2", "TEXT"),
-            ("email_account_3", "TEXT"),
-            ("email_app_password_3", "TEXT"),
-            ("email_account_4", "TEXT"),
-            ("email_app_password_4", "TEXT"),
-            ("email_account_5", "TEXT"),
-            ("email_app_password_5", "TEXT")
-        ]
-        for col_name, col_type in cols_to_verify:
-            if col_name not in existing_cols:
-                try:
-                    cursor.execute(f"ALTER TABLE clients ADD COLUMN {col_name} {col_type}")
-                except Exception:
-                    pass
-        conn.commit()
-
-        # Seed Mock Clients if empty BEFORE child tables reference client_id
-        cursor.execute("SELECT COUNT(*) FROM clients")
+        cursor.execute("SELECT COUNT(*) FROM webhook_logs")
         if cursor.fetchone()[0] == 0:
-            mock_clients = [
-                ("Priority Plumbing", "comp_plumbing", "123-456-7890", "fb_plumb_99", "", "", "both", "C", "hubspot", "", "", "", "appointment-booked", "closed-won", "", "all", "NO"),
-                ("Apex HVAC & Air", "comp_hvac", "987-654-3210", "", "", "ms_hvac_88", "both", "E", "servicetitan", "", "", "", "", "", "completed-lead", "all", "NO"),
-                ("Metro Dental Care", "comp_dental", "555-123-4567", "", "li_dental_77", "", "both", "C", "email", "gmail", "bookings@metrodental.com", "", "", "", "", "maximum_one", "YES")
-            ]
-            cursor.executemany("""
-                INSERT INTO clients (
-                    name, callrail_company_id, google_ads_customer_id, facebook_ads_id, linkedin_ads_id, microsoft_ads_id,
-                    lead_gen_method, qualification_criteria, source_of_truth, email_provider, email_account, email_app_password,
-                    crm_deal_tags, crm_won_deal_tags, crm_lead_tags, lead_count_rule, exclude_past_customers
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, mock_clients)
-            conn.commit()
-            print("Seeded 3 mock agency clients successfully!")
-
-        # 2. CREATE USERS TABLE
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                email TEXT UNIQUE NOT NULL,
-                hashed_password TEXT NOT NULL,
-                role TEXT DEFAULT 'full',
-                client_id INTEGER,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        conn.commit()
-
-        # Self-heal users schema
-        cursor.execute("PRAGMA table_info(users)")
-        existing_user_cols = [col[1] for col in cursor.fetchall()]
-        user_cols_to_verify = [
-            ("role", "TEXT DEFAULT 'full'"),
-            ("client_id", "INTEGER")
-        ]
-        for col_name, col_type in user_cols_to_verify:
-            if col_name not in existing_user_cols:
-                try:
-                    cursor.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_type}")
-                except Exception:
-                    pass
-        conn.commit()
-
-        # Seed default admin user if users table is empty
-        cursor.execute("SELECT COUNT(*) FROM users")
-        if cursor.fetchone()[0] == 0:
-            default_admin_email = "admin@leadgrove.net"
-            default_admin_pass = hash_password("admin123")
             cursor.execute("""
-                INSERT INTO users (email, hashed_password, role)
-                VALUES (?, ?, 'full')
-            """, (default_admin_email, default_admin_pass))
+                INSERT INTO webhook_logs (client_id, source, event_type, status_code, payload_summary, error_message)
+                VALUES 
+                (1, 'CallRail', 'call_completed', 200, 'Inbound call from +1 (555) 234-5678 (Duration: 4m 12s, Transcript Audited)', NULL),
+                (1, 'HubSpot CRM', 'deal.closed_won', 200, 'Closed Won Deal #8492 - Amount: $1,250.00 (Customer: John Doe)', NULL),
+                (1, 'Website Form', 'form_submission', 200, 'Inbound Web Form POST - GCLID: Cj0KCQiA... (Email: j.doe@example.com)', NULL),
+                (1, 'CallRail', 'call_completed', 200, 'Inbound call from +1 (555) 876-5432 (Duration: 1m 05s, Not Qualified)', NULL),
+                (1, 'ServiceTitan', 'job.completed', 422, 'Job #9102 completed ($850.00) - Missing matching phone/email in click session DB', 'Identity Match Failed: Phone +15559998888 not found in last 90 days sessions'),
+                (2, 'WhatConverts', 'call_completed', 200, 'Inbound call from +1 (555) 345-6789 (Duration: 3m 45s, Qualified Lead)', NULL),
+                (2, 'QuickBooks', 'invoice.paid', 200, 'Invoice #INV-401 Paid - Amount: $3,400.00 (Customer: Apex HVAC)', NULL)
+            """)
             conn.commit()
-            print(f"Seeded default admin user '{default_admin_email}' successfully!")
 
-        # 3. CREATE SESSIONS TABLE (Multi-Tenant Click Attribution)
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS sessions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                client_id INTEGER DEFAULT 1,
-                phone TEXT NOT NULL,
-                email TEXT,
-                name TEXT,
-                company TEXT,
-                gclid TEXT,
-                fbclid TEXT,
-                li_fat_id TEXT,
-                msclkid TEXT,
-                source TEXT,
-                qualified TEXT,
-                sale_closed TEXT,
-                value REAL DEFAULT 0.0,
-                reason TEXT,
-                model_used TEXT,
-                raw_data TEXT,
-                match_fuzzy TEXT DEFAULT 'NO',
-                certainty_score INTEGER DEFAULT 100,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (client_id) REFERENCES clients (id)
-            )
-        """)
-        conn.commit()
+        cursor.execute("SELECT COUNT(*) FROM unmatched_records")
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("""
+                INSERT INTO unmatched_records (client_id, record_type, customer_identifier, amount, source_system, reason, status)
+                VALUES
+                (1, 'sale', 'sarah.jenkins@gmail.com / +1 (555) 999-1234', 1450.00, 'HubSpot CRM Webhook', 'No matching click ID session found in last 90 days (Direct or Organic customer)', 'UNMATCHED'),
+                (1, 'sale', '+1 (555) 444-5555 (Phone Typo)', 820.00, 'QuickBooks Invoice #INV-1092', 'Phone number not recognized in CallRail session database', 'UNMATCHED'),
+                (2, 'lead', 'info@techcorp.io', 0.00, 'Website Form Webhook', 'GCLID parameter expired (>90 days old) prior to conversion upload', 'UNMATCHED')
+            """)
+            conn.commit()
+    except Exception as e:
+        print(f"⚠️ [DB Init] Non-critical seed error: {e}")
 
-        # Self-heal sessions schema
-        cursor.execute("PRAGMA table_info(sessions)")
-        existing_session_cols = [col[1] for col in cursor.fetchall()]
-        session_cols_to_verify = [
-            ("fbclid", "TEXT"),
-            ("ttclid", "TEXT"),
-            ("twclid", "TEXT"),
-            ("pin_clid", "TEXT"),
-            ("scclid", "TEXT"),
-            ("gptclid", "TEXT"),
-            ("rdt_cid", "TEXT"),
-            ("li_fat_id", "TEXT"),
-            ("msclkid", "TEXT"),
-            ("match_fuzzy", "TEXT DEFAULT 'NO'"),
-            ("certainty_score", "INTEGER DEFAULT 100"),
-            ("adjusted", "TEXT DEFAULT 'NO'"),
-            ("adjusted_value", "REAL DEFAULT 0.0"),
-            ("adjustment_type", "TEXT"),
-            ("adjusted_at", "TIMESTAMP")
-        ]
-        for col_name, col_type in session_cols_to_verify:
-            if col_name not in existing_session_cols:
-                try:
-                    cursor.execute(f"ALTER TABLE sessions ADD COLUMN {col_name} {col_type}")
-                except Exception:
-                    pass
-        conn.commit()
+    conn.close()
 
-        # 4. CREATE OTHER AUXILIARY TABLES
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS user_invitations (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                email TEXT UNIQUE NOT NULL,
-                role TEXT NOT NULL,
-                client_id INTEGER,
-                token TEXT UNIQUE NOT NULL,
-                invited_by TEXT NOT NULL,
-                is_used TEXT DEFAULT 'NO',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (client_id) REFERENCES clients (id)
-            )
-        """)
-        conn.commit()
-
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS user_sessions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                token TEXT UNIQUE NOT NULL,
-                email TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        conn.commit()
-
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS password_resets (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                email TEXT NOT NULL,
-                token TEXT UNIQUE NOT NULL,
-                is_used TEXT DEFAULT 'NO',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                expires_at TIMESTAMP
-            )
-        """)
-        conn.commit()
-
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS client_config_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                client_id INTEGER,
-                changed_by TEXT NOT NULL,
-                feature_name TEXT NOT NULL,
-                old_value TEXT,
-                new_value TEXT,
-                changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (client_id) REFERENCES clients (id)
-            )
-        """)
-        conn.commit()
-
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS webhook_logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                client_id INTEGER,
-                source TEXT NOT NULL,
-                event_type TEXT NOT NULL,
-                status_code INTEGER DEFAULT 200,
-                payload_summary TEXT,
-                error_message TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (client_id) REFERENCES clients (id)
-            )
-        """)
-        conn.commit()
-
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS unmatched_records (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                client_id INTEGER NOT NULL,
-                record_type TEXT DEFAULT 'sale',
-                customer_identifier TEXT,
-                amount REAL DEFAULT 0.0,
-                source_system TEXT,
-                reason TEXT,
-                status TEXT DEFAULT 'UNMATCHED',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (client_id) REFERENCES clients (id)
-            )
-        """)
-        conn.commit()
-
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS excluded_customers (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                client_id INTEGER NOT NULL,
-                first_name TEXT,
-                last_name TEXT,
-                email TEXT,
-                phone TEXT,
-                company_name TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (client_id) REFERENCES clients (id)
-            )
-        """)
-        try:
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_excluded_customers_client_phone ON excluded_customers(client_id, phone);")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_excluded_customers_client_email ON excluded_customers(client_id, email);")
-        except Exception:
-            pass
-        conn.commit()
-
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS analyzed_emails (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                client_id INTEGER,
-                subject TEXT,
-                sender TEXT,
-                recipient TEXT,
-                analyzed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        conn.commit()
-
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS crm_webhook_logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                client_id INTEGER,
-                contact_name TEXT,
-                stage TEXT,
-                amount REAL,
-                received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        conn.commit()
-
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS billing_webhook_logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                client_id INTEGER,
-                customer_name TEXT,
-                invoice_number TEXT,
-                amount REAL,
-                received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        conn.commit()
-
-        # Seed mock webhook logs & unmatched records safely
-        try:
-            cursor.execute("SELECT COUNT(*) FROM webhook_logs")
-            if cursor.fetchone()[0] == 0:
-                cursor.execute("""
-                    INSERT INTO webhook_logs (client_id, source, event_type, status_code, payload_summary, error_message)
-                    VALUES 
-                    (1, 'CallRail', 'call_completed', 200, 'Inbound call from +1 (555) 234-5678 (Duration: 4m 12s, Transcript Audited)', NULL),
-                    (1, 'HubSpot CRM', 'deal.closed_won', 200, 'Closed Won Deal #8492 - Amount: $1,250.00 (Customer: John Doe)', NULL),
-                    (1, 'Website Form', 'form_submission', 200, 'Inbound Web Form POST - GCLID: Cj0KCQiA... (Email: j.doe@example.com)', NULL),
-                    (1, 'CallRail', 'call_completed', 200, 'Inbound call from +1 (555) 876-5432 (Duration: 1m 05s, Not Qualified)', NULL),
-                    (1, 'ServiceTitan', 'job.completed', 422, 'Job #9102 completed ($850.00) - Missing matching phone/email in click session DB', 'Identity Match Failed: Phone +15559998888 not found in last 90 days sessions'),
-                    (2, 'WhatConverts', 'call_completed', 200, 'Inbound call from +1 (555) 345-6789 (Duration: 3m 45s, Qualified Lead)', NULL),
-                    (2, 'QuickBooks', 'invoice.paid', 200, 'Invoice #INV-401 Paid - Amount: $3,400.00 (Customer: Apex HVAC)', NULL)
-                """)
-                conn.commit()
-        except Exception as e:
-            print(f"⚠️ Safe seed webhook_logs notice: {e}")
-
-        try:
-            cursor.execute("SELECT COUNT(*) FROM unmatched_records")
-            if cursor.fetchone()[0] == 0:
-                cursor.execute("""
-                    INSERT INTO unmatched_records (client_id, record_type, customer_identifier, amount, source_system, reason, status)
-                    VALUES
-                    (1, 'sale', 'sarah.jenkins@gmail.com / +1 (555) 999-1234', 1450.00, 'HubSpot CRM Webhook', 'No matching click ID session found in last 90 days (Direct or Organic customer)', 'UNMATCHED'),
-                    (1, 'sale', '+1 (555) 444-5555 (Phone Typo)', 820.00, 'QuickBooks Invoice #INV-1092', 'Phone number not recognized in CallRail session database', 'UNMATCHED'),
-                    (2, 'lead', 'info@techcorp.io', 0.00, 'Website Form Webhook', 'GCLID parameter expired (>90 days old) prior to conversion upload', 'UNMATCHED')
-                """)
-                conn.commit()
-        except Exception as e:
-            print(f"⚠️ Safe seed unmatched_records notice: {e}")
-
-        conn.close()
-    except Exception as global_db_err:
-        print(f"⚠️ Global init_db non-fatal notice: {global_db_err}")
 
 def ensure_tables_exist():
-    """Self-healing guard to ensure critical tables exist before serving endpoints."""
     try:
         init_db()
     except Exception as e:
         print(f"⚠️ [DB Guard] Non-fatal table init error: {e}")
+
 
 def _async_init_db():
     try:
@@ -726,15 +596,12 @@ def _async_init_db():
     except Exception as e:
         print(f"⚠️ [DB Init] Warning: Non-fatal startup database init error: {e}")
 
-# Run database initialization asynchronously on FastAPI startup to allow instant port binding on Render
 @app.on_event("startup")
 def startup_db_init():
     print("🚀 [Startup] App startup event triggered! Binding port immediately...")
     threading.Thread(target=_async_init_db, daemon=True).start()
     print("⚡ [Startup] Port binding ready!")
 
-
-# ---------------------------------------------------------
 # ANTHROPIC CLAUDE CONFIGURATION
 # ---------------------------------------------------------
 API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()
@@ -1689,7 +1556,9 @@ def get_admin_users(request: Request):
     return HTMLResponse(html_content)
 
 @app.get("/", response_class=HTMLResponse)
-def read_root(request: Request):
+def read_root(request: Request, response: Response):
+    ensure_tables_exist()
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, private"
     """Agency Portal Landing Page with Auth Check."""
     email = is_authenticated(request)
     user_header_html = ""
