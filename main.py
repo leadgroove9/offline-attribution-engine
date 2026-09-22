@@ -187,11 +187,6 @@ app = FastAPI(
     version="15.2.0"
 )
 
-@app.get("/health")
-@app.get("/healthz")
-def health_check():
-    return {"status": "ok", "service": "LeadGroove Engine", "version": "15.2.0"}
-
 # ---------------------------------------------------------
 # DATABASE CONFIGURATION (SQLite)
 # ---------------------------------------------------------
@@ -1654,6 +1649,11 @@ def get_admin_users(request: Request):
     </html>
     """
     return HTMLResponse(html_content)
+
+@app.get("/health")
+@app.get("/healthz")
+def root_health_check():
+    return {"status": "ok", "service": "LeadGroove Engine", "version": "15.2.0"}
 
 @app.get("/", response_class=HTMLResponse)
 def read_root(request: Request, response: Response):
