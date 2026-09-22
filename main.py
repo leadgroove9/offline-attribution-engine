@@ -1,5 +1,3 @@
-import uuid
-from datetime import datetime, timedelta
 import os
 import sqlite3
 import re
@@ -189,11 +187,11 @@ app = FastAPI(
     version="15.2.0"
 )
 
+# Unauthenticated Health Probe for DigitalOcean / Load Balancers
 @app.get("/health")
 @app.get("/healthz")
-def health_check_probe():
-    return {"status": "ok", "service": "LeadGroove Engine", "version": "15.2.0"}
-
+def health_check():
+    return {"status": "ok", "service": "LeadGroove Engine"}
 
 # ---------------------------------------------------------
 # DATABASE CONFIGURATION (SQLite)
@@ -1659,7 +1657,10 @@ def get_admin_users(request: Request):
     return HTMLResponse(html_content)
 
 @app.get("/", response_class=HTMLResponse)
-def read_root(request: Request):
+def read_root(request: Request, response: Response):
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, private"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
     """Agency Portal Landing Page with Auth Check."""
     email = is_authenticated(request)
     user_header_html = ""
