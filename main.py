@@ -1,52 +1,5 @@
-
-def ensure_auth_tables_exist():
-    try:
-        conn = db_router.connect()
-        cursor = conn.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                id SERIAL PRIMARY KEY,
-                email TEXT UNIQUE NOT NULL,
-                hashed_password TEXT NOT NULL,
-                role TEXT DEFAULT 'full',
-                client_id INTEGER,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS user_sessions (
-                id SERIAL PRIMARY KEY,
-                token TEXT UNIQUE NOT NULL,
-                email TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS password_resets (
-                id SERIAL PRIMARY KEY,
-                email TEXT NOT NULL,
-                token TEXT UNIQUE NOT NULL,
-                expires_at TEXT NOT NULL,
-                is_used TEXT DEFAULT 'NO',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS user_invitations (
-                id SERIAL PRIMARY KEY,
-                email TEXT NOT NULL,
-                role TEXT DEFAULT 'full',
-                client_id INTEGER,
-                token TEXT UNIQUE NOT NULL,
-                is_used TEXT DEFAULT 'NO',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        print(f"⚠️ Auth table check warning: {e}")
-
+import uuid
+from datetime import datetime, timedelta
 import os
 import sqlite3
 import re
@@ -236,11 +189,11 @@ app = FastAPI(
     version="15.2.0"
 )
 
-# Top-Level Direct Health Check Endpoint for DigitalOcean / Render Probes
 @app.get("/health")
 @app.get("/healthz")
-def root_health_check():
-    return {"status": "ok", "service": "LeadGroove Offline Attribution Engine"}
+def health_check_probe():
+    return {"status": "ok", "service": "LeadGroove Engine", "version": "15.2.0"}
+
 
 # ---------------------------------------------------------
 # DATABASE CONFIGURATION (SQLite)
