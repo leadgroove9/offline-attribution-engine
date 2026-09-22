@@ -187,11 +187,12 @@ app = FastAPI(
     version="15.2.0"
 )
 
-# Unauthenticated Health Probe for DigitalOcean / Load Balancers
+
 @app.get("/health")
 @app.get("/healthz")
 def health_check():
     return {"status": "ok", "service": "LeadGroove Engine"}
+
 
 # ---------------------------------------------------------
 # DATABASE CONFIGURATION (SQLite)
@@ -1035,7 +1036,7 @@ def get_register(request: Request, error: Optional[str] = None, invite_token: Op
             token_hidden_input = f"<input type='hidden' name='invite_token' value='{invite_token}'>"
 
     error_html = f'<div style="background-color: #ffebee; color: #c62828; padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; font-weight: bold; border-left: 4px solid #c62828;">❌ {error}</div>' if error else ''
-    return f"""
+    resp_html = f"""
     <html>
         <head>
             <title>Register - LeadGroove 🤖</title>
@@ -1084,6 +1085,9 @@ def get_register(request: Request, error: Optional[str] = None, invite_token: Op
         </body>
     </html>
     """
+    response = HTMLResponse(content=resp_html, status_code=200)
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, private"
+    return response
 
 @app.post("/register")
 async def post_register(request: Request):
@@ -1162,7 +1166,7 @@ async def post_register(request: Request):
 @app.get("/login", response_class=HTMLResponse)
 def get_login(request: Request, error: Optional[str] = None):
     error_html = f'<div style="background-color: #ffebee; color: #c62828; padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; font-weight: bold; border-left: 4px solid #c62828;">❌ {error}</div>' if error else ''
-    return f"""
+    resp_html = f"""
     <html>
         <head>
             <title>Log In - LeadGroove 🤖</title>
@@ -1208,6 +1212,9 @@ def get_login(request: Request, error: Optional[str] = None):
         </body>
     </html>
     """
+    response = HTMLResponse(content=resp_html, status_code=200)
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, private"
+    return response
 
 @app.post("/login")
 async def post_login(request: Request):
@@ -1278,7 +1285,7 @@ def get_forgot_password(request: Request, error: Optional[str] = None, success: 
             </div>
             '''
 
-    return f"""
+    resp_html = f"""
     <html>
         <head>
             <title>Reset Password - LeadGroove \U0001f916</title>
@@ -1318,6 +1325,9 @@ def get_forgot_password(request: Request, error: Optional[str] = None, success: 
         </body>
     </html>
     """
+    response = HTMLResponse(content=resp_html, status_code=200)
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, private"
+    return response
 
 
 @app.post("/forgot-password")
@@ -1438,7 +1448,7 @@ def get_reset_password(request: Request, token: Optional[str] = None, error: Opt
 
     error_html = f'<div style="background-color: #ffebee; color: #c62828; padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; font-weight: bold; border-left: 4px solid #c62828;">❌ {error}</div>' if error else ''
 
-    return f"""
+    resp_html = f"""
     <html>
         <head>
             <title>Define New Password - LeadGroove \U0001f916</title>
@@ -1476,6 +1486,9 @@ def get_reset_password(request: Request, token: Optional[str] = None, error: Opt
         </body>
     </html>
     """
+    response = HTMLResponse(content=resp_html, status_code=200)
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, private"
+    return response
 
 
 @app.post("/reset-password")
@@ -1654,13 +1667,13 @@ def get_admin_users(request: Request):
         </body>
     </html>
     """
+    response = HTMLResponse(content=resp_html, status_code=200)
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, private"
+    return response
     return HTMLResponse(html_content)
 
 @app.get("/", response_class=HTMLResponse)
-def read_root(request: Request, response: Response):
-    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, private"
-    response.headers["Pragma"] = "no-cache"
-    response.headers["Expires"] = "0"
+def read_root(request: Request):
     """Agency Portal Landing Page with Auth Check."""
     email = is_authenticated(request)
     user_header_html = ""
@@ -1678,7 +1691,7 @@ def read_root(request: Request, response: Response):
             </div>
         '''
         
-    return f"""
+    resp_html = f"""
     <html>
         <head>
             <title>Multi-Tenant Multi-Channel Attribution Engine 🤖</title>
@@ -1714,6 +1727,9 @@ def read_root(request: Request, response: Response):
         </body>
     </html>
     """
+    response = HTMLResponse(content=resp_html, status_code=200)
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, private"
+    return response
 
 
 
@@ -2753,7 +2769,7 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
     """
 
 
-    return f"""
+    resp_html = f"""
     <!DOCTYPE html>
     <html>
         <head>
@@ -3089,6 +3105,9 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
         </body>
     </html>
     """
+    response = HTMLResponse(content=resp_html, status_code=200)
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, private"
+    return response
 
 
 
@@ -3639,7 +3658,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
     """
 
     
-    return f"""
+    resp_html = f"""
     <!DOCTYPE html>
     <html>
         <head>
@@ -6657,6 +6676,9 @@ def view_settings(request: Request, client_id: Optional[int] = None):
         </body>
     </html>
     """
+    response = HTMLResponse(content=resp_html, status_code=200)
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, private"
+    return response
 
 
 @app.post("/dashboard/user/update-role")
@@ -9527,6 +9549,9 @@ def add_client_page(request: Request):
         </body>
     </html>
     """
+    response = HTMLResponse(content=resp_html, status_code=200)
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, private"
+    return response
     html_content = html_content.replace('<body>\n            <div class="container">', f'<body>\n            <div class="container">\n                {user_header_bar}')
     html_content = html_content.replace("conversions-[id]", f"conversions-{next_id}")
     return HTMLResponse(html_content)
@@ -12785,6 +12810,9 @@ def view_reports(
     </body>
     </html>
     """
+    response = HTMLResponse(content=resp_html, status_code=200)
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, private"
+    return response
     return HTMLResponse(content=html_content)
 
 
@@ -12916,7 +12944,7 @@ def view_health_dashboard(request: Request, client_id: Optional[int] = None):
             </tr>
             """
 
-    return f"""
+    resp_html = f"""
     <!DOCTYPE html>
     <html>
         <head>
@@ -13045,6 +13073,9 @@ def view_health_dashboard(request: Request, client_id: Optional[int] = None):
         </body>
     </html>
     """
+    response = HTMLResponse(content=resp_html, status_code=200)
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, private"
+    return response
 
 @app.post("/dashboard/health/resolve-unmatched")
 def resolve_unmatched_record(request: Request, record_id: int = Form(...), client_id: int = Form(...)):
