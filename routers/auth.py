@@ -14,6 +14,10 @@ from config import ADMIN_EMAILS
 
 router = APIRouter()
 
+@router.get("/register", response_class=HTMLResponse)
+def get_register(request: Request, error: Optional[str] = None, invite_token: Optional[str] = None):
+
+
 @router.get("/", response_class=HTMLResponse)
 def read_root(request: Request):
     """Agency Portal Landing Page with Auth Check."""
@@ -70,8 +74,6 @@ def read_root(request: Request):
     </html>
     """
 
-@router.get("/register", response_class=HTMLResponse)
-def get_register(request: Request, error: Optional[str] = None, invite_token: Optional[str] = None):
     email_val = ""
     lock_email_attr = ""
     invite_role_msg = ""
@@ -185,18 +187,6 @@ async def post_register(request: Request):
         try:
             conn = db_router.connect()
             cursor = conn.cursor()
-            
-            # Ensure users table exists safely
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS users (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    email TEXT UNIQUE NOT NULL,
-                    hashed_password TEXT NOT NULL,
-                    role TEXT DEFAULT 'full',
-                    client_id INTEGER,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
             
             cursor.execute("SELECT id FROM users WHERE email = ?", (email,))
             if cursor.fetchone():

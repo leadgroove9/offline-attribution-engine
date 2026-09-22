@@ -20,12 +20,6 @@ app = FastAPI(
 # Hardened Security Headers Middleware
 app.add_middleware(SecurityHeadersMiddleware)
 
-# Dedicated Health Check Endpoints for DigitalOcean Probes (/health and /healthz)
-@app.get("/health")
-@app.get("/healthz")
-def root_health_check():
-    return {"status": "ok", "service": "LeadGroove Offline Attribution Engine"}
-
 # Include Application Routers
 app.include_router(auth_router)
 app.include_router(dashboard_router)
