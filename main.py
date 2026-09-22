@@ -4,25 +4,16 @@ import re
 import json
 import csv
 import io
-import sqlite3
 import hashlib
-import hmac
-import time
-import datetime
-import threading
 import uuid
+import threading
+import sqlite3
 import difflib
-import uvicorn
-from typing import Optional, List, Dict, Any
-from fastapi import FastAPI, Request, Response, Form, File, UploadFile, HTTPException, Depends, status
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, FileResponse, StreamingResponse
-from fastapi.middleware.cors import CORSMiddleware
+from typing import Optional, List, Dict, Any, Tuple
+from fastapi import FastAPI, Request, HTTPException, File, UploadFile, Form, Response
+from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse
 from pydantic import BaseModel
-
-try:
-    import pandas as pd
-except ImportError:
-    pd = None
+import pandas as pd
 
 try:
     from anthropic import Anthropic
@@ -77,7 +68,6 @@ def delete_session(token: str):
         pass
 
 def is_authenticated(request: Request) -> Optional[str]:
-    ensure_tables_exist()
     token = request.cookies.get("session_token")
     return get_session_email(token)
 
@@ -191,12 +181,18 @@ def find_dynamic_columns_custom(columns: list) -> tuple:
             continue
     return phone_col, email_col, value_col, name_col, company_col
 
-
 app = FastAPI(
     title="Offline Attribution Engine (Multi-Tenant Multi-Channel)",
     description="Multi-tenant agency platform for tracking offline leads/sales and AI audits across Google, Meta, LinkedIn, and Microsoft",
     version="15.2.0"
 )
+
+@app.get("/health")
+@app.get("/healthz")
+def root_health_check():
+    return {"status": "ok", "service": "LeadGroove Engine", "version": "15.2.0"}
+
+
 
 # ---------------------------------------------------------
 # DATABASE CONFIGURATION (SQLite)
@@ -215,31 +211,22 @@ class PostgreSQLCursorWrapper:
         self._fetchall_override = None
 
     def execute(self, query, params=None):
-        # Reset overrides
         self._fetchone_override = None
         self._fetchall_override = None
         
-        # 1. Map SQLite parameters placeholder (?) to PostgreSQL (%s)
-        # Be careful not to replace ? inside text strings, but simple replace works for our code's query structure
         query_formatted = query.replace("?", "%s")
+        query_formatted = re.sub(r"INTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT", "SERIAL PRIMARY KEY", query_formatted, flags=re.IGNORECASE)
+        query_formatted = re.sub(r"AUTOINCREMENT", "", query_formatted, flags=re.IGNORECASE)
         
-        # 2. Map SQLite table creation constraints to PostgreSQL serialization schemas
-        query_formatted = query_formatted.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY")
-        query_formatted = query_formatted.replace("AUTOINCREMENT", "")
-        
-        # 3. Intercept PRAGMA table_info dynamic schema self-healing checks
         if "PRAGMA table_info(" in query:
             table_name = query.split("PRAGMA table_info(")[1].split(")")[0].strip().replace("'", "").replace('"', '')
             pg_query = f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table_name}'"
             self.cursor.execute(pg_query)
             cols = self.cursor.fetchall()
-            # Mock PRAGMA table_info columns format: (cid, name, type, notnull, dflt_value, pk)
-            # main.py does: `existing_cols = [col[1] for col in cursor.fetchall()]`
             mock_cols = [(0, col[0], 'TEXT', 0, None, 0) for col in cols]
             self._fetchall_override = lambda: mock_cols
             return self
 
-        # 4. Intercept sqlite_sequence checks used for calculating onboarding sequence IDs
         if "SELECT seq FROM sqlite_sequence" in query:
             table_name = "clients"
             if "name =" in query:
@@ -252,17 +239,16 @@ class PostgreSQLCursorWrapper:
             self._fetchone_override = lambda: (max_id,)
             return self
             
-        # 5. Fix potential PostgreSQL cast/comparison issues with Boolean/Text
-        # Also convert SQLite-style datetime(column, 'localtime') to PostgreSQL TO_CHAR(column, 'YYYY-MM-DD HH24:MI:SS')
         import re
         query_formatted = re.sub(r"datetime\(([^,]+),\s*'localtime'\)", r"to_char(\1, 'YYYY-MM-DD HH24:MI:SS')", query_formatted, flags=re.IGNORECASE)
         
-        # Execute raw query
         self.cursor.execute(query_formatted, params)
         return self
 
     def executemany(self, query, params_list):
         query_formatted = query.replace("?", "%s")
+        query_formatted = re.sub(r"INTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT", "SERIAL PRIMARY KEY", query_formatted, flags=re.IGNORECASE)
+        query_formatted = re.sub(r"AUTOINCREMENT", "", query_formatted, flags=re.IGNORECASE)
         self.cursor.executemany(query_formatted, params_list)
         return self
 
@@ -278,33 +264,30 @@ class PostgreSQLCursorWrapper:
 
     @property
     def lastrowid(self):
-        # PostgreSQL doesn't support cursor.lastrowid; use LASTVAL() utility sequence lookup
         try:
             self.cursor.execute("SELECT LASTVAL()")
             return self.cursor.fetchone()[0]
         except Exception:
             return 1
 
-    def close(self):
-        self.cursor.close()
-
+    def commit(self):
+        pass
 
 class PostgreSQLConnectionWrapper:
     def __init__(self, pg_conn):
         self.connection = pg_conn
-        
+
     def cursor(self):
         return PostgreSQLCursorWrapper(self.connection.cursor())
-        
+
     def commit(self):
         self.connection.commit()
-        
+
     def rollback(self):
         self.connection.rollback()
         
     def close(self):
         self.connection.close()
-
 
 class DatabaseRouter:
     _pg_failed = False
@@ -318,7 +301,6 @@ class DatabaseRouter:
                 url_clean = url_clean.replace("postgres://", "postgresql://", 1)
             
             try:
-                # Ensure sslmode='require' is present for Render PostgreSQL
                 if "sslmode=" not in url_clean:
                     conn = psycopg2.connect(url_clean, sslmode="require", connect_timeout=3)
                 else:
@@ -333,274 +315,387 @@ class DatabaseRouter:
             import sqlite3
             return sqlite3.connect("offline_attribution.db")
 
-# Monkeypatch sqlite3 inside current module scope to redirect connect calls transparently!
 class MockSqlite3:
     def connect(self, *args, **kwargs):
         return DatabaseRouter.connect()
 
 db_router = MockSqlite3()
 
-
-
-# ---------------------------------------------------------
-# DATABASE CONFIGURATION (SQLite & PostgreSQL)
-# ---------------------------------------------------------
-DB_PATH = "offline_attribution.db"
-DATABASE_URL = os.environ.get("DATABASE_URL")
-
-class PostgreSQLConnectionWrapper:
-    def __init__(self, pg_conn):
-        self.connection = pg_conn
-        
-    def cursor(self):
-        return PostgreSQLCursorWrapper(self.connection.cursor())
-        
-    def commit(self):
-        self.connection.commit()
-        
-    def rollback(self):
-        try:
-            self.connection.rollback()
-        except Exception:
-            pass
-            
-    def close(self):
-        try:
-            self.connection.close()
-        except Exception:
-            pass
-
-class PostgreSQLCursorWrapper:
-    def __init__(self, pg_cursor):
-        self.cursor = pg_cursor
-        self._fetchone_override = None
-        self._fetchall_override = None
-
-    def execute(self, query, params=None):
-        self._fetchone_override = None
-        self._fetchall_override = None
-        
-        query_formatted = query.replace("?", "%s")
-        query_formatted = re.sub(r"INTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT", "SERIAL PRIMARY KEY", query_formatted, flags=re.IGNORECASE)
-        query_formatted = re.sub(r"AUTOINCREMENT", "", query_formatted, flags=re.IGNORECASE)
-        
-        if "PRAGMA table_info(" in query:
-            table_name = query.split("PRAGMA table_info(")[1].split(")")[0].strip().replace("'", "").replace('"', '')
-            pg_query = f"SELECT column_name FROM information_schema.columns WHERE LOWER(table_name) = '{table_name.lower()}'"
-            self.cursor.execute(pg_query)
-            cols = self.cursor.fetchall()
-            mock_cols = [(0, col[0], 'TEXT', 0, None, 0) for col in cols]
-            self._fetchall_override = lambda: mock_cols
-            return self
-
-        if "SELECT seq FROM sqlite_sequence" in query:
-            table_name = "clients"
-            if "name =" in query:
-                parts = query.split("name =")
-                if len(parts) > 1:
-                    table_name = parts[1].replace("'", "").replace('"', '').strip()
-            pg_query = f"SELECT COALESCE(MAX(id), 0) FROM {table_name}"
-            self.cursor.execute(pg_query)
-            max_id = self.cursor.fetchone()[0]
-            self._fetchone_override = lambda: (max_id,)
-            return self
-            
-        query_formatted = re.sub(r"datetime\(([^,]+),\s*'localtime'\)", r"to_char(\1, 'YYYY-MM-DD HH24:MI:SS')", query_formatted, flags=re.IGNORECASE)
-        
-        if params:
-            self.cursor.execute(query_formatted, params)
-        else:
-            self.cursor.execute(query_formatted)
-        return self
-
-    def executemany(self, query, params_list):
-        query_formatted = query.replace("?", "%s")
-        self.cursor.executemany(query_formatted, params_list)
-        return self
-
-    def fetchone(self):
-        if self._fetchone_override:
-            return self._fetchone_override()
-        return self.cursor.fetchone()
-
-    def fetchall(self):
-        if self._fetchall_override:
-            return self._fetchall_override()
-        return self.cursor.fetchall()
-
-    @property
-    def lastrowid(self):
-        try:
-            self.cursor.execute("SELECT LASTVAL()")
-            return self.cursor.fetchone()[0]
-        except Exception:
-            return 1
-
-    def close(self):
-        try:
-            self.cursor.close()
-        except Exception:
-            pass
-
-class DatabaseRouter:
-    _pg_failed = False
-
-    @staticmethod
-    def connect():
-        if DATABASE_URL and not DatabaseRouter._pg_failed:
-            import psycopg2
-            url_clean = DATABASE_URL
-            if url_clean.startswith("postgres://"):
-                url_clean = url_clean.replace("postgres://", "postgresql://", 1)
-            
-            try:
-                if "sslmode=" not in url_clean:
-                    conn = psycopg2.connect(url_clean, sslmode="require", connect_timeout=5)
-                else:
-                    conn = psycopg2.connect(url_clean, connect_timeout=5)
-                return PostgreSQLConnectionWrapper(conn)
-            except Exception as e:
-                print(f"⚠️ PostgreSQL connection error ({e}). Switching to local SQLite fallback.")
-                DatabaseRouter._pg_failed = True
-                return sqlite3.connect(DB_PATH)
-        else:
-            return sqlite3.connect(DB_PATH)
-
-class MockSqlite3:
-    def connect(self, *args, **kwargs):
-        return DatabaseRouter.connect()
-
-db_router = MockSqlite3()
 
 def ensure_tables_exist():
-    """Ensures all tables and missing columns exist across SQLite and PostgreSQL."""
+    """Guarantees all core tables exist in PostgreSQL/SQLite before any endpoint handles a query."""
     try:
         conn = db_router.connect()
         cursor = conn.cursor()
         
-        # 1. Create Clients Table
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS clients (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                callrail_account_id TEXT,
-                callrail_company_id TEXT UNIQUE,
-                google_ads_customer_id TEXT,
-                facebook_ads_id TEXT,
-                linkedin_ads_id TEXT,
-                microsoft_ads_id TEXT,
-                lead_gen_method TEXT,
-                qualification_criteria TEXT,
-                source_of_truth TEXT,
-                email_provider TEXT,
-                email_account TEXT,
-                email_app_password TEXT,
-                crm_deal_tags TEXT,
-                crm_won_deal_tags TEXT,
-                crm_lead_tags TEXT,
-                lead_count_rule TEXT,
-                exclude_past_customers TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        conn.commit()
-        
-        # Self-heal clients table columns
-        cursor.execute("PRAGMA table_info(clients)")
-        existing_client_cols = [col[1].lower() for col in cursor.fetchall()]
-        all_client_cols = [
-            ("name", "TEXT"),
-            ("callrail_account_id", "TEXT"),
-            ("callrail_company_id", "TEXT"),
-            ("google_ads_customer_id", "TEXT"),
-            ("facebook_ads_id", "TEXT"),
-            ("linkedin_ads_id", "TEXT"),
-            ("microsoft_ads_id", "TEXT"),
-            ("tiktok_ads_id", "TEXT"),
-            ("twitter_ads_id", "TEXT"),
-            ("pinterest_ads_id", "TEXT"),
-            ("snapchat_ads_id", "TEXT"),
-            ("chatgpt_ads_id", "TEXT"),
-            ("reddit_ads_id", "TEXT"),
-            ("lead_gen_method", "TEXT"),
-            ("qualification_criteria", "TEXT"),
-            ("source_of_truth", "TEXT"),
-            ("email_provider", "TEXT"),
-            ("email_account", "TEXT"),
-            ("email_app_password", "TEXT"),
-            ("crm_deal_tags", "TEXT"),
-            ("crm_won_deal_tags", "TEXT"),
-            ("crm_value_field", "TEXT"),
-            ("crm_lead_tags", "TEXT"),
-            ("lead_count_rule", "TEXT"),
-            ("exclude_past_customers", "TEXT"),
-            ("sales_source", "TEXT DEFAULT 'manual'"),
-            ("call_tracking_provider", "TEXT"),
-            ("ctm_account_id", "TEXT"),
-            ("ctm_profile_id", "TEXT"),
-            ("wc_account_id", "TEXT"),
-            ("wc_profile_id", "TEXT"),
-            ("email_account_2", "TEXT"),
-            ("email_app_password_2", "TEXT"),
-            ("email_account_3", "TEXT"),
-            ("email_app_password_3", "TEXT"),
-            ("email_account_4", "TEXT"),
-            ("email_app_password_4", "TEXT"),
-            ("email_account_5", "TEXT"),
-            ("email_app_password_5", "TEXT")
-        ]
-        for col_name, col_type in all_client_cols:
-            if col_name.lower() not in existing_client_cols:
-                try:
-                    cursor.execute(f"ALTER TABLE clients ADD COLUMN {col_name} {col_type}")
-                    conn.commit()
-                except Exception:
-                    pass
+        # 1. Clients Table (MUST BE FIRST because other tables reference clients.id)
+        try:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS clients (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    callrail_account_id TEXT,
+                    callrail_company_id TEXT UNIQUE,
+                    google_ads_customer_id TEXT,
+                    facebook_ads_id TEXT,
+                    linkedin_ads_id TEXT,
+                    microsoft_ads_id TEXT,
+                    lead_gen_method TEXT,
+                    qualification_criteria TEXT,
+                    source_of_truth TEXT,
+                    email_provider TEXT,
+                    email_account TEXT,
+                    email_app_password TEXT,
+                    crm_deal_tags TEXT,
+                    crm_won_deal_tags TEXT,
+                    crm_lead_tags TEXT,
+                    lead_count_rule TEXT,
+                    exclude_past_customers TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conn.commit()
+        except Exception as e:
+            print(f"⚠️ Clients table create error: {e}")
+            try: conn.rollback()
+            except: pass
 
-        # 2. Create Users Table
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                email TEXT UNIQUE NOT NULL,
-                hashed_password TEXT NOT NULL,
-                role TEXT DEFAULT 'full',
-                client_id INTEGER,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        conn.commit()
-        
-        # Self-heal users table columns
-        cursor.execute("PRAGMA table_info(users)")
-        existing_user_cols = [col[1].lower() for col in cursor.fetchall()]
-        user_cols = [
-            ("email", "TEXT"),
-            ("hashed_password", "TEXT"),
-            ("role", "TEXT DEFAULT 'full'"),
-            ("client_id", "INTEGER")
-        ]
-        for col_name, col_type in user_cols:
-            if col_name.lower() not in existing_user_cols:
-                try:
-                    cursor.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_type}")
-                    conn.commit()
-                except Exception:
-                    pass
+        # Self-heal all 41 clients table columns
+        try:
+            cursor.execute("PRAGMA table_info(clients)")
+            existing_cols = [col[1] for col in cursor.fetchall()]
+            cols_to_verify = [
+                ("sales_source", "TEXT DEFAULT 'manual'"),
+                ("google_ads_customer_id", "TEXT"),
+                ("facebook_ads_id", "TEXT"),
+                ("tiktok_ads_id", "TEXT"),
+                ("twitter_ads_id", "TEXT"),
+                ("pinterest_ads_id", "TEXT"),
+                ("snapchat_ads_id", "TEXT"),
+                ("chatgpt_ads_id", "TEXT"),
+                ("reddit_ads_id", "TEXT"),
+                ("linkedin_ads_id", "TEXT"),
+                ("microsoft_ads_id", "TEXT"),
+                ("lead_gen_method", "TEXT"),
+                ("qualification_criteria", "TEXT"),
+                ("source_of_truth", "TEXT"),
+                ("email_provider", "TEXT"),
+                ("email_account", "TEXT"),
+                ("email_app_password", "TEXT"),
+                ("crm_deal_tags", "TEXT"),
+                ("crm_won_deal_tags", "TEXT"),
+                ("crm_value_field", "TEXT"),
+                ("crm_lead_tags", "TEXT"),
+                ("lead_count_rule", "TEXT"),
+                ("exclude_past_customers", "TEXT"),
+                ("callrail_account_id", "TEXT"),
+                ("call_tracking_provider", "TEXT"),
+                ("ctm_account_id", "TEXT"),
+                ("ctm_profile_id", "TEXT"),
+                ("wc_account_id", "TEXT"),
+                ("wc_profile_id", "TEXT"),
+                ("email_account_2", "TEXT"),
+                ("email_app_password_2", "TEXT"),
+                ("email_account_3", "TEXT"),
+                ("email_app_password_3", "TEXT"),
+                ("email_account_4", "TEXT"),
+                ("email_app_password_4", "TEXT"),
+                ("email_account_5", "TEXT"),
+                ("email_app_password_5", "TEXT")
+            ]
+            for col_name, col_type in cols_to_verify:
+                if col_name not in existing_cols:
+                    try:
+                        cursor.execute(f"ALTER TABLE clients ADD COLUMN {col_name} {col_type}")
+                        conn.commit()
+                    except Exception:
+                        try: conn.rollback()
+                        except: pass
+        except Exception as e:
+            print(f"⚠️ Clients column check error: {e}")
 
-        # 3. Create User Sessions Table
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS user_sessions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                token TEXT UNIQUE NOT NULL,
-                email TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        conn.commit()
+        # 2. Users Table
+        try:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    email TEXT UNIQUE NOT NULL,
+                    hashed_password TEXT NOT NULL,
+                    role TEXT DEFAULT 'full',
+                    client_id INTEGER,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conn.commit()
+        except Exception as e:
+            print(f"⚠️ Users table create error: {e}")
+            try: conn.rollback()
+            except: pass
+
+        # 3. Sessions Table
+        try:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS sessions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    client_id INTEGER DEFAULT 1,
+                    phone TEXT NOT NULL,
+                    email TEXT,
+                    name TEXT,
+                    company TEXT,
+                    gclid TEXT,
+                    fbclid TEXT,
+                    li_fat_id TEXT,
+                    msclkid TEXT,
+                    source TEXT,
+                    qualified TEXT,
+                    sale_closed TEXT,
+                    value REAL DEFAULT 0.0,
+                    reason TEXT,
+                    model_used TEXT,
+                    raw_data TEXT,
+                    match_fuzzy TEXT DEFAULT 'NO',
+                    certainty_score INTEGER DEFAULT 100,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (client_id) REFERENCES clients (id)
+                )
+            """)
+            conn.commit()
+        except Exception as e:
+            print(f"⚠️ Sessions table create error: {e}")
+            try: conn.rollback()
+            except: pass
+
+        # Self-heal sessions columns
+        try:
+            cursor.execute("PRAGMA table_info(sessions)")
+            existing_session_cols = [col[1] for col in cursor.fetchall()]
+            session_cols_to_verify = [
+                ("fbclid", "TEXT"),
+                ("ttclid", "TEXT"),
+                ("twclid", "TEXT"),
+                ("pin_clid", "TEXT"),
+                ("scclid", "TEXT"),
+                ("gptclid", "TEXT"),
+                ("rdt_cid", "TEXT"),
+                ("li_fat_id", "TEXT"),
+                ("msclkid", "TEXT"),
+                ("match_fuzzy", "TEXT DEFAULT 'NO'"),
+                ("certainty_score", "INTEGER DEFAULT 100"),
+                ("adjusted", "TEXT DEFAULT 'NO'"),
+                ("adjusted_value", "REAL DEFAULT 0.0"),
+                ("adjustment_type", "TEXT"),
+                ("adjusted_at", "TIMESTAMP")
+            ]
+            for col_name, col_type in session_cols_to_verify:
+                if col_name not in existing_session_cols:
+                    try:
+                        cursor.execute(f"ALTER TABLE sessions ADD COLUMN {col_name} {col_type}")
+                        conn.commit()
+                    except Exception:
+                        try: conn.rollback()
+                        except: pass
+        except Exception as e:
+            print(f"⚠️ Sessions column check error: {e}")
+
+        # 4. User Sessions Table
+        try:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS user_sessions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    token TEXT UNIQUE NOT NULL,
+                    email TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conn.commit()
+        except Exception as e:
+            print(f"⚠️ User sessions table create error: {e}")
+            try: conn.rollback()
+            except: pass
+
+        # 5. User Invitations Table
+        try:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS user_invitations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    email TEXT UNIQUE NOT NULL,
+                    role TEXT NOT NULL,
+                    client_id INTEGER,
+                    token TEXT UNIQUE NOT NULL,
+                    invited_by TEXT NOT NULL,
+                    is_used TEXT DEFAULT 'NO',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (client_id) REFERENCES clients (id)
+                )
+            """)
+            conn.commit()
+        except Exception as e:
+            print(f"⚠️ User invitations table create error: {e}")
+            try: conn.rollback()
+            except: pass
+
+        # 6. Password Resets Table
+        try:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS password_resets (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    email TEXT NOT NULL,
+                    token TEXT UNIQUE NOT NULL,
+                    is_used TEXT DEFAULT 'NO',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    expires_at TIMESTAMP
+                )
+            """)
+            conn.commit()
+        except Exception as e:
+            print(f"⚠️ Password resets table create error: {e}")
+            try: conn.rollback()
+            except: pass
+
+        # 7. Excluded Customers Table
+        try:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS excluded_customers (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    client_id INTEGER NOT NULL,
+                    first_name TEXT,
+                    last_name TEXT,
+                    email TEXT,
+                    phone TEXT,
+                    company_name TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (client_id) REFERENCES clients (id)
+                )
+            """)
+            conn.commit()
+        except Exception as e:
+            print(f"⚠️ Excluded customers table create error: {e}")
+            try: conn.rollback()
+            except: pass
+
+        # 8. Client Config History
+        try:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS client_config_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    client_id INTEGER,
+                    changed_by TEXT NOT NULL,
+                    feature_name TEXT NOT NULL,
+                    old_value TEXT,
+                    new_value TEXT,
+                    changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (client_id) REFERENCES clients (id)
+                )
+            """)
+            conn.commit()
+        except Exception as e:
+            print(f"⚠️ Config history table create error: {e}")
+            try: conn.rollback()
+            except: pass
+
+        # 9. Webhook Logs
+        try:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS webhook_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    client_id INTEGER,
+                    source TEXT NOT NULL,
+                    event_type TEXT NOT NULL,
+                    status_code INTEGER DEFAULT 200,
+                    payload_summary TEXT,
+                    error_message TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (client_id) REFERENCES clients (id)
+                )
+            """)
+            conn.commit()
+        except Exception as e:
+            print(f"⚠️ Webhook logs table create error: {e}")
+            try: conn.rollback()
+            except: pass
+
+        # 10. Unmatched Records
+        try:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS unmatched_records (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    client_id INTEGER NOT NULL,
+                    record_type TEXT DEFAULT 'sale',
+                    customer_identifier TEXT,
+                    amount REAL DEFAULT 0.0,
+                    source_system TEXT,
+                    reason TEXT,
+                    status TEXT DEFAULT 'UNMATCHED',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (client_id) REFERENCES clients (id)
+                )
+            """)
+            conn.commit()
+        except Exception as e:
+            print(f"⚠️ Unmatched records table create error: {e}")
+            try: conn.rollback()
+            except: pass
+
+        # 11. Analyzed Emails
+        try:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS analyzed_emails (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    client_id INTEGER,
+                    subject TEXT,
+                    sender TEXT,
+                    recipient TEXT,
+                    analyzed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conn.commit()
+        except Exception as e:
+            print(f"⚠️ Analyzed emails table create error: {e}")
+            try: conn.rollback()
+            except: pass
+
+        # 12. CRM Webhook Logs
+        try:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS crm_webhook_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    client_id INTEGER,
+                    contact_name TEXT,
+                    stage TEXT,
+                    amount REAL,
+                    received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conn.commit()
+        except Exception as e:
+            print(f"⚠️ CRM webhook logs table create error: {e}")
+            try: conn.rollback()
+            except: pass
+
+        # 13. Billing Webhook Logs
+        try:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS billing_webhook_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    client_id INTEGER,
+                    customer_name TEXT,
+                    invoice_number TEXT,
+                    amount REAL,
+                    received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conn.commit()
+        except Exception as e:
+            print(f"⚠️ Billing webhook logs table create error: {e}")
+            try: conn.rollback()
+            except: pass
 
         conn.close()
-    except Exception as e:
-        print(f"⚠️ [ensure_tables_exist] Non-fatal error: {e}")
+    except Exception as main_e:
+        print(f"⚠️ ensure_tables_exist global error: {main_e}")
+
+
+
 
 def init_db():
     """Initializes the database, creates necessary tables, and self-heals schemas."""
@@ -961,12 +1056,6 @@ def _async_init_db():
         print(f"⚠️ [DB Init] Warning: Non-fatal startup database init error: {e}")
 
 # Run database initialization asynchronously on FastAPI startup to allow instant port binding on Render
-
-@app.get("/health")
-@app.get("/healthz")
-def root_health_check():
-    return {"status": "ok", "service": "LeadGroove Engine", "version": "15.2.0"}
-
 @app.on_event("startup")
 def startup_db_init():
     print("🚀 [Startup] App startup event triggered! Binding port immediately...")
@@ -1933,11 +2022,9 @@ def get_admin_users(request: Request):
     return HTMLResponse(html_content)
 
 @app.get("/", response_class=HTMLResponse)
-def read_root(request: Request, response: Response):
+def read_root(request: Request):
+    ensure_tables_exist()
     """Agency Portal Landing Page with Auth Check."""
-    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, private"
-    response.headers["Pragma"] = "no-cache"
-    response.headers["Expires"] = "0" 
     email = is_authenticated(request)
     user_header_html = ""
     auth_buttons_html = ""
@@ -2148,6 +2235,7 @@ def export_filtered_leads(
 
 @app.get("/dashboard", response_class=HTMLResponse)
 def view_dashboard(request: Request, client_id: Optional[int] = None, date_range: Optional[str] = "all", start_date: Optional[str] = "", end_date: Optional[str] = ""):
+    ensure_tables_exist()
     email = is_authenticated(request)
     if not email:
         return RedirectResponse(url="/login", status_code=303)
@@ -13061,7 +13149,7 @@ def view_reports(
     </body>
     </html>
     """
-    return HTMLResponse(content=html_content)
+    return HTMLResponse(content=html_content, headers={"Cache-Control": "no-cache, no-store, must-revalidate, private"})
 
 
 if __name__ == "__main__":
