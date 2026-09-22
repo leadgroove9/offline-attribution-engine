@@ -14,60 +14,6 @@ from config import ADMIN_EMAILS
 
 router = APIRouter()
 
-def ensure_auth_tables_exist():
-    """Self-healing function to guarantee auth tables exist before handling auth operations."""
-    try:
-        conn = db_router.connect()
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                email TEXT UNIQUE NOT NULL,
-                hashed_password TEXT NOT NULL,
-                role TEXT DEFAULT 'full',
-                client_id INTEGER,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS user_sessions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                token TEXT UNIQUE NOT NULL,
-                email TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS password_resets (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                email TEXT NOT NULL,
-                token TEXT UNIQUE NOT NULL,
-                is_used TEXT DEFAULT 'NO',
-                expires_at TIMESTAMP,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS user_invitations (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                email TEXT NOT NULL,
-                token TEXT UNIQUE NOT NULL,
-                role TEXT DEFAULT 'full',
-                client_id INTEGER,
-                is_used TEXT DEFAULT 'NO',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        print(f"⚠️ Auth tables check warning: {e}")
-
 @router.get("/", response_class=HTMLResponse)
 def read_root(request: Request):
     """Agency Portal Landing Page with Auth Check."""
@@ -80,49 +26,43 @@ def read_root(request: Request):
         auth_buttons_html = '<a href="/dashboard" class="btn">📊 Open Agency & Client Dashboard</a>'
     else:
         user_header_html = '<p style="color: #666; font-weight: bold; font-size: 14px;">🔒 Account registration is currently free</p>'
-        auth_buttons_html = '''
+        auth_buttons_html = """
             <div style="display: flex; gap: 15px; justify-content: center; margin-top: 20px;">
                 <a href="/login" class="btn" style="margin-top: 0; background-color: #1a237e;">🔑 Log In</a>
                 <a href="/register" class="btn" style="margin-top: 0; background-color: #2e7d32;">🚀 Sign Up Free</a>
             </div>
-        '''
+        """
         
     return f"""
-    <!DOCTYPE html>
     <html>
         <head>
             <title>Multi-Tenant Multi-Channel Attribution Engine 🤖</title>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1">
             <style>
-                body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; text-align: center; padding-top: 80px; background-color: #f4f6f9; margin: 0; padding-bottom: 40px; }}
-                .container {{ display: inline-block; background: white; padding: 40px; border-radius: 12px; box-shadow: 0px 4px 15px rgba(0,0,0,0.08); max-width: 600px; width: 90%; box-sizing: border-box; }}
-                h1 {{ color: #1a237e; margin-bottom: 10px; font-size: 26px; }}
-                p {{ color: #555; font-size: 16px; line-height: 1.5; }}
-                .badge {{ background-color: #e8f5e9; color: #2e7d32; padding: 5px 15px; border-radius: 15px; font-weight: bold; display: inline-block; }}
-                .btn {{ display: inline-block; background-color: #1a237e; color: white; padding: 12px 24px; text-decoration: none; font-size: 15px; font-weight: bold; border-radius: 6px; margin-top: 20px; transition: background 0.2s; border: none; cursor: pointer; }}
+                body {{ font-family: Arial, sans-serif; text-align: center; padding-top: 80px; background-color: #f4f6f9; }}
+                .container {{ display: inline-block; background: white; padding: 40px; border-radius: 10px; box-shadow: 0px 4px 10px rgba(0,0,0,0.1); max-width: 600px; }}
+                h1 {{ color: #1a237e; margin-bottom: 10px; }}
+                p {{ color: #555; font-size: 18px; }}
+                .badge {{ background-color: #e8f5e9; color: #2e7d32; padding: 5px 15px; border-radius: 15px; font-weight: bold; }}
+                .btn {{ display: inline-block; background-color: #1a237e; color: white; padding: 12px 24px; text-decoration: none; font-size: 16px; font-weight: bold; border-radius: 5px; margin-top: 20px; transition: background 0.2s; }}
                 .btn:hover {{ background-color: #0d1b2a; }}
-                .feature-list {{ text-align: left; margin-top: 30px; color: #333; line-height: 1.6; border-top: 1px solid #eee; padding-top: 20px; }}
-                .feature-list h3 {{ font-size: 16px; color: #1a237e; margin-bottom: 12px; }}
-                .feature-list ul {{ padding-left: 20px; margin: 0; }}
-                .feature-list li {{ margin-bottom: 8px; font-size: 14px; }}
+                .feature-list {{ text-align: left; margin-top: 25px; color: #333; line-height: 1.6; }}
             </style>
         </head>
         <body>
             <div class="container">
-                <h1>Welcome To LeadGroove's Offline Conversion Tracking Engine</h1>
+                <h1>Welcome To Lead Grove's Offline Conversion Tracking Automation SAAS!</h1>
                 <p>Status: <span class="badge">Healthy, Multi-Tenant & AI-Enabled</span></p>
-                <p>Track offline lead and sales data across CallRail, CRMs, and web forms, and sync verified revenue back to your ad platforms automatically!</p>
+                <p>Just point us to your offline lead/sales data, and it gets imported to your AD accounts automatically!</p>
                 {user_header_html}
                 {auth_buttons_html}
                 
                 <div class="feature-list">
-                    <h3>Multi-Tenant Platform Capabilities:</h3>
+                    <h3>Multi-Tenant Architecture Capabilities:</h3>
                     <ul>
-                        <li>🏢 <strong>Multi-Channel Tracking</strong>: Seamless matching of Google (GCLID), Meta/Facebook (FBCLID), LinkedIn (LI_FAT_ID), and Microsoft (MSCLKID) Click IDs.</li>
-                        <li>📋 <strong>Onboarding Wizard</strong>: Custom qualification criteria mapping, CRM tag routing, and lead count rules.</li>
-                        <li>📥 <strong>Dynamic Webhook Ingestion</strong>: `/webhooks/callrail?client_id=X` automatically pairs phone call logs to campaign sessions.</li>
-                        <li>🧠 <strong>Claude 4.5 Haiku AI Audits</strong>: Real-time transcript parsing based on client-specific qualification definitions.</li>
+                        <li>🏢 <strong>Multi-Channel Tracking</strong>: Seamless matching of Google (GCLID), Facebook (FBCLID), LinkedIn (LI_FAT_ID), and Microsoft (MSCLKID) Click IDs!</li>
+                        <li>🏢 <strong>5-Step Onboarding Wizard</strong>: Custom qualification mapping, billing order routing, and CRM parameters.</li>
+                        <li>📥 <strong>Dynamic Webhook Endpoint</strong>: `/webhooks/callrail?client_id=X` automatically links tracking logs to the correct account.</li>
+                        <li>🧠 <strong>Claude 4.5 Haiku Custom Audits</strong>: Real-time transcript parsing based on client's specific qualification definitions.</li>
                     </ul>
                 </div>
             </div>
@@ -132,7 +72,6 @@ def read_root(request: Request):
 
 @router.get("/register", response_class=HTMLResponse)
 def get_register(request: Request, error: Optional[str] = None, invite_token: Optional[str] = None):
-    ensure_auth_tables_exist()
     email_val = ""
     lock_email_attr = ""
     invite_role_msg = ""
@@ -161,7 +100,6 @@ def get_register(request: Request, error: Optional[str] = None, invite_token: Op
 
     error_html = f'<div style="background-color: #ffebee; color: #c62828; padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; font-weight: bold; border-left: 4px solid #c62828;">❌ {error}</div>' if error else ''
     return f"""
-    <!DOCTYPE html>
     <html>
         <head>
             <title>Register - LeadGroove 🤖</title>
@@ -213,7 +151,6 @@ def get_register(request: Request, error: Optional[str] = None, invite_token: Op
 
 @router.post("/register")
 async def post_register(request: Request):
-    ensure_auth_tables_exist()
     try:
         form_data = await request.form()
         email = form_data.get("email", "").strip().lower()
@@ -249,6 +186,18 @@ async def post_register(request: Request):
             conn = db_router.connect()
             cursor = conn.cursor()
             
+            # Ensure users table exists safely
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    email TEXT UNIQUE NOT NULL,
+                    hashed_password TEXT NOT NULL,
+                    role TEXT DEFAULT 'full',
+                    client_id INTEGER,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
             cursor.execute("SELECT id FROM users WHERE email = ?", (email,))
             if cursor.fetchone():
                 conn.close()
@@ -270,17 +219,24 @@ async def post_register(request: Request):
             response = RedirectResponse(url="/dashboard", status_code=303)
             response.set_cookie(key="session_token", value=token, max_age=86400 * 30, httponly=True)
             return response
-        except Exception as inner_e:
-            return HTMLResponse(get_register(request, error=f"Database user creation error: {str(inner_e)}", invite_token=invite_token))
+        except Exception as e:
+            return HTMLResponse(get_register(request, error=f"Database error: {str(e)}"))
     except Exception as outer_e:
-        return HTMLResponse(get_register(request, error=f"Registration form processing error: {str(outer_e)}", invite_token=invite_token))
+        import traceback
+        tb = traceback.format_exc()
+        return HTMLResponse(f"""
+        <html>
+            <body style="font-family: monospace; padding: 40px; background-color: #ffebee; color: #c62828;">
+                <h2>❌ Unhandled Registration Error</h2>
+                <pre>{tb}</pre>
+            </body>
+        </html>
+        """, status_code=500)
 
 @router.get("/login", response_class=HTMLResponse)
 def get_login(request: Request, error: Optional[str] = None):
-    ensure_auth_tables_exist()
     error_html = f'<div style="background-color: #ffebee; color: #c62828; padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; font-weight: bold; border-left: 4px solid #c62828;">❌ {error}</div>' if error else ''
     return f"""
-    <!DOCTYPE html>
     <html>
         <head>
             <title>Log In - LeadGroove 🤖</title>
@@ -329,7 +285,6 @@ def get_login(request: Request, error: Optional[str] = None):
 
 @router.post("/login")
 async def post_login(request: Request):
-    ensure_auth_tables_exist()
     try:
         form_data = await request.form()
         email = form_data.get("email", "").strip().lower()
@@ -355,7 +310,16 @@ async def post_login(request: Request):
         except Exception as e:
             return HTMLResponse(get_login(request, error=f"Database error: {str(e)}"))
     except Exception as outer_e:
-        return HTMLResponse(get_login(request, error=f"Login processing error: {str(outer_e)}"))
+        import traceback
+        tb = traceback.format_exc()
+        return HTMLResponse(f"""
+        <html>
+            <body style="font-family: monospace; padding: 40px; background-color: #ffebee; color: #c62828;">
+                <h2>❌ Unhandled Login Error</h2>
+                <pre>{tb}</pre>
+            </body>
+        </html>
+        """, status_code=500)
 
 @router.get("/logout")
 def get_logout(request: Request):
@@ -365,9 +329,9 @@ def get_logout(request: Request):
     response.delete_cookie("session_token")
     return response
 
+
 @router.get("/forgot-password", response_class=HTMLResponse)
 def get_forgot_password(request: Request, error: Optional[str] = None, success: Optional[str] = None, token: Optional[str] = None):
-    ensure_auth_tables_exist()
     error_html = f'<div style="background-color: #ffebee; color: #c62828; padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; font-weight: bold; border-left: 4px solid #c62828;">❌ {error}</div>' if error else ''
     
     success_html = ""
@@ -380,7 +344,7 @@ def get_forgot_password(request: Request, error: Optional[str] = None, success: 
         if token:
             success_html += f'''
             <div style="background-color: #fff9c4; border: 1px solid #fbc02d; padding: 16px; border-radius: 6px; margin-bottom: 25px; text-align: left; font-size: 13px; color: #574300; line-height: 1.5;">
-                🛠️ <strong>Developer Sandbox Notice:</strong> Since no SMTP mail server is connected, the password reset request has been printed to the server console and generated directly below:
+                🛠️ <strong>Developer Sandbox Notice:</strong> Password reset token generated below:
                 <div style="margin-top: 10px; font-weight: bold; font-family: monospace; background: white; padding: 10px; border-radius: 4px; border: 1px solid #ffeb3b; word-break: break-all;">
                     <a href="/reset-password?token={token}" style="color: #1a237e; text-decoration: underline;">Click here to reset password</a>
                 </div>
@@ -389,7 +353,6 @@ def get_forgot_password(request: Request, error: Optional[str] = None, success: 
             '''
 
     return f"""
-    <!DOCTYPE html>
     <html>
         <head>
             <title>Reset Password - LeadGroove 🤖</title>
@@ -430,9 +393,9 @@ def get_forgot_password(request: Request, error: Optional[str] = None, success: 
     </html>
     """
 
+
 @router.post("/forgot-password")
 async def post_forgot_password(request: Request):
-    ensure_auth_tables_exist()
     try:
         form_data = await request.form()
         email = form_data.get("email", "").strip().lower()
@@ -460,7 +423,7 @@ async def post_forgot_password(request: Request):
         conn.commit()
         conn.close()
         
-        print(f"🔑 [PASSWORD RESET] Link generated for {email}: http://localhost:8000/reset-password?token={token}")
+        print(f"🔑 [PASSWORD RESET] Link generated for {email}: /reset-password?token={token}")
         
         return HTMLResponse(get_forgot_password(
             request, 
@@ -470,12 +433,11 @@ async def post_forgot_password(request: Request):
     except Exception as e:
         return HTMLResponse(get_forgot_password(request, error=f"Error generating reset request: {str(e)}"))
 
+
 @router.get("/reset-password", response_class=HTMLResponse)
 def get_reset_password(request: Request, token: Optional[str] = None, error: Optional[str] = None):
-    ensure_auth_tables_exist()
     if not token:
         return HTMLResponse("""
-            <!DOCTYPE html>
             <html>
                 <body style="font-family: sans-serif; text-align: center; padding-top: 100px; background-color: #f4f6f9;">
                     <div style="display: inline-block; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 400px;">
@@ -500,7 +462,6 @@ def get_reset_password(request: Request, token: Optional[str] = None, error: Opt
     
     if not row:
         return HTMLResponse("""
-            <!DOCTYPE html>
             <html>
                 <body style="font-family: sans-serif; text-align: center; padding-top: 100px; background-color: #f4f6f9;">
                     <div style="display: inline-block; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 400px;">
@@ -516,7 +477,6 @@ def get_reset_password(request: Request, token: Optional[str] = None, error: Opt
     
     if is_used == 'YES':
         return HTMLResponse("""
-            <!DOCTYPE html>
             <html>
                 <body style="font-family: sans-serif; text-align: center; padding-top: 100px; background-color: #f4f6f9;">
                     <div style="display: inline-block; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 400px;">
@@ -532,7 +492,6 @@ def get_reset_password(request: Request, token: Optional[str] = None, error: Opt
         expiry_dt = datetime.strptime(expires_at_str, "%Y-%m-%d %H:%M:%S")
         if datetime.now() > expiry_dt:
             return HTMLResponse("""
-                <!DOCTYPE html>
                 <html>
                     <body style="font-family: sans-serif; text-align: center; padding-top: 100px; background-color: #f4f6f9;">
                         <div style="display: inline-block; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 400px;">
@@ -549,7 +508,6 @@ def get_reset_password(request: Request, token: Optional[str] = None, error: Opt
     error_html = f'<div style="background-color: #ffebee; color: #c62828; padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; font-weight: bold; border-left: 4px solid #c62828;">❌ {error}</div>' if error else ''
 
     return f"""
-    <!DOCTYPE html>
     <html>
         <head>
             <title>Define New Password - LeadGroove 🤖</title>
@@ -588,9 +546,9 @@ def get_reset_password(request: Request, token: Optional[str] = None, error: Opt
     </html>
     """
 
+
 @router.post("/reset-password")
 async def post_reset_password(request: Request):
-    ensure_auth_tables_exist()
     try:
         form_data = await request.form()
         token = form_data.get("token", "").strip()
@@ -636,7 +594,6 @@ async def post_reset_password(request: Request):
         conn.close()
         
         return HTMLResponse("""
-            <!DOCTYPE html>
             <html>
                 <head>
                     <title>Password Reset Success - LeadGroove 🤖</title>
@@ -661,9 +618,9 @@ async def post_reset_password(request: Request):
     except Exception as e:
         return HTMLResponse(get_reset_password(request, token=token, error=f"Database update failed: {str(e)}"))
 
+
 @router.get("/admin/users", response_class=HTMLResponse)
 def get_admin_users(request: Request):
-    ensure_auth_tables_exist()
     email = is_authenticated(request)
     if not email:
         return RedirectResponse(url="/login", status_code=303)
