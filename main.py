@@ -20,14 +20,13 @@ app = FastAPI(
 # Hardened Security Headers Middleware
 app.add_middleware(SecurityHeadersMiddleware)
 
-# Top-level direct health check endpoints (Bypasses sub-routers & database dependency for DigitalOcean probes)
-@app.get("/")
+# Dedicated health check endpoints for DigitalOcean probes
 @app.get("/health")
 @app.get("/healthz")
 def root_health_check():
     return {"status": "ok", "service": "LeadGroove Offline Attribution Engine"}
 
-# Include Application Routers
+# Include Application Routers (auth_router handles root `/` landing page with login/signup buttons)
 app.include_router(auth_router)
 app.include_router(dashboard_router)
 app.include_router(settings_router)

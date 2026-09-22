@@ -15,12 +15,11 @@ from config import ADMIN_EMAILS
 router = APIRouter()
 
 def ensure_auth_tables_exist():
-    """Self-healing helper to guarantee user and session tables exist in PostgreSQL/SQLite."""
+    """Self-healing function to guarantee auth tables exist before handling auth operations."""
     try:
         conn = db_router.connect()
         cursor = conn.cursor()
         
-        # 1. Create Users Table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -32,7 +31,6 @@ def ensure_auth_tables_exist():
             )
         """)
         
-        # 2. Create User Sessions Table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS user_sessions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -41,73 +39,129 @@ def ensure_auth_tables_exist():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-
-        # 3. Create Password Resets Table
+        
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS password_resets (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 email TEXT NOT NULL,
-                token TEXT NOT NULL,
+                token TEXT UNIQUE NOT NULL,
                 is_used TEXT DEFAULT 'NO',
                 expires_at TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-
-        # 4. Create User Invitations Table
+        
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS user_invitations (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 email TEXT NOT NULL,
+                token TEXT UNIQUE NOT NULL,
                 role TEXT DEFAULT 'full',
                 client_id INTEGER,
-                token TEXT UNIQUE NOT NULL,
-                invited_by TEXT NOT NULL,
                 is_used TEXT DEFAULT 'NO',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-
+        
         conn.commit()
         conn.close()
     except Exception as e:
-        print(f"⚠️ Auth tables self-heal warning: {e}")
+        print(f"⚠️ Auth tables check warning: {e}")
 
+@router.get("/", response_class=HTMLResponse)
+def read_root(request: Request):
+    """Agency Portal Landing Page with Auth Check."""
+    email = is_authenticated(request)
+    user_header_html = ""
+    auth_buttons_html = ""
+    
+    if email:
+        user_header_html = f'<p style="color: #2e7d32; font-weight: bold; font-size: 15px;">👤 Logged in as: {email} | <a href="/logout" style="color: #c62828; text-decoration: none;">🚪 Log Out</a></p>'
+        auth_buttons_html = '<a href="/dashboard" class="btn">📊 Open Agency & Client Dashboard</a>'
+    else:
+        user_header_html = '<p style="color: #666; font-weight: bold; font-size: 14px;">🔒 Account registration is currently free</p>'
+        auth_buttons_html = '''
+            <div style="display: flex; gap: 15px; justify-content: center; margin-top: 20px;">
+                <a href="/login" class="btn" style="margin-top: 0; background-color: #1a237e;">🔑 Log In</a>
+                <a href="/register" class="btn" style="margin-top: 0; background-color: #2e7d32;">🚀 Sign Up Free</a>
+            </div>
+        '''
+        
+    return f"""
+    <!DOCTYPE html>
+    <html>
+        <head>
+            <title>Multi-Tenant Multi-Channel Attribution Engine 🤖</title>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>
+                body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; text-align: center; padding-top: 80px; background-color: #f4f6f9; margin: 0; padding-bottom: 40px; }}
+                .container {{ display: inline-block; background: white; padding: 40px; border-radius: 12px; box-shadow: 0px 4px 15px rgba(0,0,0,0.08); max-width: 600px; width: 90%; box-sizing: border-box; }}
+                h1 {{ color: #1a237e; margin-bottom: 10px; font-size: 26px; }}
+                p {{ color: #555; font-size: 16px; line-height: 1.5; }}
+                .badge {{ background-color: #e8f5e9; color: #2e7d32; padding: 5px 15px; border-radius: 15px; font-weight: bold; display: inline-block; }}
+                .btn {{ display: inline-block; background-color: #1a237e; color: white; padding: 12px 24px; text-decoration: none; font-size: 15px; font-weight: bold; border-radius: 6px; margin-top: 20px; transition: background 0.2s; border: none; cursor: pointer; }}
+                .btn:hover {{ background-color: #0d1b2a; }}
+                .feature-list {{ text-align: left; margin-top: 30px; color: #333; line-height: 1.6; border-top: 1px solid #eee; padding-top: 20px; }}
+                .feature-list h3 {{ font-size: 16px; color: #1a237e; margin-bottom: 12px; }}
+                .feature-list ul {{ padding-left: 20px; margin: 0; }}
+                .feature-list li {{ margin-bottom: 8px; font-size: 14px; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>Welcome To LeadGroove's Offline Conversion Tracking Engine</h1>
+                <p>Status: <span class="badge">Healthy, Multi-Tenant & AI-Enabled</span></p>
+                <p>Track offline lead and sales data across CallRail, CRMs, and web forms, and sync verified revenue back to your ad platforms automatically!</p>
+                {user_header_html}
+                {auth_buttons_html}
+                
+                <div class="feature-list">
+                    <h3>Multi-Tenant Platform Capabilities:</h3>
+                    <ul>
+                        <li>🏢 <strong>Multi-Channel Tracking</strong>: Seamless matching of Google (GCLID), Meta/Facebook (FBCLID), LinkedIn (LI_FAT_ID), and Microsoft (MSCLKID) Click IDs.</li>
+                        <li>📋 <strong>Onboarding Wizard</strong>: Custom qualification criteria mapping, CRM tag routing, and lead count rules.</li>
+                        <li>📥 <strong>Dynamic Webhook Ingestion</strong>: `/webhooks/callrail?client_id=X` automatically pairs phone call logs to campaign sessions.</li>
+                        <li>🧠 <strong>Claude 4.5 Haiku AI Audits</strong>: Real-time transcript parsing based on client-specific qualification definitions.</li>
+                    </ul>
+                </div>
+            </div>
+        </body>
+    </html>
+    """
 
 @router.get("/register", response_class=HTMLResponse)
 def get_register(request: Request, error: Optional[str] = None, invite_token: Optional[str] = None):
+    ensure_auth_tables_exist()
     email_val = ""
     lock_email_attr = ""
     invite_role_msg = ""
     token_hidden_input = ""
     
     if invite_token:
-        try:
-            ensure_auth_tables_exist()
-            conn = db_router.connect()
-            cursor = conn.cursor()
-            cursor.execute("SELECT email, role, client_id FROM user_invitations WHERE token = ? AND is_used = 'NO'", (invite_token,))
-            row = cursor.fetchone()
-            conn.close()
-            if not row:
-                error = "Invalid or expired invitation token. Please request a new invite link."
-            else:
-                invited_email, invited_role, invited_client_id = row
-                email_val = invited_email
-                lock_email_attr = "readonly style='background: #f1f3f4; color: #666;'"
-                role_title = "Full Function (Manager)" if invited_role == "full" else "Read-Only (Viewer)"
-                invite_role_msg = f"""
-                <div style="background-color: #e8f5e9; color: #2e7d32; padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; font-weight: bold; border-left: 4px solid #2e7d32;">
-                    ✅ Invitation Verified!<br>
-                    You are registering as a <strong>{role_title}</strong>.
-                </div>
-                """
-                token_hidden_input = f"<input type='hidden' name='invite_token' value='{invite_token}'>"
-        except Exception as ie:
-            error = f"Invitation lookup failed: {ie}"
+        conn = db_router.connect()
+        cursor = conn.cursor()
+        cursor.execute("SELECT email, role, client_id FROM user_invitations WHERE token = ? AND is_used = 'NO'", (invite_token,))
+        row = cursor.fetchone()
+        conn.close()
+        if not row:
+            error = "Invalid or expired invitation token. Please request a new invite link."
+        else:
+            invited_email, invited_role, invited_client_id = row
+            email_val = invited_email
+            lock_email_attr = "readonly style='background: #f1f3f4; color: #666;'"
+            role_title = "Full Function (Manager)" if invited_role == "full" else "Read-Only (Viewer)"
+            invite_role_msg = f"""
+            <div style="background-color: #e8f5e9; color: #2e7d32; padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; font-weight: bold; border-left: 4px solid #2e7d32;">
+                ✅ Invitation Verified!<br>
+                You are registering as a <strong>{role_title}</strong>.
+            </div>
+            """
+            token_hidden_input = f"<input type='hidden' name='invite_token' value='{invite_token}'>"
 
     error_html = f'<div style="background-color: #ffebee; color: #c62828; padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; font-weight: bold; border-left: 4px solid #c62828;">❌ {error}</div>' if error else ''
     return f"""
+    <!DOCTYPE html>
     <html>
         <head>
             <title>Register - LeadGroove 🤖</title>
@@ -159,6 +213,7 @@ def get_register(request: Request, error: Optional[str] = None, invite_token: Op
 
 @router.post("/register")
 async def post_register(request: Request):
+    ensure_auth_tables_exist()
     try:
         form_data = await request.form()
         email = form_data.get("email", "").strip().lower()
@@ -175,8 +230,6 @@ async def post_register(request: Request):
             
         resolved_role = "full"
         resolved_client_id = None
-        
-        ensure_auth_tables_exist()
         
         if invite_token:
             conn = db_router.connect()
@@ -213,29 +266,21 @@ async def post_register(request: Request):
             conn.commit()
             conn.close()
             
-            # Create session inside try block to handle any session table issues safely
             token = create_session(email)
             response = RedirectResponse(url="/dashboard", status_code=303)
             response.set_cookie(key="session_token", value=token, max_age=86400 * 30, httponly=True)
             return response
-        except Exception as e:
-            return HTMLResponse(get_register(request, error=f"Database error during registration: {str(e)}"))
+        except Exception as inner_e:
+            return HTMLResponse(get_register(request, error=f"Database user creation error: {str(inner_e)}", invite_token=invite_token))
     except Exception as outer_e:
-        import traceback
-        tb = traceback.format_exc()
-        return HTMLResponse(f"""
-        <html>
-            <body style="font-family: monospace; padding: 40px; background-color: #ffebee; color: #c62828;">
-                <h2>❌ Unhandled Registration Error</h2>
-                <pre>{tb}</pre>
-            </body>
-        </html>
-        """, status_code=500)
+        return HTMLResponse(get_register(request, error=f"Registration form processing error: {str(outer_e)}", invite_token=invite_token))
 
 @router.get("/login", response_class=HTMLResponse)
 def get_login(request: Request, error: Optional[str] = None):
+    ensure_auth_tables_exist()
     error_html = f'<div style="background-color: #ffebee; color: #c62828; padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; font-weight: bold; border-left: 4px solid #c62828;">❌ {error}</div>' if error else ''
     return f"""
+    <!DOCTYPE html>
     <html>
         <head>
             <title>Log In - LeadGroove 🤖</title>
@@ -284,6 +329,7 @@ def get_login(request: Request, error: Optional[str] = None):
 
 @router.post("/login")
 async def post_login(request: Request):
+    ensure_auth_tables_exist()
     try:
         form_data = await request.form()
         email = form_data.get("email", "").strip().lower()
@@ -292,8 +338,6 @@ async def post_login(request: Request):
         if not email or not password:
             return HTMLResponse(get_login(request, error="All fields are required."))
             
-        ensure_auth_tables_exist()
-        
         try:
             conn = db_router.connect()
             cursor = conn.cursor()
@@ -311,16 +355,7 @@ async def post_login(request: Request):
         except Exception as e:
             return HTMLResponse(get_login(request, error=f"Database error: {str(e)}"))
     except Exception as outer_e:
-        import traceback
-        tb = traceback.format_exc()
-        return HTMLResponse(f"""
-        <html>
-            <body style="font-family: monospace; padding: 40px; background-color: #ffebee; color: #c62828;">
-                <h2>❌ Unhandled Login Error</h2>
-                <pre>{tb}</pre>
-            </body>
-        </html>
-        """, status_code=500)
+        return HTMLResponse(get_login(request, error=f"Login processing error: {str(outer_e)}"))
 
 @router.get("/logout")
 def get_logout(request: Request):
@@ -330,9 +365,9 @@ def get_logout(request: Request):
     response.delete_cookie("session_token")
     return response
 
-
 @router.get("/forgot-password", response_class=HTMLResponse)
 def get_forgot_password(request: Request, error: Optional[str] = None, success: Optional[str] = None, token: Optional[str] = None):
+    ensure_auth_tables_exist()
     error_html = f'<div style="background-color: #ffebee; color: #c62828; padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; font-weight: bold; border-left: 4px solid #c62828;">❌ {error}</div>' if error else ''
     
     success_html = ""
@@ -354,6 +389,7 @@ def get_forgot_password(request: Request, error: Optional[str] = None, success: 
             '''
 
     return f"""
+    <!DOCTYPE html>
     <html>
         <head>
             <title>Reset Password - LeadGroove 🤖</title>
@@ -394,9 +430,9 @@ def get_forgot_password(request: Request, error: Optional[str] = None, success: 
     </html>
     """
 
-
 @router.post("/forgot-password")
 async def post_forgot_password(request: Request):
+    ensure_auth_tables_exist()
     try:
         form_data = await request.form()
         email = form_data.get("email", "").strip().lower()
@@ -404,18 +440,15 @@ async def post_forgot_password(request: Request):
         if not email:
             return HTMLResponse(get_forgot_password(request, error="Email is required."))
             
-        ensure_auth_tables_exist()
         conn = db_router.connect()
         cursor = conn.cursor()
         
-        # Verify user exists
         cursor.execute("SELECT id FROM users WHERE email = ?", (email,))
         user = cursor.fetchone()
         if not user:
             conn.close()
             return HTMLResponse(get_forgot_password(request, error="No registered account found with that email address."))
             
-        # Create reset token
         token = uuid.uuid4().hex
         expires_at = (datetime.now() + timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
         
@@ -427,7 +460,6 @@ async def post_forgot_password(request: Request):
         conn.commit()
         conn.close()
         
-        # Print link to standard logs
         print(f"🔑 [PASSWORD RESET] Link generated for {email}: http://localhost:8000/reset-password?token={token}")
         
         return HTMLResponse(get_forgot_password(
@@ -438,11 +470,12 @@ async def post_forgot_password(request: Request):
     except Exception as e:
         return HTMLResponse(get_forgot_password(request, error=f"Error generating reset request: {str(e)}"))
 
-
 @router.get("/reset-password", response_class=HTMLResponse)
 def get_reset_password(request: Request, token: Optional[str] = None, error: Optional[str] = None):
+    ensure_auth_tables_exist()
     if not token:
         return HTMLResponse("""
+            <!DOCTYPE html>
             <html>
                 <body style="font-family: sans-serif; text-align: center; padding-top: 100px; background-color: #f4f6f9;">
                     <div style="display: inline-block; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 400px;">
@@ -454,11 +487,9 @@ def get_reset_password(request: Request, token: Optional[str] = None, error: Opt
             </html>
         """)
         
-    ensure_auth_tables_exist()
     conn = db_router.connect()
     cursor = conn.cursor()
     
-    # Validate token
     cursor.execute("""
         SELECT email, is_used, expires_at 
         FROM password_resets 
@@ -469,6 +500,7 @@ def get_reset_password(request: Request, token: Optional[str] = None, error: Opt
     
     if not row:
         return HTMLResponse("""
+            <!DOCTYPE html>
             <html>
                 <body style="font-family: sans-serif; text-align: center; padding-top: 100px; background-color: #f4f6f9;">
                     <div style="display: inline-block; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 400px;">
@@ -484,6 +516,7 @@ def get_reset_password(request: Request, token: Optional[str] = None, error: Opt
     
     if is_used == 'YES':
         return HTMLResponse("""
+            <!DOCTYPE html>
             <html>
                 <body style="font-family: sans-serif; text-align: center; padding-top: 100px; background-color: #f4f6f9;">
                     <div style="display: inline-block; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 400px;">
@@ -495,11 +528,11 @@ def get_reset_password(request: Request, token: Optional[str] = None, error: Opt
             </html>
         """)
         
-    # Check expiry
     try:
         expiry_dt = datetime.strptime(expires_at_str, "%Y-%m-%d %H:%M:%S")
         if datetime.now() > expiry_dt:
             return HTMLResponse("""
+                <!DOCTYPE html>
                 <html>
                     <body style="font-family: sans-serif; text-align: center; padding-top: 100px; background-color: #f4f6f9;">
                         <div style="display: inline-block; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 400px;">
@@ -511,11 +544,12 @@ def get_reset_password(request: Request, token: Optional[str] = None, error: Opt
                 </html>
             """)
     except Exception:
-        pass # If expiry date parsing fails, bypass and allow reset
+        pass
 
     error_html = f'<div style="background-color: #ffebee; color: #c62828; padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; font-weight: bold; border-left: 4px solid #c62828;">❌ {error}</div>' if error else ''
 
     return f"""
+    <!DOCTYPE html>
     <html>
         <head>
             <title>Define New Password - LeadGroove 🤖</title>
@@ -554,9 +588,9 @@ def get_reset_password(request: Request, token: Optional[str] = None, error: Opt
     </html>
     """
 
-
 @router.post("/reset-password")
 async def post_reset_password(request: Request):
+    ensure_auth_tables_exist()
     try:
         form_data = await request.form()
         token = form_data.get("token", "").strip()
@@ -572,11 +606,9 @@ async def post_reset_password(request: Request):
         if len(password) < 6:
             return HTMLResponse(get_reset_password(request, token=token, error="Password must be at least 6 characters long."))
             
-        ensure_auth_tables_exist()
         conn = db_router.connect()
         cursor = conn.cursor()
         
-        # Double check token validity
         cursor.execute("SELECT email, is_used, expires_at FROM password_resets WHERE token = ?", (token,))
         row = cursor.fetchone()
         if not row:
@@ -588,7 +620,6 @@ async def post_reset_password(request: Request):
             conn.close()
             return HTMLResponse(get_reset_password(request, token=token, error="This reset link has already been used."))
             
-        # Parse expiry date
         try:
             expiry_dt = datetime.strptime(expires_at_str, "%Y-%m-%d %H:%M:%S")
             if datetime.now() > expiry_dt:
@@ -597,18 +628,15 @@ async def post_reset_password(request: Request):
         except Exception:
             pass
             
-        # Hash new password and update database
         hashed = hash_password(password)
         cursor.execute("UPDATE users SET hashed_password = ? WHERE email = ?", (hashed, email))
-        
-        # Mark token as used
         cursor.execute("UPDATE password_resets SET is_used = 'YES' WHERE token = ?", (token,))
         
         conn.commit()
         conn.close()
         
-        # Display Success page
         return HTMLResponse("""
+            <!DOCTYPE html>
             <html>
                 <head>
                     <title>Password Reset Success - LeadGroove 🤖</title>
@@ -633,9 +661,9 @@ async def post_reset_password(request: Request):
     except Exception as e:
         return HTMLResponse(get_reset_password(request, token=token, error=f"Database update failed: {str(e)}"))
 
-
 @router.get("/admin/users", response_class=HTMLResponse)
 def get_admin_users(request: Request):
+    ensure_auth_tables_exist()
     email = is_authenticated(request)
     if not email:
         return RedirectResponse(url="/login", status_code=303)
@@ -643,7 +671,6 @@ def get_admin_users(request: Request):
         raise HTTPException(status_code=403, detail="Unauthorized: Access is restricted to site administrators.")
         
     try:
-        ensure_auth_tables_exist()
         conn = db_router.connect()
         cursor = conn.cursor()
         cursor.execute("SELECT id, email, created_at FROM users ORDER BY created_at DESC")
