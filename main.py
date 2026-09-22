@@ -1,4 +1,3 @@
-\# Deploy test
 import os
 import sqlite3
 import re
@@ -192,7 +191,6 @@ app = FastAPI(
 @app.get("/healthz")
 def health_check():
     return {"status": "ok", "service": "LeadGroove Engine", "version": "15.2.0"}
-
 
 # ---------------------------------------------------------
 # DATABASE CONFIGURATION (SQLite)
