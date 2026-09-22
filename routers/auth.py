@@ -1,9 +1,16 @@
-from fastapi import APIRouter, Request, HTTPException, Form
-from fastapi.responses import HTMLResponse, RedirectResponse
+import uuid
+from datetime import datetime, timedelta
 from typing import Optional
-from services.auth_service import hash_password, verify_password, create_session, delete_session, is_authenticated, get_user_role_and_client
-from security.rate_limiter import rate_limiter
+from fastapi import APIRouter, Request, HTTPException
+from fastapi.responses import HTMLResponse, RedirectResponse
+
 from database.connection import db_router
+from services.auth_service import (
+    hash_password, verify_password, create_session, get_session_email,
+    delete_session, is_authenticated, get_user_role_and_client
+)
+from models.schemas import UserRoleUpdate, UserDelete, InviteRoleUpdate, InviteDelete, UserInvite
+from config import ADMIN_EMAILS
 
 router = APIRouter()
 
@@ -123,7 +130,6 @@ async def post_register(request: Request):
             conn = db_router.connect()
             cursor = conn.cursor()
             
-            # Check if user already exists
             cursor.execute("SELECT id FROM users WHERE email = ?", (email,))
             if cursor.fetchone():
                 conn.close()
@@ -141,7 +147,6 @@ async def post_register(request: Request):
             conn.commit()
             conn.close()
             
-            # Auto-login after registration
             token = create_session(email)
             response = RedirectResponse(url="/dashboard", status_code=303)
             response.set_cookie(key="session_token", value=token, max_age=86400 * 30, httponly=True)
@@ -271,7 +276,7 @@ def get_forgot_password(request: Request, error: Optional[str] = None, success: 
         if token:
             success_html += f'''
             <div style="background-color: #fff9c4; border: 1px solid #fbc02d; padding: 16px; border-radius: 6px; margin-bottom: 25px; text-align: left; font-size: 13px; color: #574300; line-height: 1.5;">
-                🛠️ <strong>Developer Sandbox Notice:</strong> Since no SMTP mail server is connected, the password reset request has been printed to the server console and generated directly below:
+                🛠️ <strong>Developer Sandbox Notice:</strong> Password reset token generated below:
                 <div style="margin-top: 10px; font-weight: bold; font-family: monospace; background: white; padding: 10px; border-radius: 4px; border: 1px solid #ffeb3b; word-break: break-all;">
                     <a href="/reset-password?token={token}" style="color: #1a237e; text-decoration: underline;">Click here to reset password</a>
                 </div>
@@ -282,7 +287,7 @@ def get_forgot_password(request: Request, error: Optional[str] = None, success: 
     return f"""
     <html>
         <head>
-            <title>Reset Password - LeadGroove \U0001f916</title>
+            <title>Reset Password - LeadGroove 🤖</title>
             <style>
                 body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding-top: 120px; background-color: #f4f6f9; color: #333; }}
                 .container {{ display: inline-block; background: white; padding: 40px; border-radius: 12px; box-shadow: 0px 8px 24px rgba(0,0,0,0.08); max-width: 450px; width: 100%; text-align: left; box-sizing: border-box; }}
@@ -310,7 +315,7 @@ def get_forgot_password(request: Request, error: Optional[str] = None, success: 
                         <label for="email">Email Address</label>
                         <input type="email" id="email" name="email" required placeholder="e.g. corey@youragency.com">
                     </div>
-                    <button type="submit" class="btn">\u2709\ufe0f Request Reset Link</button>
+                    <button type="submit" class="btn">✉️ Request Reset Link</button>
                 </form>
                 <div class="switch-link">
                     Remember your credentials? <a href="/login">Log In</a>
@@ -333,14 +338,12 @@ async def post_forgot_password(request: Request):
         conn = db_router.connect()
         cursor = conn.cursor()
         
-        # Verify user exists
         cursor.execute("SELECT id FROM users WHERE email = ?", (email,))
         user = cursor.fetchone()
         if not user:
             conn.close()
             return HTMLResponse(get_forgot_password(request, error="No registered account found with that email address."))
             
-        # Create reset token
         token = uuid.uuid4().hex
         expires_at = (datetime.now() + timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
         
@@ -352,8 +355,7 @@ async def post_forgot_password(request: Request):
         conn.commit()
         conn.close()
         
-        # Print link to standard logs
-        print(f"🔑 [PASSWORD RESET] Link generated for {email}: http://localhost:8000/reset-password?token={token}")
+        print(f"🔑 [PASSWORD RESET] Link generated for {email}: /reset-password?token={token}")
         
         return HTMLResponse(get_forgot_password(
             request, 
@@ -382,7 +384,6 @@ def get_reset_password(request: Request, token: Optional[str] = None, error: Opt
     conn = db_router.connect()
     cursor = conn.cursor()
     
-    # Validate token
     cursor.execute("""
         SELECT email, is_used, expires_at 
         FROM password_resets 
@@ -419,7 +420,6 @@ def get_reset_password(request: Request, token: Optional[str] = None, error: Opt
             </html>
         """)
         
-    # Check expiry
     try:
         expiry_dt = datetime.strptime(expires_at_str, "%Y-%m-%d %H:%M:%S")
         if datetime.now() > expiry_dt:
@@ -435,14 +435,14 @@ def get_reset_password(request: Request, token: Optional[str] = None, error: Opt
                 </html>
             """)
     except Exception:
-        pass # If expiry date parsing fails, bypass and allow reset
+        pass
 
     error_html = f'<div style="background-color: #ffebee; color: #c62828; padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; font-weight: bold; border-left: 4px solid #c62828;">❌ {error}</div>' if error else ''
 
     return f"""
     <html>
         <head>
-            <title>Define New Password - LeadGroove \U0001f916</title>
+            <title>Define New Password - LeadGroove 🤖</title>
             <style>
                 body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding-top: 120px; background-color: #f4f6f9; color: #333; }}
                 .container {{ display: inline-block; background: white; padding: 40px; border-radius: 12px; box-shadow: 0px 8px 24px rgba(0,0,0,0.08); max-width: 400px; width: 100%; text-align: left; box-sizing: border-box; }}
@@ -499,7 +499,6 @@ async def post_reset_password(request: Request):
         conn = db_router.connect()
         cursor = conn.cursor()
         
-        # Double check token validity
         cursor.execute("SELECT email, is_used, expires_at FROM password_resets WHERE token = ?", (token,))
         row = cursor.fetchone()
         if not row:
@@ -511,7 +510,6 @@ async def post_reset_password(request: Request):
             conn.close()
             return HTMLResponse(get_reset_password(request, token=token, error="This reset link has already been used."))
             
-        # Parse expiry date
         try:
             expiry_dt = datetime.strptime(expires_at_str, "%Y-%m-%d %H:%M:%S")
             if datetime.now() > expiry_dt:
@@ -520,21 +518,17 @@ async def post_reset_password(request: Request):
         except Exception:
             pass
             
-        # Hash new password and update database
         hashed = hash_password(password)
         cursor.execute("UPDATE users SET hashed_password = ? WHERE email = ?", (hashed, email))
-        
-        # Mark token as used
         cursor.execute("UPDATE password_resets SET is_used = 'YES' WHERE token = ?", (token,))
         
         conn.commit()
         conn.close()
         
-        # Display Success page
         return HTMLResponse("""
             <html>
                 <head>
-                    <title>Password Reset Success - LeadGroove \U0001f916</title>
+                    <title>Password Reset Success - LeadGroove 🤖</title>
                     <style>
                         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding-top: 120px; background-color: #f4f6f9; color: #333; }
                         .container { display: inline-block; background: white; padding: 40px; border-radius: 12px; box-shadow: 0px 8px 24px rgba(0,0,0,0.08); max-width: 400px; width: 100%; box-sizing: border-box; }
@@ -546,9 +540,9 @@ async def post_reset_password(request: Request):
                 </head>
                 <body>
                     <div class="container">
-                        <h1>\U0001f389 Password Reset Complete!</h1>
+                        <h1>🎉 Password Reset Complete!</h1>
                         <p>Your password credentials have been successfully updated. You can now use your new password to access your dashboard.</p>
-                        <a href="/login" class="btn">\U0001f511 Proceed to Login</a>
+                        <a href="/login" class="btn">🔑 Proceed to Login</a>
                     </div>
                 </body>
             </html>
@@ -656,118 +650,3 @@ def get_admin_users(request: Request):
     </html>
     """
     return HTMLResponse(html_content)
-
-@router.get("/", response_class=HTMLResponse)
-def read_root(request: Request):
-    """Agency Portal Landing Page with Auth Check."""
-    email = is_authenticated(request)
-    user_header_html = ""
-    auth_buttons_html = ""
-    
-    if email:
-        user_header_html = f'<p style="color: #2e7d32; font-weight: bold; font-size: 15px;">👤 Logged in as: {email} | <a href="/logout" style="color: #c62828; text-decoration: none;">🚪 Log Out</a></p>'
-        auth_buttons_html = '<a href="/dashboard" class="btn">📊 Open Agency & Client Dashboard</a>'
-    else:
-        user_header_html = '<p style="color: #666; font-weight: bold; font-size: 14px;">🔒 Account registration is currently free</p>'
-        auth_buttons_html = '''
-            <div style="display: flex; gap: 15px; justify-content: center; margin-top: 20px;">
-                <a href="/login" class="btn" style="margin-top: 0; background-color: #1a237e;">🔑 Log In</a>
-                <a href="/register" class="btn" style="margin-top: 0; background-color: #2e7d32;">🚀 Sign Up Free</a>
-            </div>
-        '''
-        
-    return f"""
-    <html>
-        <head>
-            <title>Multi-Tenant Multi-Channel Attribution Engine 🤖</title>
-            <style>
-                body {{ font-family: Arial, sans-serif; text-align: center; padding-top: 80px; background-color: #f4f6f9; }}
-                .container {{ display: inline-block; background: white; padding: 40px; border-radius: 10px; box-shadow: 0px 4px 10px rgba(0,0,0,0.1); max-width: 600px; }}
-                h1 {{ color: #1a237e; margin-bottom: 10px; }}
-                p {{ color: #555; font-size: 18px; }}
-                .badge {{ background-color: #e8f5e9; color: #2e7d32; padding: 5px 15px; border-radius: 15px; font-weight: bold; }}
-                .btn {{ display: inline-block; background-color: #1a237e; color: white; padding: 12px 24px; text-decoration: none; font-size: 16px; font-weight: bold; border-radius: 5px; margin-top: 20px; transition: background 0.2s; }}
-                .btn:hover {{ background-color: #0d1b2a; }}
-                .feature-list {{ text-align: left; margin-top: 25px; color: #333; line-height: 1.6; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>Welcome To Lead Grove's Offline Conversion Tracking Automation SAAS!</h1>
-                <p>Status: <span class="badge">Healthy, Multi-Tenant & AI-Enabled</span></p>
-                <p>Just point us to your offline lead/sales data, and it gets imported to your AD accounts automatically!</p>
-                {user_header_html}
-                {auth_buttons_html}
-                
-                <div class="feature-list">
-                    <h3>Multi-Tenant Architecture Capabilities:</h3>
-                    <ul>
-                        <li>🏢 <strong>Multi-Channel Tracking</strong>: Seamless matching of Google (GCLID), Facebook (FBCLID), LinkedIn (LI_FAT_ID), and Microsoft (MSCLKID) Click IDs!</li>
-                        <li>🏢 <strong>5-Step Onboarding Wizard</strong>: Custom qualification mapping, billing order routing, and CRM parameters.</li>
-                        <li>📥 <strong>Dynamic Webhook Endpoint</strong>: `/webhooks/callrail?client_id=X` automatically links tracking logs to the correct account.</li>
-                        <li>🧠 <strong>Claude 4.5 Haiku Custom Audits</strong>: Real-time transcript parsing based on client's specific qualification definitions.</li>
-                    </ul>
-                </div>
-            </div>
-        </body>
-    </html>
-    """
-
-
-
-def is_in_date_range(created_at_val, date_range: str, start_date_str: str, end_date_str: str) -> bool:
-    if not date_range or date_range == "all":
-        return True
-        
-    if not created_at_val:
-        return True
-        
-    try:
-        from datetime import datetime, timedelta
-        dt = None
-        if isinstance(created_at_val, datetime):
-            dt = created_at_val
-        else:
-            s_clean = str(created_at_val).strip()
-            if "T" in s_clean:
-                s_clean = s_clean.replace("T", " ")
-            s_clean = s_clean.split(".")[0]
-            try:
-                dt = datetime.strptime(s_clean, "%Y-%m-%d %H:%M:%S")
-            except ValueError:
-                try:
-                    dt = datetime.strptime(s_clean, "%Y-%m-%d")
-                except ValueError:
-                    return True
-                    
-        now = datetime.now()
-        if date_range in ["1d", "today"]:
-            cutoff = now - timedelta(days=1)
-            return dt >= cutoff
-        elif date_range == "7d":
-            cutoff = now - timedelta(days=7)
-            return dt >= cutoff
-        elif date_range == "30d":
-            cutoff = now - timedelta(days=30)
-            return dt >= cutoff
-        elif date_range == "90d":
-            cutoff = now - timedelta(days=90)
-            return dt >= cutoff
-        elif date_range == "custom":
-            valid = True
-            if start_date_str and start_date_str.strip():
-                s_dt = datetime.strptime(start_date_str.strip(), "%Y-%m-%d")
-                valid = valid and (dt >= s_dt)
-            if end_date_str and end_date_str.strip():
-                e_dt = datetime.strptime(end_date_str.strip(), "%Y-%m-%d") + timedelta(days=1)
-                valid = valid and (dt < e_dt)
-            return valid
-    except Exception as e:
-        print(f"Date filter parse exception: {e}")
-        return True
-        
-    return True
-
-
-
-
