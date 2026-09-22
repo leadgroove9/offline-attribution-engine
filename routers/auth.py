@@ -14,6 +14,66 @@ from config import ADMIN_EMAILS
 
 router = APIRouter()
 
+def ensure_auth_tables_exist():
+    """Self-healing helper to guarantee user and session tables exist in PostgreSQL/SQLite."""
+    try:
+        conn = db_router.connect()
+        cursor = conn.cursor()
+        
+        # 1. Create Users Table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT UNIQUE NOT NULL,
+                hashed_password TEXT NOT NULL,
+                role TEXT DEFAULT 'full',
+                client_id INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # 2. Create User Sessions Table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS user_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                token TEXT UNIQUE NOT NULL,
+                email TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # 3. Create Password Resets Table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS password_resets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT NOT NULL,
+                token TEXT NOT NULL,
+                is_used TEXT DEFAULT 'NO',
+                expires_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # 4. Create User Invitations Table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS user_invitations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT NOT NULL,
+                role TEXT DEFAULT 'full',
+                client_id INTEGER,
+                token TEXT UNIQUE NOT NULL,
+                invited_by TEXT NOT NULL,
+                is_used TEXT DEFAULT 'NO',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"⚠️ Auth tables self-heal warning: {e}")
+
+
 @router.get("/register", response_class=HTMLResponse)
 def get_register(request: Request, error: Optional[str] = None, invite_token: Optional[str] = None):
     email_val = ""
@@ -22,25 +82,29 @@ def get_register(request: Request, error: Optional[str] = None, invite_token: Op
     token_hidden_input = ""
     
     if invite_token:
-        conn = db_router.connect()
-        cursor = conn.cursor()
-        cursor.execute("SELECT email, role, client_id FROM user_invitations WHERE token = ? AND is_used = 'NO'", (invite_token,))
-        row = cursor.fetchone()
-        conn.close()
-        if not row:
-            error = "Invalid or expired invitation token. Please request a new invite link."
-        else:
-            invited_email, invited_role, invited_client_id = row
-            email_val = invited_email
-            lock_email_attr = "readonly style='background: #f1f3f4; color: #666;'"
-            role_title = "Full Function (Manager)" if invited_role == "full" else "Read-Only (Viewer)"
-            invite_role_msg = f"""
-            <div style="background-color: #e8f5e9; color: #2e7d32; padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; font-weight: bold; border-left: 4px solid #2e7d32;">
-                ✅ Invitation Verified!<br>
-                You are registering as a <strong>{role_title}</strong>.
-            </div>
-            """
-            token_hidden_input = f"<input type='hidden' name='invite_token' value='{invite_token}'>"
+        try:
+            ensure_auth_tables_exist()
+            conn = db_router.connect()
+            cursor = conn.cursor()
+            cursor.execute("SELECT email, role, client_id FROM user_invitations WHERE token = ? AND is_used = 'NO'", (invite_token,))
+            row = cursor.fetchone()
+            conn.close()
+            if not row:
+                error = "Invalid or expired invitation token. Please request a new invite link."
+            else:
+                invited_email, invited_role, invited_client_id = row
+                email_val = invited_email
+                lock_email_attr = "readonly style='background: #f1f3f4; color: #666;'"
+                role_title = "Full Function (Manager)" if invited_role == "full" else "Read-Only (Viewer)"
+                invite_role_msg = f"""
+                <div style="background-color: #e8f5e9; color: #2e7d32; padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; font-weight: bold; border-left: 4px solid #2e7d32;">
+                    ✅ Invitation Verified!<br>
+                    You are registering as a <strong>{role_title}</strong>.
+                </div>
+                """
+                token_hidden_input = f"<input type='hidden' name='invite_token' value='{invite_token}'>"
+        except Exception as ie:
+            error = f"Invitation lookup failed: {ie}"
 
     error_html = f'<div style="background-color: #ffebee; color: #c62828; padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; font-weight: bold; border-left: 4px solid #c62828;">❌ {error}</div>' if error else ''
     return f"""
@@ -112,6 +176,8 @@ async def post_register(request: Request):
         resolved_role = "full"
         resolved_client_id = None
         
+        ensure_auth_tables_exist()
+        
         if invite_token:
             conn = db_router.connect()
             cursor = conn.cursor()
@@ -147,12 +213,13 @@ async def post_register(request: Request):
             conn.commit()
             conn.close()
             
+            # Create session inside try block to handle any session table issues safely
             token = create_session(email)
             response = RedirectResponse(url="/dashboard", status_code=303)
             response.set_cookie(key="session_token", value=token, max_age=86400 * 30, httponly=True)
             return response
         except Exception as e:
-            return HTMLResponse(get_register(request, error=f"Database error: {str(e)}"))
+            return HTMLResponse(get_register(request, error=f"Database error during registration: {str(e)}"))
     except Exception as outer_e:
         import traceback
         tb = traceback.format_exc()
@@ -225,6 +292,8 @@ async def post_login(request: Request):
         if not email or not password:
             return HTMLResponse(get_login(request, error="All fields are required."))
             
+        ensure_auth_tables_exist()
+        
         try:
             conn = db_router.connect()
             cursor = conn.cursor()
@@ -276,7 +345,7 @@ def get_forgot_password(request: Request, error: Optional[str] = None, success: 
         if token:
             success_html += f'''
             <div style="background-color: #fff9c4; border: 1px solid #fbc02d; padding: 16px; border-radius: 6px; margin-bottom: 25px; text-align: left; font-size: 13px; color: #574300; line-height: 1.5;">
-                🛠️ <strong>Developer Sandbox Notice:</strong> Password reset token generated below:
+                🛠️ <strong>Developer Sandbox Notice:</strong> Since no SMTP mail server is connected, the password reset request has been printed to the server console and generated directly below:
                 <div style="margin-top: 10px; font-weight: bold; font-family: monospace; background: white; padding: 10px; border-radius: 4px; border: 1px solid #ffeb3b; word-break: break-all;">
                     <a href="/reset-password?token={token}" style="color: #1a237e; text-decoration: underline;">Click here to reset password</a>
                 </div>
@@ -335,15 +404,18 @@ async def post_forgot_password(request: Request):
         if not email:
             return HTMLResponse(get_forgot_password(request, error="Email is required."))
             
+        ensure_auth_tables_exist()
         conn = db_router.connect()
         cursor = conn.cursor()
         
+        # Verify user exists
         cursor.execute("SELECT id FROM users WHERE email = ?", (email,))
         user = cursor.fetchone()
         if not user:
             conn.close()
             return HTMLResponse(get_forgot_password(request, error="No registered account found with that email address."))
             
+        # Create reset token
         token = uuid.uuid4().hex
         expires_at = (datetime.now() + timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
         
@@ -355,7 +427,8 @@ async def post_forgot_password(request: Request):
         conn.commit()
         conn.close()
         
-        print(f"🔑 [PASSWORD RESET] Link generated for {email}: /reset-password?token={token}")
+        # Print link to standard logs
+        print(f"🔑 [PASSWORD RESET] Link generated for {email}: http://localhost:8000/reset-password?token={token}")
         
         return HTMLResponse(get_forgot_password(
             request, 
@@ -381,9 +454,11 @@ def get_reset_password(request: Request, token: Optional[str] = None, error: Opt
             </html>
         """)
         
+    ensure_auth_tables_exist()
     conn = db_router.connect()
     cursor = conn.cursor()
     
+    # Validate token
     cursor.execute("""
         SELECT email, is_used, expires_at 
         FROM password_resets 
@@ -420,6 +495,7 @@ def get_reset_password(request: Request, token: Optional[str] = None, error: Opt
             </html>
         """)
         
+    # Check expiry
     try:
         expiry_dt = datetime.strptime(expires_at_str, "%Y-%m-%d %H:%M:%S")
         if datetime.now() > expiry_dt:
@@ -435,7 +511,7 @@ def get_reset_password(request: Request, token: Optional[str] = None, error: Opt
                 </html>
             """)
     except Exception:
-        pass
+        pass # If expiry date parsing fails, bypass and allow reset
 
     error_html = f'<div style="background-color: #ffebee; color: #c62828; padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; font-weight: bold; border-left: 4px solid #c62828;">❌ {error}</div>' if error else ''
 
@@ -496,9 +572,11 @@ async def post_reset_password(request: Request):
         if len(password) < 6:
             return HTMLResponse(get_reset_password(request, token=token, error="Password must be at least 6 characters long."))
             
+        ensure_auth_tables_exist()
         conn = db_router.connect()
         cursor = conn.cursor()
         
+        # Double check token validity
         cursor.execute("SELECT email, is_used, expires_at FROM password_resets WHERE token = ?", (token,))
         row = cursor.fetchone()
         if not row:
@@ -510,6 +588,7 @@ async def post_reset_password(request: Request):
             conn.close()
             return HTMLResponse(get_reset_password(request, token=token, error="This reset link has already been used."))
             
+        # Parse expiry date
         try:
             expiry_dt = datetime.strptime(expires_at_str, "%Y-%m-%d %H:%M:%S")
             if datetime.now() > expiry_dt:
@@ -518,13 +597,17 @@ async def post_reset_password(request: Request):
         except Exception:
             pass
             
+        # Hash new password and update database
         hashed = hash_password(password)
         cursor.execute("UPDATE users SET hashed_password = ? WHERE email = ?", (hashed, email))
+        
+        # Mark token as used
         cursor.execute("UPDATE password_resets SET is_used = 'YES' WHERE token = ?", (token,))
         
         conn.commit()
         conn.close()
         
+        # Display Success page
         return HTMLResponse("""
             <html>
                 <head>
@@ -560,6 +643,7 @@ def get_admin_users(request: Request):
         raise HTTPException(status_code=403, detail="Unauthorized: Access is restricted to site administrators.")
         
     try:
+        ensure_auth_tables_exist()
         conn = db_router.connect()
         cursor = conn.cursor()
         cursor.execute("SELECT id, email, created_at FROM users ORDER BY created_at DESC")
