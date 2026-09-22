@@ -13,14 +13,21 @@ from routers.webhooks import router as webhooks_router
 
 app = FastAPI(
     title="LeadGroove Offline Attribution Engine (Multi-Tenant)",
-    description="Multi-tenant agency platform for tracking offline leads/sales and AI audits with Hardened Security (v191)",
+    description="Multi-tenant agency platform for tracking offline leads/sales and AI audits with Hardened Security",
     version="15.3.0"
 )
 
-# Hardened Security Headers Middleware (v191)
+# Hardened Security Headers Middleware
 app.add_middleware(SecurityHeadersMiddleware)
 
-# Include Routers
+# Top-level direct health check endpoints (Bypasses sub-routers & database dependency for DigitalOcean probes)
+@app.get("/")
+@app.get("/health")
+@app.get("/healthz")
+def root_health_check():
+    return {"status": "ok", "service": "LeadGroove Offline Attribution Engine"}
+
+# Include Application Routers
 app.include_router(auth_router)
 app.include_router(dashboard_router)
 app.include_router(settings_router)
@@ -34,5 +41,5 @@ def on_startup():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
-    print(f"🌐 Starting LeadGroove Server (v191 Security Hardened) on 0.0.0.0:{port}...")
+    print(f"🌐 Starting LeadGroove Server on 0.0.0.0:{port}...")
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
