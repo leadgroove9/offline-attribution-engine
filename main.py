@@ -1,25 +1,198 @@
 import os
-import sys
+import sqlite3
 import re
 import json
 import csv
 import io
+import pandas as pd
+import difflib
+from fastapi import FastAPI, Request, HTTPException, File, UploadFile, Form
+from fastapi.responses import HTMLResponse, StreamingResponse, Response, RedirectResponse
+from pydantic import BaseModel
+from typing import Optional
+try:
+    from anthropic import Anthropic
+except ImportError:
+    Anthropic = None
+
+# Initialize FastAPI App
+
 import hashlib
 import uuid
-import threading
-import sqlite3
-import difflib
-from typing import Optional, List, Dict, Any
-from fastapi import FastAPI, Request, HTTPException, File, UploadFile, Form, Response
-from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse
-from pydantic import BaseModel
-import pandas as pd
+
+def hash_password(password: str) -> str:
+    salt = uuid.uuid4().hex
+    hashed = hashlib.sha256(salt.encode() + password.encode()).hexdigest()
+    return f"{salt}:{hashed}"
+
+def verify_password(stored_password: str, provided_password: str) -> bool:
+    try:
+        salt, hashed = stored_password.split(":")
+        check_hashed = hashlib.sha256(salt.encode() + provided_password.encode()).hexdigest()
+        return check_hashed == hashed
+    except Exception:
+        return False
+
+def create_session(email: str) -> str:
+    token = uuid.uuid4().hex
+    conn = db_router.connect()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO user_sessions (token, email) VALUES (?, ?)", (token, email))
+    conn.commit()
+    conn.close()
+    return token
+
+def get_session_email(token: str) -> Optional[str]:
+    if not token:
+        return None
+    try:
+        conn = db_router.connect()
+        cursor = conn.cursor()
+        cursor.execute("SELECT email FROM user_sessions WHERE token = ?", (token,))
+        row = cursor.fetchone()
+        conn.close()
+        return row[0] if row else None
+    except Exception:
+        return None
+
+def delete_session(token: str):
+    if not token:
+        return
+    try:
+        conn = db_router.connect()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM user_sessions WHERE token = ?", (token,))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+def is_authenticated(request: Request) -> Optional[str]:
+    token = request.cookies.get("session_token")
+    return get_session_email(token)
+
+def get_user_role_and_client(email: str) -> tuple[str, Optional[int]]:
+    """Returns the (role, client_id) for the user. Defaults to ('full', None) if not found."""
+    if not email:
+        return "read", None
+    conn = db_router.connect()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT role, client_id FROM users WHERE LOWER(TRIM(email)) = ?", (email.strip().lower(),))
+        row = cursor.fetchone()
+        if row:
+            return row[0] or "full", row[1]
+    except Exception as e:
+        print(f"⚠️ Error getting user role: {e}")
+    finally:
+        conn.close()
+    return "full", None
+
+
+def clean_company_name(name: str) -> str:
+    if not name:
+        return ""
+    name_clean = name.lower().strip()
+    name_clean = re.sub(r"[^\w\s]", "", name_clean)
+    noise_words = ["inc", "llc", "corp", "co", "ltd", "group", "services", "limited", "incorporated", "corporation"]
+    tokens = [w for w in name_clean.split() if w not in noise_words]
+    return " ".join(tokens)
+
+def clean_person_name(name: str) -> str:
+    if not name:
+        return ""
+    name_clean = name.lower().strip()
+    name_clean = re.sub(r"[^\w\s,]", "", name_clean)
+    return name_clean
+
+def check_name_transposition(name1: str, name2: str) -> float:
+    n1 = clean_person_name(name1)
+    n2 = clean_person_name(name2)
+    tokens1 = [t.strip() for t in n1.split(",") if t.strip()]
+    tokens2 = [t.strip() for t in n2.split(",") if t.strip()]
+    
+    if len(tokens1) > 1:
+        n1_standard = " ".join(reversed(tokens1))
+    else:
+        n1_standard = n1
+        
+    if len(tokens2) > 1:
+        n2_standard = " ".join(reversed(tokens2))
+    else:
+        n2_standard = n2
+
+    t1 = n1_standard.split()
+    t2 = n2_standard.split()
+    
+    if not t1 or not t2:
+        return 0.0
+        
+    if sorted(t1) == sorted(t2):
+        return 1.0
+        
+    if t1[-1] == t2[-1]:
+        f1, f2 = t1[0], t2[0]
+        if f1 == f2:
+            return 1.0
+        f1_clean = re.sub(r"\.", "", f1).strip()
+        f2_clean = re.sub(r"\.", "", f2).strip()
+        if f1_clean == f2_clean:
+            return 1.0
+        if len(f1_clean) == 1 and f2_clean.startswith(f1_clean):
+            return 0.90
+        if len(f2_clean) == 1 and f1_clean.startswith(f2_clean):
+            return 0.90
+        if f1_clean in f2_clean or f2_clean in f1_clean:
+            return 0.85
+            
+    return difflib.SequenceMatcher(None, n1_standard, n2_standard).ratio()
+
+def calculate_company_similarity(name1: str, name2: str) -> float:
+    c1 = clean_company_name(name1)
+    c2 = clean_company_name(name2)
+    if not c1 or not c2:
+        return 0.0
+    if c1 in c2 or c2 in c1:
+        return 1.0
+    return difflib.SequenceMatcher(None, c1, c2).ratio()
+
+def find_dynamic_columns_custom(columns: list) -> tuple:
+    phone_col = None
+    email_col = None
+    value_col = None
+    name_col = None
+    company_col = None
+    cleaned_cols = {col: re.sub(r"[\s_-]+", "", col.lower()) for col in columns}
+    for original_col, clean_col in cleaned_cols.items():
+        if not phone_col and re.search(r"(phone|tele|mobile|cell|num|contact)", clean_col):
+            phone_col = original_col
+            continue
+        if not email_col and re.search(r"(email|mail|address)", clean_col):
+            email_col = original_col
+            continue
+        if not value_col and re.search(r"(amount|value|revenue|total|price|paid|sum|invoice|sale|cost)", clean_col):
+            value_col = original_col
+            continue
+        if not name_col and re.search(r"(name|customer|client|contact|lead)", clean_col):
+            name_col = original_col
+            continue
+        if not company_col and re.search(r"(company|business|firm|org|account)", clean_col):
+            company_col = original_col
+            continue
+    return phone_col, email_col, value_col, name_col, company_col
 
 app = FastAPI(
     title="Offline Attribution Engine (Multi-Tenant Multi-Channel)",
     description="Multi-tenant agency platform for tracking offline leads/sales and AI audits across Google, Meta, LinkedIn, and Microsoft",
     version="15.2.0"
 )
+
+@app.get("/")
+@app.get("/health")
+@app.get("/healthz")
+def root_health_check():
+    return {"status": "ok", "service": "LeadGroove Engine", "version": "15.2.0"}
+
 
 # ---------------------------------------------------------
 # DATABASE CONFIGURATION (SQLite)
@@ -77,6 +250,7 @@ class PostgreSQLCursorWrapper:
             
         # 5. Fix potential PostgreSQL cast/comparison issues with Boolean/Text
         # Also convert SQLite-style datetime(column, 'localtime') to PostgreSQL TO_CHAR(column, 'YYYY-MM-DD HH24:MI:SS')
+        import re
         query_formatted = re.sub(r"datetime\(([^,]+),\s*'localtime'\)", r"to_char(\1, 'YYYY-MM-DD HH24:MI:SS')", query_formatted, flags=re.IGNORECASE)
         
         # Execute raw query
@@ -533,7 +707,7 @@ def startup_db_init():
 # ANTHROPIC CLAUDE CONFIGURATION
 # ---------------------------------------------------------
 API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()
-client = Anthropic(api_key=API_KEY, max_retries=3, timeout=30.0) if API_KEY else None
+client = Anthropic(api_key=API_KEY, max_retries=3, timeout=30.0) if (API_KEY and Anthropic is not None) else None
 
 def clean_json_string(text: str) -> str:
     text = text.strip()
@@ -11144,6 +11318,7 @@ async def receive_calltrackingmetrics_webhook(request: Request, client_id: Optio
             twclid,
             pin_clid,
             gptclid,
+            rdt_cid,
             "calltrackingmetrics", 
             ai_qualified, 
             ai_sale_closed, 
@@ -11347,6 +11522,7 @@ async def receive_whatconverts_webhook(request: Request, client_id: Optional[int
             twclid,
             pin_clid,
             gptclid,
+            rdt_cid,
             "whatconverts", 
             ai_qualified, 
             ai_sale_closed, 
@@ -11831,6 +12007,7 @@ async def receive_callrail_webhook(request: Request, client_id: Optional[int] = 
             twclid,
             pin_clid,
             gptclid,
+            rdt_cid,
             "callrail", 
             ai_qualified, 
             ai_sale_closed, 
@@ -11899,7 +12076,7 @@ async def receive_form_lead(lead: FormLead, client_id: Optional[int] = None):
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO sessions (client_id, phone, email, name, company, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, gptclid, rdt_cid, source, qualified, sale_closed, reason)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             resolved_client_id, 
             normalized_phone, 
@@ -11914,6 +12091,7 @@ async def receive_form_lead(lead: FormLead, client_id: Optional[int] = None):
             lead.twclid,
             lead.pin_clid,
             lead.gptclid,
+            lead.rdt_cid,
             "form",
             qualified_val,
             sale_closed_val,
