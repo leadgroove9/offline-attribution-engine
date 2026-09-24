@@ -1,3 +1,4 @@
+import threading
 import os
 import sqlite3
 import re
@@ -187,7 +188,6 @@ app = FastAPI(
     version="15.2.0"
 )
 
-@app.get("/")
 @app.get("/health")
 @app.get("/healthz")
 def root_health_check():
@@ -250,7 +250,6 @@ class PostgreSQLCursorWrapper:
             
         # 5. Fix potential PostgreSQL cast/comparison issues with Boolean/Text
         # Also convert SQLite-style datetime(column, 'localtime') to PostgreSQL TO_CHAR(column, 'YYYY-MM-DD HH24:MI:SS')
-        import re
         query_formatted = re.sub(r"datetime\(([^,]+),\s*'localtime'\)", r"to_char(\1, 'YYYY-MM-DD HH24:MI:SS')", query_formatted, flags=re.IGNORECASE)
         
         # Execute raw query
@@ -9699,7 +9698,7 @@ def backfill_historical_callrail_leads(client_id: int, qualification_criteria_co
         
         cursor.execute("""
             INSERT INTO sessions (
-                client_id, phone, name, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, gptclid, rdt_cid, source, qualified, sale_closed, value, reason, model_used, raw_data, created_at
+                client_id, phone, name, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, gptclid, rdt_cid, source, qualified, sale_closed, value, reason, model_used, raw_data
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
@@ -11318,7 +11317,6 @@ async def receive_calltrackingmetrics_webhook(request: Request, client_id: Optio
             twclid,
             pin_clid,
             gptclid,
-            rdt_cid,
             "calltrackingmetrics", 
             ai_qualified, 
             ai_sale_closed, 
@@ -11522,7 +11520,6 @@ async def receive_whatconverts_webhook(request: Request, client_id: Optional[int
             twclid,
             pin_clid,
             gptclid,
-            rdt_cid,
             "whatconverts", 
             ai_qualified, 
             ai_sale_closed, 
@@ -12091,7 +12088,7 @@ async def receive_form_lead(lead: FormLead, client_id: Optional[int] = None):
             lead.twclid,
             lead.pin_clid,
             lead.gptclid,
-            lead.rdt_cid,
+            lead.rdt_cid if hasattr(lead, 'rdt_cid') else None,
             "form",
             qualified_val,
             sale_closed_val,
