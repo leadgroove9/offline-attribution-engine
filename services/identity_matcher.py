@@ -2,7 +2,7 @@ import os
 import re
 import difflib
 from datetime import datetime, timedelta
-from typing import Optional, Tuple, List
+from typing import Optional
 from database.connection import db_router
 
 def clean_company_name(name: str) -> str:
@@ -115,6 +115,7 @@ def extract_param_from_url(url: str, param_name: str) -> Optional[str]:
     match = re.search(rf"[?&]{param_name}=([^&#]+)", url)
     return match.group(1) if match else None
 
+
 def is_in_date_range(created_at_str: str, date_range: str, start_date: Optional[str] = None, end_date: Optional[str] = None) -> bool:
     if not created_at_str:
         return True
@@ -146,13 +147,3 @@ def is_in_date_range(created_at_str: str, date_range: str, start_date: Optional[
         except Exception:
             return True
     return True
-
-def find_dynamic_columns_custom(df, target_keywords):
-    if df is None or df.empty:
-        return None
-    for col in df.columns:
-        col_clean = str(col).lower().strip()
-        for kw in target_keywords:
-            if kw.lower() in col_clean:
-                return col
-    return None
