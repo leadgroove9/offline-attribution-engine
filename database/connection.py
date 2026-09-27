@@ -21,17 +21,15 @@ class PostgreSQLCursorWrapper:
 
     def execute(self, query, params=None):
         pg_query = query.replace("?", "%s")
-        
-        # Translate PRAGMA table_info(table_name)
         pragma_match = re.search(r"PRAGMA\s+table_info\((.*?)\)", pg_query, re.IGNORECASE)
         if pragma_match:
-            t_name = pragma_match.group(1).strip("'\" ")
-            pg_query = f"SELECT 0, column_name FROM information_schema.columns WHERE table_name = '{t_name}'"
+            table_name = pragma_match.group(1).replace("'", "").replace('"', '').strip()
+            pg_query = f"SELECT 0, column_name FROM information_schema.columns WHERE table_name = '{table_name}'"
         else:
             pg_query = pg_query.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY")
             pg_query = pg_query.replace("PRIMARY KEY AUTOINCREMENT", "PRIMARY KEY")
             pg_query = pg_query.replace("AUTOINCREMENT", "")
-            pg_query = re.sub(r"datetime\(([^,]+),\s*'localtime'\)", r"to_char(\1::timestamp, 'YYYY-MM-DD HH24:MI:SS')", pg_query, flags=re.IGNORECASE)
+            pg_query = re.sub(r"datetime\((.*?),", r"to_char(::timestamp,", pg_query, flags=re.IGNORECASE)
             
         if params is None:
             return self._cursor.execute(pg_query)

@@ -13,19 +13,22 @@ from routers.webhooks import router as webhooks_router
 
 app = FastAPI(
     title="LeadGroove Offline Attribution Engine (Multi-Tenant)",
-    description="Multi-tenant agency platform for tracking offline leads/sales and AI audits across Google, Meta, LinkedIn, and Microsoft",
+    description="Multi-tenant agency platform for tracking offline leads/sales and AI audits",
     version="15.3.0"
 )
-
-@app.get("/")
-@app.get("/health")
-@app.get("/healthz")
-def root_health():
-    return {"status": "ok", "service": "LeadGroove Offline Attribution Engine"}
 
 @app.on_event("startup")
 def on_startup():
     startup_db_init()
+
+@app.get("/")
+@app.get("/health")
+@app.get("/healthz")
+def root_health_check(request: Request):
+    email = is_authenticated(request)
+    if email:
+        return RedirectResponse(url="/dashboard", status_code=303)
+    return {"status": "ok", "service": "LeadGroove Offline Attribution Engine"}
 
 app.include_router(auth_router)
 app.include_router(dashboard_router)
