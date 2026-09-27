@@ -4315,10 +4315,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             <div class="section-title">🔌 Single Source of Truth Settings</div>
                             
                             <div class="form-group">
-                                <label for="source_of_truth">Where is your Single Source of Truth?</label>
-                                <small style="color: #666; font-size: 12px; display: block; margin-top: -4px; margin-bottom: 8px;">
-                                    i.e. Where does your sales data exist that indicates which of your incoming leads close into sales or not?
-                                </small>
+                                <label for="source_of_truth">Single Source of Truth Platform</label>
                                 <select id="source_of_truth" onchange="toggleSOTFields()">
                                     {sot_options}
                                 </select>
@@ -6301,10 +6298,12 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             if (dealBox) dealBox.style.display = 'block';
                             const dLabel = document.getElementById('sot-deal-tags-label');
                             const wLabel = document.getElementById('sot-won-deal-tags-label');
-                            if (dLabel && sot === 'spreadsheets') dLabel.innerText = 'Which tags/statuses on your spreadsheet signify a qualified conversion?';
-                            else if (dLabel && sot !== 'google_sheets') dLabel.innerText = 'Which tags/statuses under Deals signify a qualified conversion?';
-                            if (wLabel && sot === 'spreadsheets') wLabel.innerText = 'Which tags/statuses on your spreadsheet signify a won deal conversion?';
-                            else if (wLabel && sot !== 'google_sheets') wLabel.innerText = 'Which tags/statuses under Deals signify a won deal conversion?';
+                            if (dLabel && sot !== 'google_sheets' && sot !== 'spreadsheets') dLabel.innerText = 'Which tags/statuses under Deals signify a qualified conversion?';
+                            if (wLabel && sot !== 'google_sheets' && sot !== 'spreadsheets') wLabel.innerText = 'Which tags/statuses under Deals signify a won deal conversion?';
+                            if (sot === 'spreadsheets') {{
+                                if (dLabel) dLabel.innerText = 'Which tags/statuses on your spreadsheet signify a qualified conversion?';
+                                if (wLabel) wLabel.innerText = 'Which tags/statuses on your spreadsheet signify a won deal conversion?';
+                            }}
                         }}
                         if (['servicetitan', 'housecallpro', 'gohighlevel'].includes(sot)) {{
                             if (leadBox) leadBox.style.display = 'block';
@@ -6341,10 +6340,6 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         if (monthlyEmailBox) monthlyEmailBox.style.display = 'block';
                         if (dealBox) dealBox.style.display = 'block';
                         if (emailCard) emailCard.style.display = 'block';
-                        const dLabel = document.getElementById('sot-deal-tags-label');
-                        const wLabel = document.getElementById('sot-won-deal-tags-label');
-                        if (dLabel && sot === 'spreadsheets') dLabel.innerText = 'Which tags/statuses on your spreadsheet signify a qualified conversion?';
-                        if (wLabel && sot === 'spreadsheets') wLabel.innerText = 'Which tags/statuses on your spreadsheet signify a won deal conversion?';
                     }} else if (sot === 'ai_rating' || sot === 'transcripts') {{
                         if (emailBox) emailBox.style.display = 'block';
                         if (voipBox) {{
@@ -12344,7 +12339,6 @@ async def save_chat_pre_session(request: Request):
         """, (client_id, ref_id, phone, email, gclid, fbclid, msclkid, li_fat_id, ttclid, twclid, pin_clid, scclid, gptclid, rdt_cid))
         conn.commit()
         conn.close()
-        print(f"💬 [Pre-Chat Session Saved] Client #{client_id} | Ref: {ref_id} | GCLID: {gclid or None}")
         return {"status": "success", "ref_id": ref_id, "client_id": client_id, "message": "Pre-chat click session saved successfully."}
     except Exception as e:
         return {"status": "error", "detail": str(e)}
@@ -12393,7 +12387,6 @@ async def receive_chat_transcript_webhook(request: Request, client_id: Optional[
             conn.close()
             if match:
                 matched_gclid, matched_fbclid, matched_msclkid, matched_li_fat_id = match or "", match or "", match or "", match or ""
-                print(f"🎯 [Chat Pre-Session Matched] Found prior Click IDs for {customer_name} ({source_type}): GCLID={matched_gclid or 'None'}")
                 
         raw_transcript = payload.get("transcript") or payload.get("messages") or payload.get("conversation") or body_str
         transcript_str = ""
@@ -12403,8 +12396,8 @@ async def receive_chat_transcript_webhook(request: Request, client_id: Optional[
             lines = []
             for item in raw_transcript:
                 if isinstance(item, dict):
-                    spk = item.get("speaker") or item.get("author") or item.get("type") or item.get("role") or "Visitor"
-                    txt = item.get("text") or item.get("body") or item.get("message") or ""
+                    spk = item.get("speaker") or item.get("author") or item.get("role") or "Visitor"
+                    txt = item.get("text") or item.get("message") or ""
                     if txt:
                         lines.append(f"[{str(spk).title()}]: {txt}")
                 elif isinstance(item, str):
@@ -12437,7 +12430,6 @@ async def receive_chat_transcript_webhook(request: Request, client_id: Optional[
         conn.commit()
         conn.close()
         
-        print(f"🧠 [Client #{resolved_client_id}] Audited {source_type.upper()} chat transcript for {customer_name}...")
         return {
             "status": "success",
             "client_id": resolved_client_id,
