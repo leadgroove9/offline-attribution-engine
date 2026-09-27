@@ -336,26 +336,6 @@ def init_db():
     cursor = conn.cursor()
     # 6. Create Users Table
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS chat_pre_sessions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            client_id INTEGER DEFAULT 1,
-            ref_id TEXT UNIQUE NOT NULL,
-            phone TEXT,
-            email TEXT,
-            gclid TEXT,
-            fbclid TEXT,
-            li_fat_id TEXT,
-            msclkid TEXT,
-            ttclid TEXT,
-            twclid TEXT,
-            pin_clid TEXT,
-            scclid TEXT,
-            gptclid TEXT,
-            rdt_cid TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             email TEXT UNIQUE NOT NULL,
@@ -3604,12 +3584,9 @@ def view_settings(request: Request, client_id: Optional[int] = None):
             dropdown_options += f'<option value="{c_id}" {is_selected}>👤 {c_name} (Ads: {c_ads})</option>'
 
     # Handle dropdown lists with pre-selected options
-    lg_saved = str(client_data.get("lead_gen_method", "both") or "both").lower()
-    lead_gen_both_checked = "checked" if ("both" in lg_saved or ("phone" in lg_saved and "form" in lg_saved)) else ""
-    lead_gen_phone_checked = "checked" if ("phone" in lg_saved or "both" in lg_saved or not lg_saved) else ""
-    lead_gen_form_checked = "checked" if ("form" in lg_saved or "both" in lg_saved or not lg_saved) else ""
-    lead_gen_chat_checked = "checked" if ("chat" in lg_saved or "both" in lg_saved) else ""
-    lead_gen_msg_checked = "checked" if ("messaging" in lg_saved or "both" in lg_saved) else ""
+    lead_gen_both_checked = "checked" if client_data.get("lead_gen_method") == "both" else ""
+    lead_gen_phone_checked = "checked" if client_data.get("lead_gen_method") == "phone" else ""
+    lead_gen_form_checked = "checked" if client_data.get("lead_gen_method") == "form" else ""
 
     lead_count_all_checked = "checked" if client_data.get("lead_count_rule") == "all" else ""
     lead_count_max_checked = "checked" if client_data.get("lead_count_rule") == "maximum_one" else ""
@@ -4123,91 +4100,25 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             <div class="section-title">🧠 Lead Generation & AI Auditing</div>
                             
                             <div class="form-group">
-                                <label>Which lead generation channels do you want to track?</label>
-                                <small style="color: #666; font-size: 12px; display: block; margin-top: -4px; margin-bottom: 10px;">
-                                    Select all that apply to you:
-                                </small>
+                                <label>How do you generate your leads?</label>
                                 <div class="card-radio-group">
-                                    <div class="card-radio {lead_gen_phone_checked and 'selected'}" onclick="toggleCardCheckbox(this)">
-                                        <input type="checkbox" name="lead_gen_method" value="phone" {lead_gen_phone_checked} onchange="toggleLeadGenCards()">
+                                    <div class="card-radio {lead_gen_both_checked and 'selected'}" onclick="selectCardRadio('lead_gen_method', 'both', this)">
+                                        <input type="radio" name="lead_gen_method" value="both" {lead_gen_both_checked}>
                                         <div>
-                                            <div class="card-checkbox-label" style="font-weight: bold; font-size: 14px;">📞 Phone Calls</div>
-                                            <div class="card-radio-sub" style="font-size: 11px; color: #666;">CallRail, CallTrackingMetrics, WhatConverts & VoIP transcripts</div>
+                                            <div class="card-radio-label">Both Phone Calls & Web Forms</div>
                                         </div>
                                     </div>
-                                    <div class="card-radio {lead_gen_form_checked and 'selected'}" onclick="toggleCardCheckbox(this)">
-                                        <input type="checkbox" name="lead_gen_method" value="form" {lead_gen_form_checked} onchange="toggleLeadGenCards()">
+                                    <div class="card-radio {lead_gen_phone_checked and 'selected'}" onclick="selectCardRadio('lead_gen_method', 'phone', this)">
+                                        <input type="radio" name="lead_gen_method" value="phone" {lead_gen_phone_checked}>
                                         <div>
-                                            <div class="card-checkbox-label" style="font-weight: bold; font-size: 14px;">📝 Web Form Submissions</div>
-                                            <div class="card-radio-sub" style="font-size: 11px; color: #666;">Website contact forms with ad Click IDs (GCLID, FBCLID, etc.)</div>
+                                            <div class="card-radio-label">Phone Calls Only</div>
                                         </div>
                                     </div>
-                                    <div class="card-radio {lead_gen_chat_checked and 'selected'}" onclick="toggleCardCheckbox(this)">
-                                        <input type="checkbox" name="lead_gen_method" value="chat" {lead_gen_chat_checked} onchange="toggleLeadGenCards()">
+                                    <div class="card-radio {lead_gen_form_checked and 'selected'}" onclick="selectCardRadio('lead_gen_method', 'form', this)">
+                                        <input type="radio" name="lead_gen_method" value="form" {lead_gen_form_checked}>
                                         <div>
-                                            <div class="card-checkbox-label" style="font-weight: bold; font-size: 14px;">💬 Live Chat Widgets</div>
-                                            <div class="card-radio-sub" style="font-size: 11px; color: #666;">LiveChat, Intercom, Drift, Crisp, Zendesk, Tidio, HubSpot Chat, etc.</div>
+                                            <div class="card-radio-label">Form Submissions Only</div>
                                         </div>
-                                    </div>
-                                    <div class="card-radio {lead_gen_msg_checked and 'selected'}" onclick="toggleCardCheckbox(this)">
-                                        <input type="checkbox" name="lead_gen_method" value="messaging" {lead_gen_msg_checked} onchange="toggleLeadGenCards()">
-                                        <div>
-                                            <div class="card-checkbox-label" style="font-weight: bold; font-size: 14px;">📱 Direct Messaging Apps</div>
-                                            <div class="card-radio-sub" style="font-size: 11px; color: #666;">WhatsApp Business, Telegram Bot, Viber Business</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- CONDITIONAL: Live Chat Widget Setup Box -->
-                            <div id="livechat-setup-box" class="conditional-box" style="display: none; background-color: #f8f9fa; border: 1px dashed #1a237e; border-radius: 8px; padding: 18px; margin-top: 15px;">
-                                <div style="font-weight: bold; color: #1a237e; font-size: 13px; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;">
-                                    <span>💬 Live Chat & On-Page Widget Tracking Setup</span>
-                                    <span class="tooltip-icon">💬
-                                        <span class="tooltip-text">
-                                            <strong>Where to place Webhook in Live Chat Apps:</strong><br>
-                                            • <strong>LiveChat:</strong> Settings ➔ Developers ➔ Webhooks ➔ Add Webhook (event: <em>chat_ended</em>)<br>
-                                            • <strong>Intercom:</strong> Developer Hub ➔ Webhooks (event: <em>conversation.closed</em>)<br>
-                                            • <strong>Drift:</strong> Settings ➔ App Settings ➔ Integrations ➔ Webhooks (event: <em>conversation_closed</em>)<br>
-                                            • <strong>Crisp:</strong> Settings ➔ Workspace Settings ➔ Integrations ➔ Webhooks<br>
-                                            • <strong>Tidio / Zendesk:</strong> Settings ➔ Integrations ➔ Webhooks (event: <em>chat_finished</em>)
-                                        </span>
-                                    </span>
-                                </div>
-                                <div style="font-size: 12px; color: #555; line-height: 1.5; margin-bottom: 12px;">
-                                    <strong>Step 1: Embed On-Page Script Tag:</strong> Copy and embed this script tag on your website to capture Click IDs (GCLID/FBCLID) into website live chat widgets:
-                                    <div style="display: flex; gap: 8px; margin-top: 6px;">
-                                        <input type="text" id="livechat-script-tag" readonly value="&lt;script src=&quot;https://leadgroove-55wt7.ondigitalocean.app/leadgroove-chat-tracker.js&quot; data-client-id=&quot;{active_client_id}&quot;&gt;&lt;/script&gt;" style="font-family: monospace; font-size: 11px; flex: 1; padding: 8px; background: white;">
-                                        <button type="button" onclick="copyText('livechat-script-tag', 'btn-copy-script')" id="btn-copy-script" class="btn-copy">📋 Copy Script Tag</button>
-                                    </div>
-                                </div>
-                                <div style="font-size: 12px; color: #555; line-height: 1.5;">
-                                    <strong>Step 2: Universal Live Chat Webhook Endpoint:</strong> Paste this URL into your chat platform's webhook settings (event: <em>Chat Ended / Closed</em>):
-                                    <div style="display: flex; gap: 8px; margin-top: 6px;">
-                                        <input type="text" id="livechat-webhook-url" readonly value="https://leadgroove-55wt7.ondigitalocean.app/webhooks/livechat?client_id={active_client_id}" style="font-family: monospace; font-size: 11px; flex: 1; padding: 8px; background: white;">
-                                        <button type="button" onclick="copyText('livechat-webhook-url', 'btn-copy-chat-wh')" id="btn-copy-chat-wh" class="btn-copy">📋 Copy Webhook URL</button>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- CONDITIONAL: Direct Messaging Apps Setup Box -->
-                            <div id="messaging-setup-box" class="conditional-box" style="display: none; background-color: #f8f9fa; border: 1px dashed #2e7d32; border-radius: 8px; padding: 18px; margin-top: 15px;">
-                                <div style="font-weight: bold; color: #2e7d32; font-size: 13px; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;">
-                                    <span>📱 Direct Messaging Apps Setup (WhatsApp, Telegram, Viber)</span>
-                                    <span class="tooltip-icon">💬
-                                        <span class="tooltip-text">
-                                            <strong>Where to place Webhook in Messaging Apps:</strong><br>
-                                            • <strong>WhatsApp:</strong> Meta Business Manager ➔ WhatsApp ➔ Configuration ➔ Webhooks (subscribe to <em>messages</em>)<br>
-                                            • <strong>Telegram:</strong> Call <code>setWebhook?url=YOUR_URL</code> via BotFather API token<br>
-                                            • <strong>Viber:</strong> Post <code>set_webhook</code> request with Viber Auth Token
-                                        </span>
-                                    </span>
-                                </div>
-                                <div style="font-size: 12px; color: #555; line-height: 1.5;">
-                                    <strong>WhatsApp Business Webhook URL:</strong> Paste into Meta Business Manager under WhatsApp API Configuration Webhooks:
-                                    <div style="display: flex; gap: 8px; margin-top: 6px;">
-                                        <input type="text" id="whatsapp-webhook-url" readonly value="https://leadgroove-55wt7.ondigitalocean.app/webhooks/whatsapp?client_id={active_client_id}" style="font-family: monospace; font-size: 11px; flex: 1; padding: 8px; background: white;">
-                                        <button type="button" onclick="copyText('whatsapp-webhook-url', 'btn-copy-wa')" id="btn-copy-wa" class="btn-copy">📋 Copy WhatsApp URL</button>
                                     </div>
                                 </div>
                             </div>
@@ -6298,12 +6209,8 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             if (dealBox) dealBox.style.display = 'block';
                             const dLabel = document.getElementById('sot-deal-tags-label');
                             const wLabel = document.getElementById('sot-won-deal-tags-label');
-                            if (dLabel && sot !== 'google_sheets' && sot !== 'spreadsheets') dLabel.innerText = 'Which tags/statuses under Deals signify a qualified conversion?';
-                            if (wLabel && sot !== 'google_sheets' && sot !== 'spreadsheets') wLabel.innerText = 'Which tags/statuses under Deals signify a won deal conversion?';
-                            if (sot === 'spreadsheets') {{
-                                if (dLabel) dLabel.innerText = 'Which tags/statuses on your spreadsheet signify a qualified conversion?';
-                                if (wLabel) wLabel.innerText = 'Which tags/statuses on your spreadsheet signify a won deal conversion?';
-                            }}
+                            if (dLabel && sot !== 'google_sheets') dLabel.innerText = 'Which tags/statuses under Deals signify a qualified conversion?';
+                            if (wLabel && sot !== 'google_sheets') wLabel.innerText = 'Which tags/statuses under Deals signify a won deal conversion?';
                         }}
                         if (['servicetitan', 'housecallpro', 'gohighlevel'].includes(sot)) {{
                             if (leadBox) leadBox.style.display = 'block';
@@ -6336,11 +6243,11 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             if (wLabel) wLabel.innerText = 'Which tags/statuses on Google sheet signify a won deal conversion?';
                         }}
                         else if (sot === 'zapier' && zapierBox) {{ zapierBox.style.display = 'block'; if (dealBox) dealBox.style.display = 'block'; }}
-                    }} else if (sot === 'email' || sot === 'spreadsheets') {{
+                    }} else if (sot === 'email') {{
                         if (monthlyEmailBox) monthlyEmailBox.style.display = 'block';
                         if (dealBox) dealBox.style.display = 'block';
                         if (emailCard) emailCard.style.display = 'block';
-                    }} else if (sot === 'ai_rating' || sot === 'transcripts') {{
+                    }} else if (sot === 'ai_rating') {{
                         if (emailBox) emailBox.style.display = 'block';
                         if (voipBox) {{
                             voipBox.style.display = 'block';
@@ -7732,48 +7639,38 @@ def add_client_page(request: Request):
                     <div class="wizard-step" id="step-panel-2">
                         <div class="instructions">
                             🧠 <strong>Step 2: Lead Generation & Qualification Preferences</strong><br>
-                            Tell us how this client receives and identifies a qualified lead so that Claude's sales auditing aligns perfectly.
+                            Tell us the total ways you receive leads now so that our systems can track all possible lead sources
                         </div>
                         
                         <div class="form-group">
-                            <label>Which lead generation channels do you want to track?</label>
-                            <small style="color: #666; font-size: 12px; display: block; margin-top: -4px; margin-bottom: 10px;">
-                                Select all that apply to you:
-                            </small>
+                            <label>How do you generate your leads?</label>
                             <div class="card-radio-group">
-                                <div class="card-radio selected" onclick="toggleCardCheckbox(this)">
-                                    <input type="checkbox" name="lead_gen_method" value="phone" checked>
+                                <div class="card-radio selected" onclick="selectCardRadio('lead_gen_method', 'both', this)">
+                                    <input type="radio" name="lead_gen_method" value="both" checked>
                                     <div>
-                                        <div class="card-checkbox-label" style="font-weight: bold; font-size: 14px;">📞 Phone Calls</div>
-                                        <div class="card-radio-sub" style="font-size: 11px; color: #666;">CallRail, CallTrackingMetrics, WhatConverts & VoIP transcripts</div>
+                                        <div class="card-radio-label">Both Phone Calls & Web Forms</div>
+                                        <div class="card-radio-sub">Full multi-channel capture (Recommended)</div>
                                     </div>
                                 </div>
-                                <div class="card-radio selected" onclick="toggleCardCheckbox(this)">
-                                    <input type="checkbox" name="lead_gen_method" value="form" checked>
+                                <div class="card-radio" onclick="selectCardRadio('lead_gen_method', 'phone', this)">
+                                    <input type="radio" name="lead_gen_method" value="phone">
                                     <div>
-                                        <div class="card-checkbox-label" style="font-weight: bold; font-size: 14px;">📝 Web Form Submissions</div>
-                                        <div class="card-radio-sub" style="font-size: 11px; color: #666;">Website contact forms with ad Click IDs (GCLID, FBCLID, etc.)</div>
+                                        <div class="card-radio-label">Phone Calls Only</div>
+                                        <div class="card-radio-sub">Auditing CallRail phone transcripts exclusively</div>
                                     </div>
                                 </div>
-                                <div class="card-radio" onclick="toggleCardCheckbox(this)">
-                                    <input type="checkbox" name="lead_gen_method" value="chat">
+                                <div class="card-radio" onclick="selectCardRadio('lead_gen_method', 'form', this)">
+                                    <input type="radio" name="lead_gen_method" value="form">
                                     <div>
-                                        <div class="card-checkbox-label" style="font-weight: bold; font-size: 14px;">💬 Live Chat Widgets</div>
-                                        <div class="card-radio-sub" style="font-size: 11px; color: #666;">LiveChat, Intercom, Drift, Crisp, Zendesk, Tidio, HubSpot Chat, etc.</div>
-                                    </div>
-                                </div>
-                                <div class="card-radio" onclick="toggleCardCheckbox(this)">
-                                    <input type="checkbox" name="lead_gen_method" value="messaging">
-                                    <div>
-                                        <div class="card-checkbox-label" style="font-weight: bold; font-size: 14px;">📱 Direct Messaging Apps</div>
-                                        <div class="card-radio-sub" style="font-size: 11px; color: #666;">WhatsApp Business, Telegram Bot, Viber Business</div>
+                                        <div class="card-radio-label">Form Submissions Only</div>
+                                        <div class="card-radio-sub">Matching visitor website form GCLIDs only</div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         
                         <div class="form-group">
-                            <label for="qualification_criteria" style="display: inline-flex; align-items: center; gap: 5px; margin-top: 32px;">
+                            <label for="qualification_criteria" style="display: inline-flex; align-items: center; gap: 5px;">
                                 How do you qualify a lead?
                                 <span class="tooltip">💬
                                     <span class="tooltiptext">Define a lead stage that is &quot;good enough&quot;, and would be happy with paying for all day long from your Ads. This is the minimum standard the system will go for when optimizing your Ads.</span>
@@ -7804,19 +7701,14 @@ def add_client_page(request: Request):
                         
                         <div class="form-group">
                             <label for="source_of_truth">Where is your Single Source of Truth?</label>
-                            <small style="color: #666; font-size: 12px; display: block; margin-top: -4px; margin-bottom: 8px;">
-                                i.e. Where does your sales data exist that indicates which of your incoming leads close into sales or not?
-                            </small>
                             <select id="source_of_truth" onchange="toggleSOTFields()">
-                                <option value="transcripts" selected>Phone/Email Transcripts (AI-Graded Lead Qualification & Sales Tracking)</option>
-                                <option value="spreadsheets">Spreadsheets (Manual CSV / Spreadsheet Ingestion)</option>
                                 <option value="hubspot">HubSpot CRM</option>
-                                <option value="zoho">Zoho CRM</option>
                                 <option value="salesforce">Salesforce CRM</option>
-                                <option value="servicetitan">ServiceTitan CRM</option>
-                                <option value="housecallpro">Housecall Pro CRM</option>
-                                <option value="gohighlevel">GoHighLevel (GHL) CRM</option>
-                                <option value="quickbooks">QuickBooks Billing</option>
+                                <option value="zoho">Zoho CRM</option>
+                                <option value="servicetitan">ServiceTitan (Home Services)</option>
+                                <option value="housecallpro">Housecall Pro (Home Services)</option>
+                                <option value="gohighlevel">GoHighLevel / GHL (CRM & Funnels)</option>
+                                <option value="quickbooks">QuickBooks Accounting</option>
                                 <option value="xero">Xero Accounting</option>
                                 <option value="zoho_books">Zoho Books Accounting</option>
                                 <option value="netsuite">NetSuite ERP/Accounting</option>
@@ -7824,6 +7716,8 @@ def add_client_page(request: Request):
                                 <option value="freshbooks">FreshBooks Billing</option>
                                 <option value="google_sheets">Google Sheets (Live Sync)</option>
                                 <option value="zapier">Zapier Custom Integration</option>
+                                <option value="email">Monthly Sales Spreadsheet Ingestion via Email</option>
+                                <option value="ai_rating">AI Rating (Direct Call Audits & Dynamic Form-Email Monitoring)</option>
                             </select>
                         </div>
                         
@@ -12300,151 +12194,6 @@ async def receive_billing_webhook(request: Request, client_id: Optional[int] = N
 # SECURE NIGHTLY CRON SYNCRONIZATION TRIGGER
 # ---------------------------------------------------------
 @app.post("/tasks/daily-sync")
-
-@app.post("/webhooks/chat-session")
-async def save_chat_pre_session(request: Request):
-    try:
-        data = await request.json()
-        ref_id = data.get("ref_id") or data.get("session_id")
-        client_id = int(data.get("client_id", 1))
-        phone = data.get("phone", "")
-        email = data.get("email", "")
-        gclid = data.get("gclid", "")
-        fbclid = data.get("fbclid", "")
-        msclkid = data.get("msclkid", "")
-        li_fat_id = data.get("li_fat_id", "")
-        ttclid = data.get("ttclid", "")
-        twclid = data.get("twclid", "")
-        pin_clid = data.get("pin_clid", "")
-        scclid = data.get("scclid", "")
-        gptclid = data.get("gptclid", "")
-        rdt_cid = data.get("rdt_cid", "")
-        
-        if not ref_id:
-            ref_id = f"lg_{uuid.uuid4().hex[:8]}"
-            
-        conn = db_router.connect()
-        cursor = conn.cursor()
-        cursor.execute("""
-            INSERT INTO chat_pre_sessions 
-            (client_id, ref_id, phone, email, gclid, fbclid, msclkid, li_fat_id, ttclid, twclid, pin_clid, scclid, gptclid, rdt_cid)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(ref_id) DO UPDATE SET
-            phone=EXCLUDED.phone,
-            email=EXCLUDED.email,
-            gclid=EXCLUDED.gclid,
-            fbclid=EXCLUDED.fbclid,
-            msclkid=EXCLUDED.msclkid,
-            li_fat_id=EXCLUDED.li_fat_id
-        """, (client_id, ref_id, phone, email, gclid, fbclid, msclkid, li_fat_id, ttclid, twclid, pin_clid, scclid, gptclid, rdt_cid))
-        conn.commit()
-        conn.close()
-        return {"status": "success", "ref_id": ref_id, "client_id": client_id, "message": "Pre-chat click session saved successfully."}
-    except Exception as e:
-        return {"status": "error", "detail": str(e)}
-
-@app.post("/webhooks/livechat")
-@app.post("/webhooks/whatsapp")
-@app.post("/webhooks/telegram")
-@app.post("/webhooks/viber")
-async def receive_chat_transcript_webhook(request: Request, client_id: Optional[int] = None):
-    try:
-        path = request.url.path
-        source_type = "livechat"
-        if "whatsapp" in path:
-            source_type = "whatsapp"
-        elif "telegram" in path:
-            source_type = "telegram"
-        elif "viber" in path:
-            source_type = "viber"
-            
-        raw_body = await request.body()
-        body_str = raw_body.decode("utf-8", errors="ignore")
-        payload = {}
-        try:
-            payload = await request.json()
-        except Exception:
-            pass
-            
-        qp = dict(request.query_params)
-        resolved_client_id = client_id or int(qp.get("client_id", 1))
-        
-        customer_name = payload.get("name") or payload.get("customer_name") or payload.get("visitor_name") or "Chat Visitor"
-        customer_phone = payload.get("phone") or payload.get("customer_phone") or ""
-        customer_email = payload.get("email") or payload.get("customer_email") or ""
-        ref_id = payload.get("ref_id") or payload.get("session_id") or payload.get("chat_id") or ""
-        
-        matched_gclid, matched_fbclid, matched_msclkid, matched_li_fat_id = "", "", "", ""
-        if ref_id or customer_phone or customer_email:
-            conn = db_router.connect()
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT gclid, fbclid, msclkid, li_fat_id FROM chat_pre_sessions
-                WHERE (ref_id = ? AND ref_id != '') OR (phone = ? AND phone != '') OR (email = ? AND email != '')
-                ORDER BY id DESC LIMIT 1
-            """, (ref_id, customer_phone, customer_email))
-            match = cursor.fetchone()
-            conn.close()
-            if match:
-                matched_gclid, matched_fbclid, matched_msclkid, matched_li_fat_id = match or "", match or "", match or "", match or ""
-                
-        raw_transcript = payload.get("transcript") or payload.get("messages") or payload.get("conversation") or body_str
-        transcript_str = ""
-        if isinstance(raw_transcript, str):
-            transcript_str = raw_transcript
-        elif isinstance(raw_transcript, list):
-            lines = []
-            for item in raw_transcript:
-                if isinstance(item, dict):
-                    spk = item.get("speaker") or item.get("author") or item.get("role") or "Visitor"
-                    txt = item.get("text") or item.get("message") or ""
-                    if txt:
-                        lines.append(f"[{str(spk).title()}]: {txt}")
-                elif isinstance(item, str):
-                    lines.append(item)
-            transcript_str = "\n".join(lines)
-            
-        conn = db_router.connect()
-        cursor = conn.cursor()
-        cursor.execute("SELECT name, qualification_criteria FROM clients WHERE id = ?", (resolved_client_id,))
-        client_info = cursor.fetchone()
-        conn.close()
-        
-        qual_criteria = client_info if client_info else "ai_rules"
-        ai_qualified, ai_sale_closed, ai_value, ai_reason, model_name = "YES", "YES", 89.0, f"Simulated Audit: Detected qualification signals aligning with standard: 'Someone who books an appointment'.", "claude-3-5-haiku-20241022"
-        
-        session_id = f"chat_{uuid.uuid4().hex[:10]}"
-        created_at_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        conn = db_router.connect()
-        cursor = conn.cursor()
-        cursor.execute("""
-            INSERT INTO sessions 
-            (client_id, session_id, phone, email, name, gclid, fbclid, msclkid, li_fat_id, qualified, sale_closed, sale_value, qual_reason, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            resolved_client_id, session_id, customer_phone, customer_email, customer_name,
-            matched_gclid, matched_fbclid, matched_msclkid, matched_li_fat_id,
-            ai_qualified, ai_sale_closed, ai_value, ai_reason, created_at_now
-        ))
-        conn.commit()
-        conn.close()
-        
-        return {
-            "status": "success",
-            "client_id": resolved_client_id,
-            "source": source_type,
-            "message": f"{source_type.upper()} chat transcript successfully audited and logged.",
-            "ai_audit": {
-                "qualified": ai_qualified,
-                "sale_closed": ai_sale_closed,
-                "value": ai_value,
-                "reason": ai_reason
-            }
-        }
-    except Exception as e:
-        return {"status": "error", "detail": str(e)}
-
 async def trigger_daily_sync(request: Request):
     """
     Secure endpoint that lets Render's Cron Job trigger the nightly CallRail sync
