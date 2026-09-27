@@ -23,7 +23,10 @@ SOT_MAP = {
     "zapier": "Zapier Custom Webhook",
     "email": "Automated Email Sales Log Scanner",
     "manual": "Manual CSV / Spreadsheet Upload",
-    "ai_rating": "Claude AI Transcript Rating (All Calls)"
+    "ai_rating": "Claude AI Transcript Rating (All Calls)",
+    "transcripts": "Claude AI Transcript Rating (All Calls)",
+    "spreadsheets": "Manual CSV / Spreadsheet Upload",
+    "manual_csv": "Manual CSV / Spreadsheet Upload"
 }
 
 CRITERIA_MAP = {

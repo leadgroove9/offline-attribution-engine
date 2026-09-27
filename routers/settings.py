@@ -1,14 +1,16 @@
 import os
 import sqlite3
 import re
+import json
 from fastapi import APIRouter, Request, HTTPException, UploadFile, File, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.responses import HTMLResponse, RedirectResponse
 from typing import Optional
 from database.connection import db_router
 from services.auth_service import is_authenticated, get_user_role_and_client
+from services.identity_matcher import normalize_phone, extract_param_from_url, check_is_excluded_customer
 from models.schemas import ClientCreate, ClientUpdate, UserInvite, UserRoleUpdate, UserDelete, InviteRoleUpdate, InviteDelete, SaleAdjustment, ExcludedCustomer
-from config import CRITERIA_MAP, SOT_MAP, ADMIN_EMAILS
+from config import CRITERIA_MAP, SOT_MAP, ADMIN_EMAILS, ANTHROPIC_API_KEY
 
 router = APIRouter()
 
@@ -232,7 +234,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
         conn.commit()
         
         cursor.execute("""
-            SELECT subject, analyzed_at 
+            SELECT subject, datetime(analyzed_at, 'localtime') 
             FROM analyzed_emails 
             WHERE client_id = ? 
             ORDER BY analyzed_at DESC LIMIT 5
@@ -263,7 +265,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
         conn.commit()
         
         cursor.execute("""
-            SELECT contact_name, stage, amount, received_at 
+            SELECT contact_name, stage, amount, datetime(received_at, 'localtime') 
             FROM crm_webhook_logs 
             WHERE client_id = ? 
             ORDER BY received_at DESC LIMIT 5
@@ -295,7 +297,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
         conn.commit()
         
         cursor.execute("""
-            SELECT customer_name, invoice_number, amount, received_at 
+            SELECT customer_name, invoice_number, amount, datetime(received_at, 'localtime') 
             FROM billing_webhook_logs 
             WHERE client_id = ? 
             ORDER BY received_at DESC LIMIT 5
@@ -319,7 +321,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
         
         # Query configuration change history for active_client_id
         cursor.execute("""
-            SELECT feature_name, old_value, new_value, changed_at, changed_by
+            SELECT feature_name, old_value, new_value, datetime(changed_at, 'localtime'), changed_by
             FROM client_config_history
             WHERE client_id = ?
             ORDER BY changed_at DESC
@@ -4133,6 +4135,13 @@ def update_client_settings(request: Request, client: ClientUpdate):
 
 @router.get("/dashboard/add-client", response_class=HTMLResponse)
 def add_client_page(request: Request):
+    sot_options = ""
+    for code, label in SOT_MAP.items():
+        if code in ["transcripts", "spreadsheets", "manual_csv"]:
+            continue
+        is_sel = "selected" if code == "ai_rating" else ""
+        sot_options += f'<option value="{code}" {is_sel}>{label}</option>\n'
+
     email = is_authenticated(request)
     if not email:
         return RedirectResponse(url="/login", status_code=303)
@@ -4574,22 +4583,7 @@ def add_client_page(request: Request):
                                 i.e. Where does your sales data exist that indicates which of your incoming leads close into sales or not?
                             </small>
                             <select id="source_of_truth" onchange="toggleSOTFields()">
-                                <option value="transcripts" selected>Phone/Email Transcripts (AI-Graded Lead Qualification & Sales Tracking)</option>
-                                <option value="spreadsheets">Spreadsheets (Manual CSV / Spreadsheet Ingestion)</option>
-                                <option value="hubspot">HubSpot CRM</option>
-                                <option value="zoho">Zoho CRM</option>
-                                <option value="salesforce">Salesforce CRM</option>
-                                <option value="servicetitan">ServiceTitan CRM</option>
-                                <option value="housecallpro">Housecall Pro CRM</option>
-                                <option value="gohighlevel">GoHighLevel (GHL) CRM</option>
-                                <option value="quickbooks">QuickBooks Billing</option>
-                                <option value="xero">Xero Accounting</option>
-                                <option value="zoho_books">Zoho Books Accounting</option>
-                                <option value="netsuite">NetSuite ERP/Accounting</option>
-                                <option value="sage">Sage Accounting</option>
-                                <option value="freshbooks">FreshBooks Billing</option>
-                                <option value="google_sheets">Google Sheets (Live Sync)</option>
-                                <option value="zapier">Zapier Custom Integration</option>
+                                {sot_options}
                             </select>
                         </div>
                         
@@ -6139,7 +6133,12 @@ def add_client_page(request: Request):
                     if (zapierBox) zapierBox.style.display = 'none';
                     if (monthlyEmailBox) monthlyEmailBox.style.display = 'none';
                     
-                    if (['hubspot', 'salesforce', 'zoho', 'servicetitan', 'housecallpro', 'gohighlevel'].includes(sot)) {
+                    const crmPlatforms = ['hubspot', 'salesforce', 'zoho', 'servicetitan', 'housecallpro', 'gohighlevel', 'pipedrive'];
+                    const billingPlatforms = ['quickbooks', 'xero', 'zoho_books', 'netsuite', 'sage', 'freshbooks', 'google_sheets', 'zapier'];
+                    const transcriptPlatforms = ['ai_rating', 'transcripts'];
+                    const spreadsheetPlatforms = ['manual', 'manual_csv', 'spreadsheets'];
+                    
+                    if (crmPlatforms.includes(sot)) {
                         if (['hubspot', 'salesforce', 'zoho', 'gohighlevel', 'google_sheets', 'email', 'zapier'].includes(sot)) {
                             if (dealBox) dealBox.style.display = 'block';
                         }
@@ -6152,7 +6151,7 @@ def add_client_page(request: Request):
                         else if (sot === 'servicetitan' && servicetitanBox) servicetitanBox.style.display = 'block';
                         else if (sot === 'housecallpro' && housecallproBox) housecallproBox.style.display = 'block';
                         else if (sot === 'gohighlevel' && ghlBox) ghlBox.style.display = 'block';
-                    } else if (['quickbooks', 'xero', 'zoho_books', 'netsuite', 'sage', 'freshbooks', 'google_sheets', 'zapier'].includes(sot)) {
+                    } else if (billingPlatforms.includes(sot)) {
                         if (sot === 'quickbooks' && quickbooksBox) quickbooksBox.style.display = 'block';
                         else if (sot === 'xero' && xeroBox) xeroBox.style.display = 'block';
                         else if (sot === 'zoho_books' && zohoBooksBox) zohoBooksBox.style.display = 'block';
@@ -6164,11 +6163,18 @@ def add_client_page(request: Request):
                     } else if (sot === 'email') {
                         if (monthlyEmailBox) monthlyEmailBox.style.display = 'block';
                         if (dealBox) dealBox.style.display = 'block';
-                    } else if (sot === 'ai_rating') {
+                    } else if (spreadsheetPlatforms.includes(sot)) {
+                        if (monthlyEmailBox) monthlyEmailBox.style.display = 'block';
+                        if (dealBox) dealBox.style.display = 'block';
+                        const dLabel = document.getElementById('sot-deal-tags-label');
+                        const wLabel = document.getElementById('sot-won-deal-tags-label');
+                        if (dLabel) dLabel.innerText = 'Which tags/statuses on your spreadsheet signify a qualified conversion?';
+                        if (wLabel) wLabel.innerText = 'Which tags/statuses on your spreadsheet signify a won deal conversion?';
+                    } else if (transcriptPlatforms.includes(sot)) {
                         if (emailBox) emailBox.style.display = 'block';
                         if (voipBox) {
                             voipBox.style.display = 'block';
-                            toggleVoipInstructions();
+                            if (typeof toggleVoipInstructions === 'function') toggleVoipInstructions();
                         }
                     }
                 }
@@ -6530,7 +6536,7 @@ def backfill_historical_callrail_leads(client_id: int, qualification_criteria_co
         
         # Determine ratings
         if has_click_id:
-            if client:
+            if ANTHROPIC_API_KEY:
                 try:
                     # Live audit if key is active
                     ai_result = analyze_transcript_with_claude(lead["transcript"], qualification_definition_desc)
@@ -6569,7 +6575,7 @@ def backfill_historical_callrail_leads(client_id: int, qualification_criteria_co
             INSERT INTO sessions (
                 client_id, phone, name, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, gptclid, rdt_cid, source, qualified, sale_closed, value, reason, model_used, raw_data, created_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             client_id,
             normalized_phone,
@@ -6582,6 +6588,7 @@ def backfill_historical_callrail_leads(client_id: int, qualification_criteria_co
             None, # twclid
             None, # pin_clid
             None, # gptclid
+            None, # rdt_cid
             provider,
             qualified,
             sale_closed,
