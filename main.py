@@ -181,6 +181,7 @@ def find_dynamic_columns_custom(columns: list) -> tuple:
             continue
     return phone_col, email_col, value_col, name_col, company_col
 
+
 app = FastAPI(
     title="Offline Attribution Engine (Multi-Tenant Multi-Channel)",
     description="Multi-tenant agency platform for tracking offline leads/sales and AI audits across Google, Meta, LinkedIn, and Microsoft",
@@ -192,7 +193,7 @@ app = FastAPI(
 @app.get("/health")
 @app.get("/healthz")
 def root_health_check():
-    return {"status": "ok", "service": "LeadGroove Offline Attribution Engine", "version": "15.3.3"}
+    return {"status": "ok", "service": "LeadGroove Offline Attribution Engine", "version": "15.3.6"}
 
 
 # ---------------------------------------------------------
@@ -342,7 +343,7 @@ def init_db():
     """Initializes the database, creates necessary tables, and self-heals schemas."""
     conn = db_router.connect()
     cursor = conn.cursor()
-
+    
     # Create chat_pre_sessions Table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS chat_pre_sessions (
@@ -935,7 +936,8 @@ CRITERIA_MAP = {
 ADMIN_EMAILS = {"admin@leadgrove.net", "admin@leadgroove.net", "corey@test.com", "corey@leadgrove.net", "corey@leadgroove.net"}
 
 SOT_MAP = {
-    "email": "Monthly Sales Spreadsheet Ingestion via Email",
+    "transcripts": "Phone/Email Transcripts (AI-Graded Lead Qualification & Sales Tracking)",
+    "spreadsheets": "Spreadsheets (Manual CSV / Spreadsheet Ingestion)",
     "hubspot": "HubSpot CRM",
     "zoho": "Zoho CRM",
     "salesforce": "Salesforce CRM",
@@ -950,7 +952,9 @@ SOT_MAP = {
     "freshbooks": "FreshBooks Billing",
     "google_sheets": "Google Sheets (Live Sync)",
     "zapier": "Zapier Custom Integration",
-    "ai_rating": "AI Rating (Direct Call Audits & Dynamic Form-Email Monitoring)"
+    "ai_rating": "Phone/Email Transcripts (AI-Graded Lead Qualification & Sales Tracking)",
+    "email": "Phone/Email Transcripts (AI-Graded Lead Qualification & Sales Tracking)",
+    "manual": "Spreadsheets (Manual CSV / Spreadsheet Ingestion)"
 }
 
 
@@ -3615,9 +3619,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
             dropdown_options += f'<option value="{c_id}" {is_selected}>👤 {c_name} (Ads: {c_ads})</option>'
 
     # Handle dropdown lists with pre-selected options
-    lead_gen_both_checked = "checked" if client_data.get("lead_gen_method") in ["both", "all", ""] else ""
-    lead_gen_livechat_checked = "checked" if client_data.get("lead_gen_method") == "livechat" else ""
-    lead_gen_messaging_checked = "checked" if client_data.get("lead_gen_method") == "messaging" else ""
+    lead_gen_both_checked = "checked" if client_data.get("lead_gen_method") == "both" else ""
     lead_gen_phone_checked = "checked" if client_data.get("lead_gen_method") == "phone" else ""
     lead_gen_form_checked = "checked" if client_data.get("lead_gen_method") == "form" else ""
 
@@ -3854,55 +3856,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     </div>
                 </header>
 
-            
-                            <!-- Live Chat & Messaging App Setup Box -->
-                            <div id="settings-livechat-box" style="background-color: #fafafa; border: 1px dashed #00796b; border-radius: 8px; padding: 20px; margin-top: 20px;">
-                                <div class="form-group" style="margin-bottom: 15px;">
-                                    <label for="settings_livechat_provider" style="font-weight: bold; color: #00796b; font-size: 14px;">💬 Live Chat Program / Messaging App Integration</label>
-                                    <select id="settings_livechat_provider" onchange="toggleSettingsLiveChatInstructions()" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ced4da; font-size: 13px; font-weight: 600; cursor: pointer;">
-                                        <option value="livechat" selected>LiveChat (livechat.com)</option>
-                                        <option value="intercom">Intercom</option>
-                                        <option value="drift">Drift (Salesloft)</option>
-                                        <option value="crisp">Crisp Chat</option>
-                                        <option value="zendesk">Zendesk Chat / Messaging</option>
-                                        <option value="tidio">Tidio</option>
-                                        <option value="hubspot_chat">HubSpot Live Chat</option>
-                                        <option value="olark">Olark</option>
-                                        <option value="zoho_salesiq">Zoho SalesIQ</option>
-                                        <option value="helpscout">Help Scout (Beacon)</option>
-                                        <option value="whatsapp">WhatsApp Business API</option>
-                                        <option value="telegram">Telegram Bot API</option>
-                                        <option value="viber">Viber Business API</option>
-                                    </select>
-                                </div>
-
-                                <div style="background: white; padding: 12px; border-radius: 6px; border: 1px solid #b2dfdb; margin-bottom: 15px;">
-                                    <label style="font-size: 11px; font-weight: bold; color: #004d40; display: block; margin-bottom: 5px;">
-                                        1. Embed On-Page Tracking Script (Captures Click IDs & Injects Chat Variables)
-                                    </label>
-                                    <div style="display: flex; gap: 8px;">
-                                        <input type="text" class="webhook-input" id="settings-chat-script-tag" readonly value='<script src="https://leadgroove-55wt7.ondigitalocean.app/leadgroove-chat-tracker.js" data-client-id="{active_client_id}"></script>' style="font-family: monospace; font-size: 11px; background: #e0f2f1; padding: 8px; width: 100%;">
-                                        <button type="button" onclick="copyText('settings-chat-script-tag', 'settings-copy-script-btn')" id="settings-copy-script-btn" class="btn-copy" style="background: #00796b; color: white; border: none; border-radius: 4px; padding: 8px 12px; font-weight: bold; cursor: pointer; white-space: nowrap;">📋 Copy Script Tag</button>
-                                    </div>
-                                </div>
-
-                                <div id="settings-livechat-inst-card" style="background-color: #e0f2f1; border-left: 4px solid #00796b; padding: 14px; border-radius: 4px; color: #004d40; font-size: 12px; line-height: 1.5;">
-                                    💡 <strong id="settings-livechat-title">LiveChat (livechat.com) Webhook Setup Guide:</strong><br>
-                                    <span id="settings-livechat-desc">In your LiveChat Developer App Console, go to Webhooks and paste this endpoint URL for "Chat Ended" or "Transcript Ready" events:</span>
-                                    <div style="margin-top: 10px; background: white; padding: 10px; border-radius: 6px; border: 1px solid #b2dfdb;">
-                                        <label style="font-size: 11px; font-weight: bold; color: #004d40; display: block; margin-bottom: 5px;">
-                                            2. Live Chat / Messaging Webhook Endpoint URL:
-                                        </label>
-                                        <div style="display: flex; gap: 8px;">
-                                            <input type="text" class="webhook-input" id="settings-livechat-url" readonly value="" data-suffix="/webhooks/livechat?client_id={active_client_id}" style="font-family: monospace; font-size: 11px; background: #f5f5f5; padding: 8px; width: 100%;">
-                                            <button type="button" onclick="copyText('settings-livechat-url', 'settings-copy-livechat-btn')" id="settings-copy-livechat-btn" class="btn-copy" style="background: #00796b; color: white; border: none; border-radius: 4px; padding: 8px 12px; font-weight: bold; cursor: pointer; white-space: nowrap;">📋 Copy Webhook URL</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-
-<!-- Google Ads Conversion Menu Style Visual Sales Funnel -->
+            <!-- Google Ads Conversion Menu Style Visual Sales Funnel -->
             <div class="card" style="background: linear-gradient(135deg, #1a237e 0%, #283593 100%); color: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(26, 35, 126, 0.2); margin-bottom: 30px; position: relative; overflow: hidden;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.15); padding-bottom: 15px; flex-wrap: wrap; gap: 10px;">
                     <div>
@@ -4186,7 +4140,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                     <div class="card-radio {lead_gen_both_checked and 'selected'}" onclick="selectCardRadio('lead_gen_method', 'both', this)">
                                         <input type="radio" name="lead_gen_method" value="both" {lead_gen_both_checked}>
                                         <div>
-                                            <div class="card-radio-label">All Channels (Calls, Forms, Live Chat & Messaging)</div>
+                                            <div class="card-radio-label">Both Phone Calls & Web Forms</div>
                                         </div>
                                     </div>
                                     <div class="card-radio {lead_gen_phone_checked and 'selected'}" onclick="selectCardRadio('lead_gen_method', 'phone', this)">
@@ -4199,18 +4153,6 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                         <input type="radio" name="lead_gen_method" value="form" {lead_gen_form_checked}>
                                         <div>
                                             <div class="card-radio-label">Form Submissions Only</div>
-                                        </div>
-                                    </div>
-                                    <div class="card-radio {lead_gen_livechat_checked and 'selected'}" onclick="selectCardRadio('lead_gen_method', 'livechat', this)">
-                                        <input type="radio" name="lead_gen_method" value="livechat" {lead_gen_livechat_checked}>
-                                        <div>
-                                            <div class="card-radio-label">Live Chat Widgets</div>
-                                        </div>
-                                    </div>
-                                    <div class="card-radio {lead_gen_messaging_checked and 'selected'}" onclick="selectCardRadio('lead_gen_method', 'messaging', this)">
-                                        <input type="radio" name="lead_gen_method" value="messaging" {lead_gen_messaging_checked}>
-                                        <div>
-                                            <div class="card-radio-label">Messaging Apps (WhatsApp/Telegram/Viber)</div>
                                         </div>
                                     </div>
                                 </div>
@@ -4319,7 +4261,10 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             <div class="section-title">🔌 Single Source of Truth Settings</div>
                             
                             <div class="form-group">
-                                <label for="source_of_truth">Single Source of Truth Platform</label>
+                                <label for="source_of_truth" style="font-size: 14px; font-weight: bold; color: #1a237e;">Where is your Single Source of Truth?</label>
+                                <small style="color: #666; font-size: 12px; display: block; margin-top: -2px; margin-bottom: 8px; font-weight: 600; line-height: 1.4;">
+                                    i.e. Where does your sales data exist that indicates which of your incoming leads close into sales or not?
+                                </small>
                                 <select id="source_of_truth" onchange="toggleSOTFields()">
                                     {sot_options}
                                 </select>
@@ -7736,41 +7681,35 @@ def add_client_page(request: Request):
                         </div>
                         
                         <div class="form-group">
-                            <label>How do you generate your leads?</label>
-                            <div class="card-radio-group">
-                                <div class="card-radio selected" onclick="selectCardRadio('lead_gen_method', 'both', this)">
-                                    <input type="radio" name="lead_gen_method" value="both" checked>
+                            <label style="font-size: 15px; font-weight: bold; color: #1a237e;">Which lead generation channels do you want to track?</label>
+                            <small style="color: #666; font-size: 13px; display: block; margin-top: -2px; margin-bottom: 12px; font-weight: 600;">Select all that apply to you:</small>
+                            <div class="card-checkbox-group" style="display: flex; flex-direction: column; gap: 10px;">
+                                <div class="card-checkbox selected" onclick="toggleCardCheckbox(this)" style="display: flex; align-items: center; padding: 12px 15px; border: 2px solid #1a237e; border-radius: 8px; cursor: pointer; background-color: #e8eaf6; gap: 12px;">
+                                    <input type="checkbox" name="lead_gen_method" value="phone" checked style="width: 18px; height: 18px; cursor: pointer;">
                                     <div>
-                                        <div class="card-radio-label">All Channels (Calls, Forms, Live Chat & Messaging)</div>
-                                        <div class="card-radio-sub">Full multi-touch attribution across all channels (Recommended)</div>
+                                        <div class="card-checkbox-label" style="font-size: 14px; font-weight: bold; color: #1a237e;">📞 Phone Calls</div>
+                                        <div class="card-checkbox-sub" style="font-size: 12px; color: #555;">CallRail, CallTrackingMetrics, WhatConverts, or VoIP phone transcripts</div>
                                     </div>
                                 </div>
-                                <div class="card-radio" onclick="selectCardRadio('lead_gen_method', 'phone', this)">
-                                    <input type="radio" name="lead_gen_method" value="phone">
+                                <div class="card-checkbox selected" onclick="toggleCardCheckbox(this)" style="display: flex; align-items: center; padding: 12px 15px; border: 2px solid #1a237e; border-radius: 8px; cursor: pointer; background-color: #e8eaf6; gap: 12px;">
+                                    <input type="checkbox" name="lead_gen_method" value="form" checked style="width: 18px; height: 18px; cursor: pointer;">
                                     <div>
-                                        <div class="card-radio-label">Phone Calls Only</div>
-                                        <div class="card-radio-sub">Auditing CallRail, CTM, WhatConverts, & VoIP transcripts</div>
+                                        <div class="card-checkbox-label" style="font-size: 14px; font-weight: bold; color: #1a237e;">📝 Web Form Submissions</div>
+                                        <div class="card-checkbox-sub" style="font-size: 12px; color: #555;">Website lead forms capturing ad Click IDs</div>
                                     </div>
                                 </div>
-                                <div class="card-radio" onclick="selectCardRadio('lead_gen_method', 'form', this)">
-                                    <input type="radio" name="lead_gen_method" value="form">
+                                <div class="card-checkbox" onclick="toggleCardCheckbox(this)" style="display: flex; align-items: center; padding: 12px 15px; border: 2px solid #e0e0e0; border-radius: 8px; cursor: pointer; background-color: #ffffff; gap: 12px;">
+                                    <input type="checkbox" name="lead_gen_method" value="chat" style="width: 18px; height: 18px; cursor: pointer;">
                                     <div>
-                                        <div class="card-radio-label">Web Forms Only</div>
-                                        <div class="card-radio-sub">Matching visitor website form GCLIDs</div>
+                                        <div class="card-checkbox-label" style="font-size: 14px; font-weight: bold; color: #333;">💬 Live Chat Widgets</div>
+                                        <div class="card-checkbox-sub" style="font-size: 12px; color: #666;">LiveChat, Intercom, Drift, Crisp, Tidio, Zendesk, etc.</div>
                                     </div>
                                 </div>
-                                <div class="card-radio" onclick="selectCardRadio('lead_gen_method', 'livechat', this)">
-                                    <input type="radio" name="lead_gen_method" value="livechat">
+                                <div class="card-checkbox" onclick="toggleCardCheckbox(this)" style="display: flex; align-items: center; padding: 12px 15px; border: 2px solid #e0e0e0; border-radius: 8px; cursor: pointer; background-color: #ffffff; gap: 12px;">
+                                    <input type="checkbox" name="lead_gen_method" value="messaging" style="width: 18px; height: 18px; cursor: pointer;">
                                     <div>
-                                        <div class="card-radio-label">Live Chat Widgets Only</div>
-                                        <div class="card-radio-sub">Auditing LiveChat, Intercom, Drift, Crisp, Tidio, Zendesk</div>
-                                    </div>
-                                </div>
-                                <div class="card-radio" onclick="selectCardRadio('lead_gen_method', 'messaging', this)">
-                                    <input type="radio" name="lead_gen_method" value="messaging">
-                                    <div>
-                                        <div class="card-radio-label">Messaging Apps Only</div>
-                                        <div class="card-radio-sub">Auditing WhatsApp, Telegram, & Viber chat threads</div>
+                                        <div class="card-checkbox-label" style="font-size: 14px; font-weight: bold; color: #333;">📱 Direct Messaging Apps</div>
+                                        <div class="card-checkbox-sub" style="font-size: 12px; color: #666;">WhatsApp Business API, Telegram, Viber</div>
                                     </div>
                                 </div>
                             </div>
@@ -12301,10 +12240,8 @@ async def receive_billing_webhook(request: Request, client_id: Optional[int] = N
 # SECURE NIGHTLY CRON SYNCRONIZATION TRIGGER
 # ---------------------------------------------------------
 
-
-
 # ---------------------------------------------------------
-# CHAT & MESSAGING APP WEBHOOKS (LIVECHAT, WHATSAPP, TELEGRAM, VIBER)
+# PRE-CHAT CLICK ID & MESSAGING / LIVE CHAT WEBHOOK RECEIVERS
 # ---------------------------------------------------------
 
 @app.post("/webhooks/chat-session")
@@ -12320,10 +12257,9 @@ async def save_chat_pre_session(request: Request, client_id: Optional[int] = Non
                 payload = dict(form_data)
             except Exception:
                 payload = dict(request.query_params)
+                
         resolved_client_id = client_id or int(payload.get("client_id") or 1)
-        ref_id = payload.get("ref_id") or payload.get("ref") or f"lg_{uuid.uuid4().hex[:8]}"
-        phone = normalize_phone(payload.get("phone") or payload.get("customer_phone") or "")
-        email = (payload.get("email") or "").strip().lower()
+        ref_id = payload.get("ref_id") or f"lg_{uuid.uuid4().hex[:8]}"
         
         gclid = payload.get("gclid")
         fbclid = payload.get("fbclid")
@@ -12335,87 +12271,98 @@ async def save_chat_pre_session(request: Request, client_id: Optional[int] = Non
         scclid = payload.get("scclid")
         gptclid = payload.get("gptclid")
         rdt_cid = payload.get("rdt_cid")
-
+        phone = normalize_phone(payload.get("phone") or "")
+        email = (payload.get("email") or "").strip().lower()
+        
         conn = db_router.connect()
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT OR REPLACE INTO chat_pre_sessions (client_id, ref_id, phone, email, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, scclid, gptclid, rdt_cid)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (resolved_client_id, ref_id, phone or None, email or None, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, scclid, gptclid, rdt_cid))
+            INSERT OR REPLACE INTO chat_pre_sessions (
+                client_id, ref_id, phone, email, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, scclid, gptclid, rdt_cid
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (resolved_client_id, ref_id, phone, email, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, scclid, gptclid, rdt_cid))
         conn.commit()
         conn.close()
+        
         print(f"💬 [Pre-Chat Session Saved] Client #{resolved_client_id} | Ref: {ref_id} | GCLID: {gclid}")
         return {"status": "success", "ref_id": ref_id, "client_id": resolved_client_id, "message": "Pre-chat click session saved successfully."}
     except Exception as e:
-        print(f"❌ Pre-Chat Session Error: {e}")
-        return {"status": "error", "message": f"Failed to save pre-chat session: {e}"}
+        print(f"❌ Error saving pre-chat session: {e}")
+        return {"status": "error", "message": f"Failed to save pre-chat session: {str(e)}"}
 
 
-async def process_chat_webhook_event(payload: dict, client_id: Optional[int], provider_name: str):
+async def process_chat_webhook_event(payload: dict, client_id: Optional[int], source_name: str):
     try:
         resolved_client_id = client_id or 1
+        
         visitor_dict = {}
         for k in ['visitor', 'customer', 'sender', 'contact', 'user']:
             if isinstance(payload.get(k), dict):
                 visitor_dict = payload.get(k)
                 break
-        caller_name = (payload.get('name') or payload.get('customer_name') or payload.get('caller_name') or payload.get('from_name') or visitor_dict.get('name') or visitor_dict.get('full_name') or visitor_dict.get('first_name') or f'{provider_name.title()} Visitor')
-        raw_phone = payload.get('customer_phone_number') or payload.get('phone') or payload.get('from') or visitor_dict.get('phone') or visitor_dict.get('phone_number') or ""
-        email_clean = (payload.get('email') or visitor_dict.get('email') or "").strip().lower()
+                
+        caller_name = (
+            payload.get('name') or payload.get('customer_name') or payload.get('caller_name') or payload.get('from_name') or
+            visitor_dict.get('name') or visitor_dict.get('full_name') or visitor_dict.get('first_name') or 'Chat Visitor'
+        )
+        
+        raw_phone = (
+            payload.get('phone') or payload.get('customer_phone') or payload.get('from') or payload.get('caller_number') or
+            visitor_dict.get('phone') or visitor_dict.get('phone_number') or visitor_dict.get('mobile') or ""
+        )
         normalized_phone = normalize_phone(raw_phone)
         
-        custom_vars = payload.get('custom_variables') or payload.get('custom_attributes') or visitor_dict.get('custom_variables') or {}
-        gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, scclid, gptclid, rdt_cid = None, None, None, None, None, None, None, None, None, None
+        raw_email = (
+            payload.get('email') or payload.get('customer_email') or visitor_dict.get('email') or ""
+        ).strip().lower()
         
-        if isinstance(custom_vars, dict):
-            gclid = custom_vars.get('gclid')
-            fbclid = custom_vars.get('fbclid')
-            li_fat_id = custom_vars.get('li_fat_id')
-            msclkid = custom_vars.get('msclkid')
-        elif isinstance(custom_vars, list):
-            for cv in custom_vars:
-                if isinstance(cv, dict):
-                    nm = (cv.get('name') or cv.get('key') or "").lower()
-                    vl = cv.get('value') or cv.get('val')
-                    if nm == 'gclid': gclid = vl
-                    elif nm == 'fbclid': fbclid = vl
-                    elif nm == 'li_fat_id': li_fat_id = vl
-                    elif nm == 'msclkid': msclkid = vl
+        gclid = payload.get('gclid')
+        fbclid = payload.get('fbclid')
+        li_fat_id = payload.get('li_fat_id')
+        msclkid = payload.get('msclkid')
+        ttclid = payload.get('ttclid')
+        twclid = payload.get('twclid')
+        pin_clid = payload.get('pin_clid')
+        scclid = payload.get('scclid')
+        gptclid = payload.get('gptclid')
+        rdt_cid = payload.get('rdt_cid')
+        
+        ref_id = payload.get('ref_id')
+        raw_msg = str(payload.get('text') or payload.get('message') or payload.get('body') or '')
+        if not ref_id and raw_msg:
+            match = re.search(r'Ref:\s*(lg_[a-zA-Z0-9]+)', raw_msg, re.IGNORECASE)
+            if match:
+                ref_id = match.group(1)
+                
+        if ref_id or normalized_phone or raw_email:
+            conn = db_router.connect()
+            cursor = conn.cursor()
+            pre_row = None
+            if ref_id:
+                cursor.execute("SELECT gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, scclid, gptclid, rdt_cid FROM chat_pre_sessions WHERE client_id = ? AND ref_id = ?", (resolved_client_id, ref_id))
+                pre_row = cursor.fetchone()
+            if not pre_row and normalized_phone:
+                cursor.execute("SELECT gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, scclid, gptclid, rdt_cid FROM chat_pre_sessions WHERE client_id = ? AND phone = ? ORDER BY id DESC LIMIT 1", (resolved_client_id, normalized_phone))
+                pre_row = cursor.fetchone()
+            if not pre_row and raw_email:
+                cursor.execute("SELECT gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, scclid, gptclid, rdt_cid FROM chat_pre_sessions WHERE client_id = ? AND email = ? ORDER BY id DESC LIMIT 1", (resolved_client_id, raw_email))
+                pre_row = cursor.fetchone()
+            conn.close()
+            
+            if pre_row:
+                gclid = gclid or pre_row[0]
+                fbclid = fbclid or pre_row[1]
+                li_fat_id = li_fat_id or pre_row[2]
+                msclkid = msclkid or pre_row[3]
+                ttclid = ttclid or pre_row[4]
+                twclid = twclid or pre_row[5]
+                pin_clid = pin_clid or pre_row[6]
+                scclid = scclid or pre_row[7]
+                gptclid = gptclid or pre_row[8]
+                rdt_cid = rdt_cid or pre_row[9]
+                print(f"🎯 [Chat Pre-Session Matched] Found prior Click IDs for {caller_name} ({source_name}): GCLID={gclid}")
 
-        ref_id = None
-        raw_text_payload = json.dumps(payload)
-        ref_match = re.search(r"Ref:\s*(lg_[a-zA-Z0-9]+)", raw_text_payload, re.IGNORECASE)
-        if ref_match:
-            ref_id = ref_match.group(1)
-
-        conn = db_router.connect()
-        cursor = conn.cursor()
-        matched_pre = None
-        if ref_id:
-            cursor.execute("SELECT gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, scclid, gptclid, rdt_cid FROM chat_pre_sessions WHERE ref_id = ?", (ref_id,))
-            matched_pre = cursor.fetchone()
-        if not matched_pre and normalized_phone:
-            cursor.execute("SELECT gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, scclid, gptclid, rdt_cid FROM chat_pre_sessions WHERE phone = ? ORDER BY id DESC LIMIT 1", (normalized_phone,))
-            matched_pre = cursor.fetchone()
-        if not matched_pre and email_clean:
-            cursor.execute("SELECT gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, scclid, gptclid, rdt_cid FROM chat_pre_sessions WHERE email = ? ORDER BY id DESC LIMIT 1", (email_clean,))
-            matched_pre = cursor.fetchone()
-        conn.close()
-
-        if matched_pre:
-            gclid = gclid or matched_pre[0]
-            fbclid = fbclid or matched_pre[1]
-            li_fat_id = li_fat_id or matched_pre[2]
-            msclkid = msclkid or matched_pre[3]
-            ttclid = ttclid or matched_pre[4]
-            twclid = twclid or matched_pre[5]
-            pin_clid = pin_clid or matched_pre[6]
-            scclid = scclid or matched_pre[7]
-            gptclid = gptclid or matched_pre[8]
-            rdt_cid = rdt_cid or matched_pre[9]
-            print(f"🎯 [Chat Pre-Session Matched] Found prior Click IDs for {caller_name} ({provider_name}): GCLID={gclid}")
-
-        raw_transcript = payload.get('transcript') or payload.get('messages') or payload.get('text') or payload.get('message') or ""
+        raw_transcript = payload.get('transcript') or payload.get('messages') or payload.get('conversation') or raw_msg
         transcript_str = ""
         if isinstance(raw_transcript, str):
             transcript_str = raw_transcript
@@ -12429,47 +12376,48 @@ async def process_chat_webhook_event(payload: dict, client_id: Optional[int], pr
                 elif isinstance(item, str):
                     lines.append(item)
             transcript_str = "\n".join(lines)
-
+            
         ai_qualified, ai_sale_closed, ai_value, ai_reason, model_name = "NO", "NO", 0.0, "No transcript provided.", "None"
         qualification_definition_desc = "Someone who expresses real intent to buy or schedule a service."
-
+        
         conn = db_router.connect()
         cursor = conn.cursor()
         cursor.execute("SELECT name, qualification_criteria FROM clients WHERE id = ?", (resolved_client_id,))
         client_info = cursor.fetchone()
         conn.close()
-
+        
         if client_info and client_info[1]:
             qualification_definition_desc = CRITERIA_MAP.get(client_info[1], qualification_definition_desc)
-
+            
         if transcript_str.strip():
-            print(f"🧠 [Client #{resolved_client_id}] Auditing {provider_name.upper()} chat transcript for {caller_name}...")
-            ai_res = analyze_transcript_with_claude(transcript_str, qualification_definition_desc)
-            ai_qualified = ai_res.get("qualified", "NO")
-            ai_sale_closed = ai_res.get("sale_closed", "NO")
-            ai_value = float(ai_res.get("value", 0.0))
-            ai_reason = ai_res.get("reason", "No reason parsed.")
+            print(f"🧠 [Client #{resolved_client_id}] Auditing {source_name.upper()} chat transcript for {caller_name}...")
+            ai_result = analyze_transcript_with_claude(transcript_str, qualification_definition_desc)
+            ai_qualified = ai_result.get("qualified", "NO")
+            ai_sale_closed = ai_result.get("sale_closed", "NO")
+            ai_value = float(ai_result.get("value", 0.0))
+            ai_reason = ai_result.get("reason", "No reason parsed.")
             model_name = "claude-haiku-4-5-20251001"
 
         conn = db_router.connect()
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO sessions (
-                client_id, phone, email, name, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, scclid, gptclid, rdt_cid, source, qualified, sale_closed, value, reason, model_used, raw_data
+                client_id, phone, email, name, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, scclid, gptclid, rdt_cid,
+                source, qualified, sale_closed, value, reason, model_used, raw_data
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            resolved_client_id, normalized_phone or "0000000000", email_clean or None, caller_name,
+            resolved_client_id, normalized_phone or "+15550000000", raw_email, caller_name,
             gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, scclid, gptclid, rdt_cid,
-            provider_name, ai_qualified, ai_sale_closed, ai_value, ai_reason, model_name, str(payload)
+            source_name.lower(), ai_qualified, ai_sale_closed, ai_value, ai_reason, model_name, str(payload)
         ))
         conn.commit()
         conn.close()
-
+        
         return {
             "status": "success",
             "client_id": resolved_client_id,
-            "source": provider_name,
-            "message": f"{provider_name.upper()} chat transcript successfully audited and logged.",
+            "source": source_name.lower(),
+            "message": f"{source_name.upper()} chat transcript successfully audited and logged.",
             "ai_audit": {
                 "qualified": ai_qualified,
                 "sale_closed": ai_sale_closed,
@@ -12478,44 +12426,59 @@ async def process_chat_webhook_event(payload: dict, client_id: Optional[int], pr
             }
         }
     except Exception as e:
-        print(f"❌ Chat Webhook Exception ({provider_name}): {e}")
+        print(f"❌ Error processing {source_name} chat webhook: {e}")
         raise HTTPException(status_code=400, detail=str(e))
+
 
 @app.post("/webhooks/whatsapp")
 @app.get("/webhooks/whatsapp")
 async def receive_whatsapp_webhook(request: Request, client_id: Optional[int] = None):
-    if request.method == "GET":
-        mode = request.query_params.get("hub.mode")
-        challenge = request.query_params.get("hub.challenge")
-        if mode == "subscribe" and challenge:
-            return Response(content=challenge, media_type="text/plain")
-        return {"status": "active", "provider": "whatsapp"}
     try:
+        if request.method == "GET":
+            mode = request.query_params.get("hub.mode")
+            token = request.query_params.get("hub.verify_token")
+            challenge = request.query_params.get("hub.challenge")
+            if mode == "subscribe" and challenge:
+                return Response(content=challenge, media_type="text/plain")
+            return {"status": "ok", "message": "WhatsApp webhook endpoint active."}
+            
         payload = await request.json()
-    except Exception:
-        payload = dict(await request.form())
-    return await process_chat_webhook_event(payload, client_id, "whatsapp")
+        return await process_chat_webhook_event(payload, client_id, "whatsapp")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @app.post("/webhooks/telegram")
 @app.get("/webhooks/telegram")
 async def receive_telegram_webhook(request: Request, client_id: Optional[int] = None):
-    try: payload = await request.json()
-    except Exception: payload = dict(await request.form())
-    return await process_chat_webhook_event(payload, client_id, "telegram")
+    try:
+        if request.method == "GET":
+            return {"status": "ok", "message": "Telegram webhook endpoint active."}
+        payload = await request.json()
+        return await process_chat_webhook_event(payload, client_id, "telegram")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @app.post("/webhooks/viber")
 @app.get("/webhooks/viber")
 async def receive_viber_webhook(request: Request, client_id: Optional[int] = None):
-    try: payload = await request.json()
-    except Exception: payload = dict(await request.form())
-    return await process_chat_webhook_event(payload, client_id, "viber")
+    try:
+        if request.method == "GET":
+            return {"status": "ok", "message": "Viber webhook endpoint active."}
+        payload = await request.json()
+        return await process_chat_webhook_event(payload, client_id, "viber")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @app.post("/webhooks/livechat")
 @app.get("/webhooks/livechat")
 async def receive_livechat_webhook(request: Request, client_id: Optional[int] = None):
-    try: payload = await request.json()
-    except Exception: payload = dict(await request.form())
-    return await process_chat_webhook_event(payload, client_id, "livechat")
+    try:
+        if request.method == "GET":
+            return {"status": "ok", "message": "LiveChat universal webhook endpoint active."}
+        payload = await request.json()
+        return await process_chat_webhook_event(payload, client_id, "livechat")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.post("/tasks/daily-sync")
