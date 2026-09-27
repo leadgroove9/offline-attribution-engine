@@ -187,13 +187,6 @@ app = FastAPI(
     version="15.2.0"
 )
 
-# Top-level direct health check endpoints
-@app.get("/")
-@app.get("/health")
-@app.get("/healthz")
-def root_health_check():
-    return {"status": "ok", "service": "LeadGroove Offline Attribution Engine", "version": "15.3.6"}
-
 # ---------------------------------------------------------
 # DATABASE CONFIGURATION (SQLite)
 # ---------------------------------------------------------
@@ -341,7 +334,8 @@ def init_db():
     """Initializes the database, creates necessary tables, and self-heals schemas."""
     conn = db_router.connect()
     cursor = conn.cursor()
-    # 6. Create Users Table
+
+    # Create chat_pre_sessions Table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS chat_pre_sessions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -363,6 +357,7 @@ def init_db():
         )
     """)
 
+    # 6. Create Users Table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -935,8 +930,8 @@ SOT_MAP = {
     "transcripts": "Phone/Email Transcripts (AI-Graded Lead Qualification & Sales Tracking)",
     "spreadsheets": "Spreadsheets (Manual CSV / Spreadsheet Ingestion)",
     "hubspot": "HubSpot CRM",
-    "salesforce": "Salesforce CRM",
     "zoho": "Zoho CRM",
+    "salesforce": "Salesforce CRM",
     "servicetitan": "ServiceTitan CRM",
     "housecallpro": "Housecall Pro CRM",
     "gohighlevel": "GoHighLevel (GHL) CRM",
@@ -1027,6 +1022,14 @@ class ClientCreate(BaseModel):
 # ENDPOINTS
 # ---------------------------------------------------------
 
+
+
+# Top-level direct health check endpoints
+@app.get("/")
+@app.get("/health")
+@app.get("/healthz")
+def root_health_check():
+    return {"status": "ok", "service": "LeadGroove Offline Attribution Engine", "version": "15.3.7"}
 
 @app.get("/register", response_class=HTMLResponse)
 def get_register(request: Request, error: Optional[str] = None, invite_token: Optional[str] = None):
@@ -3612,9 +3615,21 @@ def view_settings(request: Request, client_id: Optional[int] = None):
             dropdown_options += f'<option value="{c_id}" {is_selected}>👤 {c_name} (Ads: {c_ads})</option>'
 
     # Handle dropdown lists with pre-selected options
-    lead_gen_both_checked = "checked" if client_data.get("lead_gen_method") == "both" else ""
-    lead_gen_phone_checked = "checked" if client_data.get("lead_gen_method") == "phone" else ""
-    lead_gen_form_checked = "checked" if client_data.get("lead_gen_method") == "form" else ""
+    lg_method_val = str(client_data.get("lead_gen_method", "both") or "both").lower()
+    lg_phone_checked = "checked" if ("phone" in lg_method_val or lg_method_val == "both" or "all" in lg_method_val) else ""
+    lg_form_checked = "checked" if ("form" in lg_method_val or lg_method_val == "both" or "all" in lg_method_val) else ""
+    lg_chat_checked = "checked" if ("chat" in lg_method_val or "all" in lg_method_val) else ""
+    lg_messaging_checked = "checked" if ("messaging" in lg_method_val or "all" in lg_method_val) else ""
+
+    lg_phone_selected = "selected" if lg_phone_checked else ""
+    lg_form_selected = "selected" if lg_form_checked else ""
+    lg_chat_selected = "selected" if lg_chat_checked else ""
+    lg_messaging_selected = "selected" if lg_messaging_checked else ""
+
+    lg_phone_color = "#1a237e" if lg_phone_checked else "#333"
+    lg_form_color = "#1a237e" if lg_form_checked else "#333"
+    lg_chat_color = "#1a237e" if lg_chat_checked else "#333"
+    lg_messaging_color = "#1a237e" if lg_messaging_checked else "#333"
 
     lead_count_all_checked = "checked" if client_data.get("lead_count_rule") == "all" else ""
     lead_count_max_checked = "checked" if client_data.get("lead_count_rule") == "maximum_one" else ""
@@ -4128,24 +4143,35 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             <div class="section-title">🧠 Lead Generation & AI Auditing</div>
                             
                             <div class="form-group">
-                                <label>How do you generate your leads?</label>
-                                <div class="card-radio-group">
-                                    <div class="card-radio {lead_gen_both_checked and 'selected'}" onclick="selectCardRadio('lead_gen_method', 'both', this)">
-                                        <input type="radio" name="lead_gen_method" value="both" {lead_gen_both_checked}>
+                                <label style="font-weight: 600; font-size: 13px; color: #495057;">Which lead generation channels do you want to track?</label>
+                                <small style="color: #666; font-size: 12px; display: block; margin-top: -4px; margin-bottom: 10px;">Select all that apply to you:</small>
+                                <div class="card-checkbox-group" style="display: flex; flex-direction: column; gap: 10px;">
+                                    <div class="card-checkbox {lg_phone_selected}" onclick="toggleCardCheckbox(this)" style="display: flex; align-items: center; padding: 12px 15px; border: 2px solid {lg_phone_checked and '#1a237e' or '#e0e0e0'}; border-radius: 8px; cursor: pointer; transition: all 0.2s; gap: 12px; background-color: {lg_phone_checked and '#e8eaf6' or '#ffffff'};">
+                                        <input type="checkbox" name="lead_gen_method_cb" value="phone" {lg_phone_checked} style="width: 18px; height: 18px; cursor: pointer;">
                                         <div>
-                                            <div class="card-radio-label">Both Phone Calls & Web Forms</div>
+                                            <div class="card-checkbox-label" style="font-size: 14px; font-weight: bold; color: {lg_phone_color};">📞 Phone Calls</div>
+                                            <div class="card-checkbox-sub" style="font-size: 12px; color: #666;">CallRail, CallTrackingMetrics, WhatConverts, VoIP</div>
                                         </div>
                                     </div>
-                                    <div class="card-radio {lead_gen_phone_checked and 'selected'}" onclick="selectCardRadio('lead_gen_method', 'phone', this)">
-                                        <input type="radio" name="lead_gen_method" value="phone" {lead_gen_phone_checked}>
+                                    <div class="card-checkbox {lg_form_selected}" onclick="toggleCardCheckbox(this)" style="display: flex; align-items: center; padding: 12px 15px; border: 2px solid {lg_form_checked and '#1a237e' or '#e0e0e0'}; border-radius: 8px; cursor: pointer; transition: all 0.2s; gap: 12px; background-color: {lg_form_checked and '#e8eaf6' or '#ffffff'};">
+                                        <input type="checkbox" name="lead_gen_method_cb" value="form" {lg_form_checked} style="width: 18px; height: 18px; cursor: pointer;">
                                         <div>
-                                            <div class="card-radio-label">Phone Calls Only</div>
+                                            <div class="card-checkbox-label" style="font-size: 14px; font-weight: bold; color: {lg_form_color};">📝 Web Form Submissions</div>
+                                            <div class="card-checkbox-sub" style="font-size: 12px; color: #666;">Website contact forms with ad Click IDs</div>
                                         </div>
                                     </div>
-                                    <div class="card-radio {lead_gen_form_checked and 'selected'}" onclick="selectCardRadio('lead_gen_method', 'form', this)">
-                                        <input type="radio" name="lead_gen_method" value="form" {lead_gen_form_checked}>
+                                    <div class="card-checkbox {lg_chat_selected}" onclick="toggleCardCheckbox(this)" style="display: flex; align-items: center; padding: 12px 15px; border: 2px solid {lg_chat_checked and '#1a237e' or '#e0e0e0'}; border-radius: 8px; cursor: pointer; transition: all 0.2s; gap: 12px; background-color: {lg_chat_checked and '#e8eaf6' or '#ffffff'};">
+                                        <input type="checkbox" name="lead_gen_method_cb" value="chat" {lg_chat_checked} style="width: 18px; height: 18px; cursor: pointer;">
                                         <div>
-                                            <div class="card-radio-label">Form Submissions Only</div>
+                                            <div class="card-checkbox-label" style="font-size: 14px; font-weight: bold; color: {lg_chat_color};">💬 Live Chat Widgets</div>
+                                            <div class="card-checkbox-sub" style="font-size: 12px; color: #666;">LiveChat, Intercom, Drift, Crisp, Zendesk, Tidio, etc.</div>
+                                        </div>
+                                    </div>
+                                    <div class="card-checkbox {lg_messaging_selected}" onclick="toggleCardCheckbox(this)" style="display: flex; align-items: center; padding: 12px 15px; border: 2px solid {lg_messaging_checked and '#1a237e' or '#e0e0e0'}; border-radius: 8px; cursor: pointer; transition: all 0.2s; gap: 12px; background-color: {lg_messaging_checked and '#e8eaf6' or '#ffffff'};">
+                                        <input type="checkbox" name="lead_gen_method_cb" value="messaging" {lg_messaging_checked} style="width: 18px; height: 18px; cursor: pointer;">
+                                        <div>
+                                            <div class="card-checkbox-label" style="font-size: 14px; font-weight: bold; color: {lg_messaging_color};">📱 Messaging Apps</div>
+                                            <div class="card-checkbox-sub" style="font-size: 12px; color: #666;">WhatsApp Business, Telegram, Viber</div>
                                         </div>
                                     </div>
                                 </div>
@@ -5610,6 +5636,26 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     }}
                 }}
                 
+                
+                function toggleCardCheckbox(container) {{
+                    const cb = container.querySelector('input[type="checkbox"]');
+                    if (window.event && window.event.target !== cb) {{
+                        cb.checked = !cb.checked;
+                    }}
+                    const labelEl = container.querySelector('.card-checkbox-label');
+                    if (cb.checked) {{
+                        container.classList.add('selected');
+                        container.style.borderColor = '#1a237e';
+                        container.style.backgroundColor = '#e8eaf6';
+                        if (labelEl) labelEl.style.color = '#1a237e';
+                    }} else {{
+                        container.classList.remove('selected');
+                        container.style.borderColor = '#e0e0e0';
+                        container.style.backgroundColor = '#ffffff';
+                        if (labelEl) labelEl.style.color = '#333';
+                    }}
+                }}
+
                 function selectCardRadio(name, value, element) {{
                     element.parentNode.querySelectorAll('.card-radio').forEach(card => {{
                         card.classList.remove('selected');
@@ -6612,7 +6658,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         reddit_ads_id: document.getElementById('reddit_ads_id').value.trim(),
                         chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
                         reddit_ads_id: document.getElementById('reddit_ads_id').value.trim(),
-                        lead_gen_method: document.querySelector('input[name="lead_gen_method"]:checked').value,
+                        lead_gen_method: Array.from(document.querySelectorAll('input[name="lead_gen_method_cb"]:checked')).map(cb => cb.value).join(',') || 'phone,form',
                         qualification_criteria: document.getElementById('qualification_criteria').value,
                         source_of_truth: document.getElementById('source_of_truth').value,
                         email_provider: document.getElementById('email_provider').value,
@@ -7674,35 +7720,35 @@ def add_client_page(request: Request):
                         </div>
                         
                         <div class="form-group">
-                            <label style="font-size: 15px; font-weight: bold; color: #1a237e; margin-bottom: 4px; display: block;">Which lead generation channels do you want to track?</label>
-                            <small style="color: #666; font-size: 13px; display: block; margin-bottom: 12px; font-weight: 600;">Select all that apply to you:</small>
-                            <div class="card-radio-group">
-                                <div class="card-radio selected" onclick="toggleCardCheckbox(this)">
-                                    <input type="checkbox" name="lead_gen_method" value="phone" checked style="accent-color: #1a237e; transform: scale(1.3); cursor: pointer;">
+                            <label style="font-weight: 600; font-size: 13px; color: #495057;">Which lead generation channels do you want to track?</label>
+                            <small style="color: #666; font-size: 12px; display: block; margin-top: -4px; margin-bottom: 10px;">Select all that apply to you:</small>
+                            <div class="card-checkbox-group" style="display: flex; flex-direction: column; gap: 10px;">
+                                <div class="card-checkbox selected" onclick="toggleCardCheckbox(this)" style="display: flex; align-items: center; padding: 12px 15px; border: 2px solid #1a237e; border-radius: 8px; cursor: pointer; transition: all 0.2s; gap: 12px; background-color: #e8eaf6;">
+                                    <input type="checkbox" name="lead_gen_method_cb" value="phone" checked style="width: 18px; height: 18px; cursor: pointer;">
                                     <div>
-                                        <div class="card-checkbox-label" style="font-weight: bold; color: #1a237e;">📞 Phone Calls</div>
-                                        <div class="card-radio-sub">Track CallRail, CallTrackingMetrics, WhatConverts, or VoIP phone calls</div>
+                                        <div class="card-checkbox-label" style="font-size: 14px; font-weight: bold; color: #1a237e;">📞 Phone Calls</div>
+                                        <div class="card-checkbox-sub" style="font-size: 12px; color: #666;">CallRail, CallTrackingMetrics, WhatConverts, VoIP</div>
                                     </div>
                                 </div>
-                                <div class="card-radio selected" onclick="toggleCardCheckbox(this)">
-                                    <input type="checkbox" name="lead_gen_method" value="form" checked style="accent-color: #1a237e; transform: scale(1.3); cursor: pointer;">
+                                <div class="card-checkbox selected" onclick="toggleCardCheckbox(this)" style="display: flex; align-items: center; padding: 12px 15px; border: 2px solid #1a237e; border-radius: 8px; cursor: pointer; transition: all 0.2s; gap: 12px; background-color: #e8eaf6;">
+                                    <input type="checkbox" name="lead_gen_method_cb" value="form" checked style="width: 18px; height: 18px; cursor: pointer;">
                                     <div>
-                                        <div class="card-checkbox-label" style="font-weight: bold; color: #1a237e;">📝 Web Form Submissions</div>
-                                        <div class="card-radio-sub">Track website contact form submissions and ad Click IDs</div>
+                                        <div class="card-checkbox-label" style="font-size: 14px; font-weight: bold; color: #1a237e;">📝 Web Form Submissions</div>
+                                        <div class="card-checkbox-sub" style="font-size: 12px; color: #666;">Website contact forms with ad Click IDs</div>
                                     </div>
                                 </div>
-                                <div class="card-radio" onclick="toggleCardCheckbox(this)">
-                                    <input type="checkbox" name="lead_gen_method" value="chat" style="accent-color: #1a237e; transform: scale(1.3); cursor: pointer;">
+                                <div class="card-checkbox" onclick="toggleCardCheckbox(this)" style="display: flex; align-items: center; padding: 12px 15px; border: 2px solid #e0e0e0; border-radius: 8px; cursor: pointer; transition: all 0.2s; gap: 12px; background-color: #ffffff;">
+                                    <input type="checkbox" name="lead_gen_method_cb" value="chat" style="width: 18px; height: 18px; cursor: pointer;">
                                     <div>
-                                        <div class="card-checkbox-label" style="font-weight: bold; color: #333;">💬 Live Chat Widgets</div>
-                                        <div class="card-radio-sub">Track LiveChat, Intercom, Drift, Crisp, Zendesk, Tidio, or HubSpot Chat</div>
+                                        <div class="card-checkbox-label" style="font-size: 14px; font-weight: bold; color: #333;">💬 Live Chat Widgets</div>
+                                        <div class="card-checkbox-sub" style="font-size: 12px; color: #666;">LiveChat, Intercom, Drift, Crisp, Zendesk, Tidio, etc.</div>
                                     </div>
                                 </div>
-                                <div class="card-radio" onclick="toggleCardCheckbox(this)">
-                                    <input type="checkbox" name="lead_gen_method" value="messaging" style="accent-color: #1a237e; transform: scale(1.3); cursor: pointer;">
+                                <div class="card-checkbox" onclick="toggleCardCheckbox(this)" style="display: flex; align-items: center; padding: 12px 15px; border: 2px solid #e0e0e0; border-radius: 8px; cursor: pointer; transition: all 0.2s; gap: 12px; background-color: #ffffff;">
+                                    <input type="checkbox" name="lead_gen_method_cb" value="messaging" style="width: 18px; height: 18px; cursor: pointer;">
                                     <div>
-                                        <div class="card-checkbox-label" style="font-weight: bold; color: #333;">📱 Direct Messaging Apps</div>
-                                        <div class="card-radio-sub">Track WhatsApp Business, Telegram, or Viber chat conversations</div>
+                                        <div class="card-checkbox-label" style="font-size: 14px; font-weight: bold; color: #333;">📱 Messaging Apps</div>
+                                        <div class="card-checkbox-sub" style="font-size: 12px; color: #666;">WhatsApp Business, Telegram, Viber</div>
                                     </div>
                                 </div>
                             </div>
@@ -8903,6 +8949,26 @@ def add_client_page(request: Request):
                     document.body.removeChild(link);
                 }
 
+                
+                function toggleCardCheckbox(container) {{
+                    const cb = container.querySelector('input[type="checkbox"]');
+                    if (window.event && window.event.target !== cb) {{
+                        cb.checked = !cb.checked;
+                    }}
+                    const labelEl = container.querySelector('.card-checkbox-label');
+                    if (cb.checked) {{
+                        container.classList.add('selected');
+                        container.style.borderColor = '#1a237e';
+                        container.style.backgroundColor = '#e8eaf6';
+                        if (labelEl) labelEl.style.color = '#1a237e';
+                    }} else {{
+                        container.classList.remove('selected');
+                        container.style.borderColor = '#e0e0e0';
+                        container.style.backgroundColor = '#ffffff';
+                        if (labelEl) labelEl.style.color = '#333';
+                    }}
+                }}
+
                 function selectCardRadio(name, value, element) {
                     element.parentNode.querySelectorAll('.card-radio').forEach(card => {
                         card.classList.remove('selected');
@@ -9394,7 +9460,7 @@ def add_client_page(request: Request):
                         snapchat_ads_id: document.getElementById('snapchat_ads_id').value.trim(),
                         chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
                         reddit_ads_id: document.getElementById('reddit_ads_id').value.trim(),
-                        lead_gen_method: document.querySelector('input[name="lead_gen_method"]:checked').value,
+                        lead_gen_method: Array.from(document.querySelectorAll('input[name="lead_gen_method_cb"]:checked')).map(cb => cb.value).join(',') || 'phone,form',
                         qualification_criteria: document.getElementById('qualification_criteria').value,
                         source_of_truth: document.getElementById('source_of_truth').value,
                         email_provider: document.getElementById('email_provider').value,
@@ -12232,138 +12298,77 @@ async def receive_billing_webhook(request: Request, client_id: Optional[int] = N
         print(f"❌ Billing Webhook Error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
+# ---------------------------------------------------------
+# SECURE NIGHTLY CRON SYNCRONIZATION TRIGGER
+# ---------------------------------------------------------
 
 # ---------------------------------------------------------
-# CHAT & MESSAGING APP WEBHOOK HANDLERS (WhatsApp, Telegram, Viber, LiveChat)
+# LIVE CHAT & MESSAGING APP WEBHOOK ENDPOINTS
 # ---------------------------------------------------------
+
 @app.post("/webhooks/chat-session")
-@app.get("/webhooks/chat-session")
-async def save_chat_pre_session(request: Request, client_id: Optional[int] = None):
+async def receive_pre_chat_session(request: Request, client_id: Optional[int] = None):
     try:
-        content_type = request.headers.get("content-type", "")
-        if "application/json" in content_type:
-            payload = await request.json()
-        else:
-            try:
-                form_data = await request.form()
-                payload = dict(form_data)
-            except Exception:
-                payload = dict(request.query_params)
-        if not payload:
-            payload = dict(request.query_params)
-            
-        resolved_client_id = client_id or int(payload.get("client_id") or 1)
-        ref_id = payload.get("ref_id") or payload.get("session_id") or f"lg_{uuid.uuid4().hex[:8]}"
-        
-        phone = normalize_phone(payload.get("phone") or payload.get("caller_phone") or "")
-        email = (payload.get("email") or "").strip().lower()
-        
-        gclid = payload.get("gclid")
-        fbclid = payload.get("fbclid")
-        li_fat_id = payload.get("li_fat_id")
-        msclkid = payload.get("msclkid")
-        ttclid = payload.get("ttclid")
-        twclid = payload.get("twclid")
-        pin_clid = payload.get("pin_clid")
-        scclid = payload.get("scclid")
-        gptclid = payload.get("gptclid")
-        rdt_cid = payload.get("rdt_cid")
+        payload = await request.json() if "application/json" in request.headers.get("content-type", "") else dict(await request.form())
+        if not isinstance(payload, dict): payload = {}
+        resolved_client_id = client_id or payload.get("client_id") or 1
+        ref_id = payload.get("ref_id") or f"lg_{uuid.uuid4().hex[:8]}"
+        gclid = payload.get("gclid") or payload.get("google_click_id")
+        fbclid = payload.get("fbclid") or payload.get("facebook_click_id")
+        li_fat_id = payload.get("li_fat_id") or payload.get("linkedin_click_id")
+        msclkid = payload.get("msclkid") or payload.get("microsoft_click_id")
         
         conn = db_router.connect()
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO chat_pre_sessions (client_id, ref_id, phone, email, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, scclid, gptclid, rdt_cid)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(ref_id) DO UPDATE SET
-                phone=COALESCE(EXCLUDED.phone, chat_pre_sessions.phone),
-                email=COALESCE(EXCLUDED.email, chat_pre_sessions.email),
-                gclid=COALESCE(EXCLUDED.gclid, chat_pre_sessions.gclid),
-                fbclid=COALESCE(EXCLUDED.fbclid, chat_pre_sessions.fbclid)
-        """, (resolved_client_id, ref_id, phone, email, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, scclid, gptclid, rdt_cid))
+            INSERT OR REPLACE INTO chat_pre_sessions (client_id, ref_id, phone, email, gclid, fbclid, li_fat_id, msclkid)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (resolved_client_id, ref_id, normalize_phone(payload.get("phone")), payload.get("email"), gclid, fbclid, li_fat_id, msclkid))
         conn.commit()
         conn.close()
-        print(f"💬 [Pre-Chat Session Saved] Client #{resolved_client_id} | Ref: {ref_id} | GCLID: {gclid}")
         return {"status": "success", "ref_id": ref_id, "client_id": resolved_client_id, "message": "Pre-chat click session saved successfully."}
     except Exception as e:
-        print(f"❌ Error saving pre-chat session: {e}")
-        return {"status": "error", "message": f"Failed to save pre-chat session: {str(e)}"}
+        raise HTTPException(status_code=400, detail=str(e))
 
-
-async def process_chat_webhook_event(payload: dict, client_id: Optional[int], provider_name: str):
-    import os, re
+async def process_chat_webhook_event(payload: dict, client_id: Optional[int], source_type: str):
     try:
         resolved_client_id = client_id or 1
-        
         visitor_dict = {}
         for k in ['visitor', 'customer', 'sender', 'contact', 'user']:
-            if isinstance(payload.get(k), dict):
-                visitor_dict = payload.get(k)
-                break
-                
-        caller_name = (
-            payload.get('name') or payload.get('customer_name') or payload.get('caller_name') or payload.get('from_name') or
-            visitor_dict.get('name') or visitor_dict.get('full_name') or visitor_dict.get('first_name') or 'Chat Visitor'
-        )
-        raw_phone = payload.get('phone') or payload.get('from') or payload.get('customer_phone') or visitor_dict.get('phone') or visitor_dict.get('phone_number') or ''
-        raw_email = payload.get('email') or payload.get('customer_email') or visitor_dict.get('email') or ''
-        
-        normalized_phone = normalize_phone(raw_phone)
-        email_clean = raw_email.strip().lower()
-        
-        custom_vars = payload.get('custom_variables') or payload.get('custom_fields') or visitor_dict.get('custom_fields') or {}
-        if isinstance(custom_vars, list):
-            cv_dict = {}
-            for item in custom_vars:
-                if isinstance(item, dict) and 'name' in item:
-                    cv_dict[item['name']] = item.get('value')
-            custom_vars = cv_dict
+            if isinstance(payload.get(k), dict): visitor_dict = payload.get(k); break
             
-        gclid = payload.get('gclid') or custom_vars.get('gclid')
-        fbclid = payload.get('fbclid') or custom_vars.get('fbclid')
-        li_fat_id = payload.get('li_fat_id') or custom_vars.get('li_fat_id')
-        msclkid = payload.get('msclkid') or custom_vars.get('msclkid')
-        ttclid = payload.get('ttclid') or custom_vars.get('ttclid')
-        twclid = payload.get('twclid') or custom_vars.get('twclid')
-        pin_clid = payload.get('pin_clid') or custom_vars.get('pin_clid')
-        scclid = payload.get('scclid') or custom_vars.get('scclid')
-        gptclid = payload.get('gptclid') or custom_vars.get('gptclid')
-        rdt_cid = payload.get('rdt_cid') or custom_vars.get('rdt_cid')
+        caller_name = (payload.get('name') or payload.get('customer_name') or payload.get('caller_name') or payload.get('from_name') or visitor_dict.get('name') or visitor_dict.get('full_name') or visitor_dict.get('first_name') or 'Chat Visitor')
+        raw_phone = payload.get('phone') or payload.get('customer_phone') or payload.get('from') or visitor_dict.get('phone') or visitor_dict.get('number')
+        raw_email = payload.get('email') or payload.get('customer_email') or visitor_dict.get('email')
         
-        ref_id = payload.get('ref_id') or custom_vars.get('ref_id')
-        raw_text = payload.get('text') or payload.get('message') or payload.get('body') or ''
-        if not ref_id and raw_text:
-            match = re.search(r'Ref:\s*(lg_[a-zA-Z0-9]+)', str(raw_text))
+        normalized_p = normalize_phone(raw_phone)
+        email_clean = raw_email.strip().lower() if raw_email else ""
+        
+        gclid = payload.get('gclid') or payload.get('google_click_id')
+        fbclid = payload.get('fbclid') or payload.get('facebook_click_id')
+        li_fat_id = payload.get('li_fat_id') or payload.get('linkedin_click_id')
+        msclkid = payload.get('msclkid') or payload.get('microsoft_click_id')
+        
+        ref_id = payload.get('ref_id') or payload.get('custom_variable')
+        if not ref_id and isinstance(payload.get('text'), str):
+            match = re.search(r'Ref:\s*(lg_[a-zA-Z0-9]+)', payload.get('text'))
             if match: ref_id = match.group(1)
             
-        if ref_id or normalized_phone or email_clean:
+        if ref_id:
             conn = db_router.connect()
             cursor = conn.cursor()
-            match_row = None
-            if ref_id:
-                cursor.execute("SELECT gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, scclid, gptclid, rdt_cid FROM chat_pre_sessions WHERE ref_id = ? AND client_id = ?", (ref_id, resolved_client_id))
-                match_row = cursor.fetchone()
-            if not match_row and normalized_phone:
-                cursor.execute("SELECT gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, scclid, gptclid, rdt_cid FROM chat_pre_sessions WHERE phone = ? AND client_id = ? ORDER BY id DESC", (normalized_phone, resolved_client_id))
-                match_row = cursor.fetchone()
-            if not match_row and email_clean:
-                cursor.execute("SELECT gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, scclid, gptclid, rdt_cid FROM chat_pre_sessions WHERE email = ? AND client_id = ? ORDER BY id DESC", (email_clean, resolved_client_id))
-                match_row = cursor.fetchone()
+            cursor.execute("SELECT gclid, fbclid, li_fat_id, msclkid, phone, email FROM chat_pre_sessions WHERE ref_id = ?", (ref_id,))
+            matched = cursor.fetchone()
             conn.close()
-            
-            if match_row:
-                if not gclid: gclid = match_row[0]
-                if not fbclid: fbclid = match_row[1]
-                if not li_fat_id: li_fat_id = match_row[2]
-                if not msclkid: msclkid = match_row[3]
-                if not ttclid: ttclid = match_row[4]
-                if not twclid: twclid = match_row[5]
-                if not pin_clid: pin_clid = match_row[6]
-                if not scclid: scclid = match_row[7]
-                if not gptclid: gptclid = match_row[8]
-                if not rdt_cid: rdt_cid = match_row[9]
-                print(f"🎯 [Chat Pre-Session Matched] Found prior Click IDs for {caller_name} ({provider_name}): GCLID={gclid}")
-
-        raw_transcript = payload.get('transcript') or payload.get('conversation') or payload.get('messages') or payload.get('chat') or raw_text
+            if matched:
+                gclid = gclid or matched[0]
+                fbclid = fbclid or matched[1]
+                li_fat_id = li_fat_id or matched[2]
+                msclkid = msclkid or matched[3]
+                normalized_p = normalized_p or matched[4]
+                email_clean = email_clean or matched[5]
+                
+        raw_transcript = payload.get('transcript') or payload.get('transcription') or payload.get('text') or payload.get('messages') or ""
         transcript_str = ""
         if isinstance(raw_transcript, str):
             transcript_str = raw_transcript
@@ -12377,95 +12382,73 @@ async def process_chat_webhook_event(payload: dict, client_id: Optional[int], pr
                 elif isinstance(item, str):
                     lines.append(item)
             transcript_str = "\n".join(lines)
-
+            
         ai_qualified, ai_sale_closed, ai_value, ai_reason, model_name = "NO", "NO", 0.0, "No transcript provided.", "None"
         qualification_definition_desc = "Someone who expresses real intent to buy or schedule a service."
-
+        
         conn = db_router.connect()
         cursor = conn.cursor()
         cursor.execute("SELECT name, qualification_criteria FROM clients WHERE id = ?", (resolved_client_id,))
         client_info = cursor.fetchone()
         conn.close()
-
+        
         if client_info and client_info[1]:
             qualification_definition_desc = CRITERIA_MAP.get(client_info[1], qualification_definition_desc)
-
+            
         if transcript_str.strip():
-            print(f"🧠 [Client #{resolved_client_id}] Auditing {provider_name.upper()} chat transcript for {caller_name}...")
-            ai_result = analyze_transcript_with_claude(transcript_str, qualification_definition_desc)
-            ai_qualified = ai_result.get("qualified", "NO")
-            ai_sale_closed = ai_result.get("sale_closed", "NO")
-            ai_value = float(ai_result.get("value", 0.0))
-            ai_reason = ai_result.get("reason", "No reason parsed.")
+            ai_res = analyze_transcript_with_claude(transcript_str, qualification_definition_desc)
+            ai_qualified = ai_res.get("qualified", "NO")
+            ai_sale_closed = ai_res.get("sale_closed", "NO")
+            ai_value = float(ai_res.get("value", 0.0))
+            ai_reason = ai_res.get("reason", "No reason parsed.")
             model_name = "claude-haiku-4-5-20251001"
-
+            
         conn = db_router.connect()
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO sessions (
-                client_id, phone, email, name, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, scclid, gptclid, rdt_cid,
-                source, qualified, sale_closed, value, reason, model_used, raw_data
+                client_id, phone, email, name, gclid, fbclid, li_fat_id, msclkid, source, qualified, sale_closed, value, reason, model_used, raw_data
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            resolved_client_id, normalized_phone or "CHAT_LEAD", email_clean, caller_name, gclid, fbclid, li_fat_id, msclkid,
-            ttclid, twclid, pin_clid, scclid, gptclid, rdt_cid, provider_name.lower(), ai_qualified, ai_sale_closed,
-            ai_value, ai_reason, model_name, str(payload)
+            resolved_client_id, normalized_p or "+15550000000", email_clean, caller_name, gclid, fbclid, li_fat_id, msclkid, source_type, ai_qualified, ai_sale_closed, ai_value, ai_reason, model_name, str(payload)
         ))
         conn.commit()
         conn.close()
-
+        
         return {
-            "status": "success",
-            "client_id": resolved_client_id,
-            "source": provider_name.lower(),
-            "message": f"{provider_name.upper()} chat transcript successfully audited and logged.",
-            "ai_audit": {
-                "qualified": ai_qualified,
-                "sale_closed": ai_sale_closed,
-                "value": ai_value,
-                "reason": ai_reason
-            }
+            "status": "success", "client_id": resolved_client_id, "source": source_type,
+            "message": f"{source_type.upper()} chat transcript successfully audited and logged.",
+            "ai_audit": {"qualified": ai_qualified, "sale_closed": ai_sale_closed, "value": ai_value, "reason": ai_reason}
         }
     except Exception as e:
-        print(f"❌ {provider_name.upper()} Webhook Error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
-
-@app.post("/webhooks/whatsapp")
 @app.get("/webhooks/whatsapp")
-async def whatsapp_webhook(request: Request, client_id: Optional[int] = None):
-    if request.method == "GET":
-        mode = request.query_params.get("hub.mode")
-        token = request.query_params.get("hub.verify_token")
-        challenge = request.query_params.get("hub.challenge")
-        if mode == "subscribe" and challenge:
-            from fastapi.responses import PlainTextResponse
-            return PlainTextResponse(content=challenge)
-        return {"status": "ok", "message": "WhatsApp webhook listener active."}
+@app.post("/webhooks/whatsapp")
+async def receive_whatsapp_webhook(request: Request, client_id: Optional[int] = None):
+    if request.method == "GET": return Response(content=request.query_params.get("hub.challenge", "ok"))
     payload = await request.json() if "application/json" in request.headers.get("content-type", "") else dict(await request.form())
     return await process_chat_webhook_event(payload, client_id, "whatsapp")
 
+@app.get("/webhooks/telegram")
 @app.post("/webhooks/telegram")
-async def telegram_webhook(request: Request, client_id: Optional[int] = None):
-    payload = await request.json()
+async def receive_telegram_webhook(request: Request, client_id: Optional[int] = None):
+    payload = await request.json() if "application/json" in request.headers.get("content-type", "") else dict(await request.form())
     return await process_chat_webhook_event(payload, client_id, "telegram")
 
+@app.get("/webhooks/viber")
 @app.post("/webhooks/viber")
-async def viber_webhook(request: Request, client_id: Optional[int] = None):
-    payload = await request.json()
+async def receive_viber_webhook(request: Request, client_id: Optional[int] = None):
+    payload = await request.json() if "application/json" in request.headers.get("content-type", "") else dict(await request.form())
     return await process_chat_webhook_event(payload, client_id, "viber")
 
-@app.post("/webhooks/livechat")
 @app.get("/webhooks/livechat")
-async def livechat_webhook(request: Request, client_id: Optional[int] = None):
+@app.post("/webhooks/livechat")
+async def receive_livechat_webhook(request: Request, client_id: Optional[int] = None):
     payload = await request.json() if "application/json" in request.headers.get("content-type", "") else dict(await request.form())
     return await process_chat_webhook_event(payload, client_id, "livechat")
 
-
-# ---------------------------------------------------------
-# SECURE NIGHTLY CRON SYNCRONIZATION TRIGGER
-# ---------------------------------------------------------
 @app.post("/tasks/daily-sync")
 async def trigger_daily_sync(request: Request):
     """
