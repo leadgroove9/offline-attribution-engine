@@ -6,26 +6,24 @@ ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()
 ADMIN_EMAILS = {"admin@leadgrove.net", "admin@leadgroove.net", "corey@test.com", "corey@leadgrove.net"}
 
 SOT_MAP = {
-    "transcripts": "Phone/Email Transcripts (AI-Graded Lead Qualification & Sales Tracking)",
-    "spreadsheets": "Spreadsheets (Manual CSV / Spreadsheet Ingestion)",
-    "hubspot": "HubSpot CRM",
-    "zoho": "Zoho CRM",
-    "salesforce": "Salesforce CRM",
-    "servicetitan": "ServiceTitan CRM",
-    "housecallpro": "Housecall Pro CRM",
-    "gohighlevel": "GoHighLevel (GHL) CRM",
-    "pipedrive": "Pipedrive CRM",
-    "quickbooks": "QuickBooks Billing",
-    "xero": "Xero Accounting",
-    "zoho_books": "Zoho Books Accounting",
-    "netsuite": "NetSuite ERP/Accounting",
-    "sage": "Sage Accounting",
-    "freshbooks": "FreshBooks Billing",
-    "google_sheets": "Google Sheets (Live Sync)",
-    "zapier": "Zapier Custom Integration",
-    "email": "Automated Email Sales Log Scanner",
     "manual": "Manual CSV / Spreadsheet Upload",
-    "ai_rating": "Claude AI Transcript Rating (All Calls)"
+    "ai_rating": "Claude AI Transcript Rating (All Calls)",
+    "email": "Automated Email Sales Log Scanner",
+    "hubspot": "HubSpot CRM Webhook",
+    "salesforce": "Salesforce CRM Webhook",
+    "zoho": "Zoho CRM Webhook",
+    "servicetitan": "ServiceTitan Lead & Job Webhook",
+    "housecallpro": "Housecall Pro Job Webhook",
+    "gohighlevel": "GoHighLevel CRM Webhook",
+    "pipedrive": "Pipedrive CRM Webhook",
+    "quickbooks": "QuickBooks Online Paid Invoice Webhook",
+    "xero": "Xero Paid Invoice Webhook",
+    "zoho_books": "Zoho Books Paid Invoice Webhook",
+    "netsuite": "NetSuite Paid Invoice Webhook",
+    "sage": "Sage Accounting Paid Invoice Webhook",
+    "freshbooks": "FreshBooks Paid Invoice Webhook",
+    "google_sheets": "Google Sheets Live Sync",
+    "zapier": "Zapier Custom Webhook"
 }
 
 CRITERIA_MAP = {

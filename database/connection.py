@@ -1,12 +1,7 @@
 import os
 import sqlite3
 import re
-
-try:
-    import psycopg2
-except ImportError:
-    psycopg2 = None
-
+import psycopg2
 from config import DATABASE_URL
 
 DB_PATH = "offline_attribution.db"
@@ -27,7 +22,6 @@ class PostgreSQLCursorWrapper:
     def execute(self, query, params=None):
         pg_query = query.replace("?", "%s")
         
-        # Handle PRAGMA table_info(table_name) for PostgreSQL
         pragma_match = re.search(r"PRAGMA\s+table_info\((.*?)\)", pg_query, re.IGNORECASE)
         if pragma_match:
             table_name = pragma_match.group(1).strip("'\" ")
@@ -38,8 +32,7 @@ class PostgreSQLCursorWrapper:
             pg_query = pg_query.replace("AUTOINCREMENT", "")
             pg_query = pg_query.replace("INSERT OR REPLACE INTO", "INSERT INTO")
             pg_query = pg_query.replace("INSERT OR IGNORE INTO", "INSERT INTO")
-            pg_query = re.sub(r"datetime\((.*?), 'localtime'\)", r"to_char(\1::timestamp, 'YYYY-MM-DD HH24:MI:SS')", pg_query, flags=re.IGNORECASE)
-
+            
         if params is None:
             return self._cursor.execute(pg_query)
         return self._cursor.execute(pg_query, params)
@@ -68,7 +61,7 @@ class PostgreSQLConnectionWrapper:
 
 class DatabaseRouter:
     def connect(self):
-        if DATABASE_URL and psycopg2:
+        if DATABASE_URL:
             try:
                 pg_conn = psycopg2.connect(DATABASE_URL)
                 return PostgreSQLConnectionWrapper(pg_conn)
