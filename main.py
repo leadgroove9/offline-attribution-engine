@@ -5685,10 +5685,8 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     if (stage3SotEl) {{
                         if (['hubspot', 'salesforce', 'zoho', 'servicetitan', 'housecallpro', 'gohighlevel', 'pipedrive'].includes(sot)) {{
                             stage3SotEl.innerText = selectedText + " CRM Webhook Pipeline";
-                        }} else if (sot === 'email' || sot === 'spreadsheets') {{
-                            stage3SotEl.innerText = "Spreadsheets Sales Ingestion";
-                        }} else if (sot === 'ai_rating' || sot === 'transcripts') {{
-                            stage3SotEl.innerText = "Phone & Email Transcripts AI Auditing";
+                        }} else if (sot === 'email') {{
+                            stage3SotEl.innerText = "Automated Email Sales Scanner";
                         }} else if (['quickbooks', 'xero', 'zoho_books', 'netsuite', 'sage', 'freshbooks'].includes(sot)) {{
                             stage3SotEl.innerText = selectedText + " Integration Webhook";
                         }} else {{
@@ -6202,10 +6200,8 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     if (stage3SotEl) {{
                         if (['hubspot', 'salesforce', 'zoho', 'servicetitan', 'housecallpro', 'gohighlevel', 'pipedrive'].includes(sot)) {{
                             stage3SotEl.innerText = selectedText + " CRM Webhook Pipeline";
-                        }} else if (sot === 'email' || sot === 'spreadsheets') {{
-                            stage3SotEl.innerText = "Spreadsheets Sales Ingestion";
-                        }} else if (sot === 'ai_rating' || sot === 'transcripts') {{
-                            stage3SotEl.innerText = "Phone & Email Transcripts AI Auditing";
+                        }} else if (sot === 'email') {{
+                            stage3SotEl.innerText = "Automated Email Sales Scanner";
                         }} else if (['quickbooks', 'xero', 'zoho_books', 'netsuite', 'sage', 'freshbooks'].includes(sot)) {{
                             stage3SotEl.innerText = selectedText + " Integration Webhook";
                         }} else {{
@@ -6305,8 +6301,10 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             if (dealBox) dealBox.style.display = 'block';
                             const dLabel = document.getElementById('sot-deal-tags-label');
                             const wLabel = document.getElementById('sot-won-deal-tags-label');
-                            if (dLabel && sot !== 'google_sheets') dLabel.innerText = 'Which tags/statuses under Deals signify a qualified conversion?';
-                            if (wLabel && sot !== 'google_sheets') wLabel.innerText = 'Which tags/statuses under Deals signify a won deal conversion?';
+                            if (dLabel && sot === 'spreadsheets') dLabel.innerText = 'Which tags/statuses on your spreadsheet signify a qualified conversion?';
+                            else if (dLabel && sot !== 'google_sheets') dLabel.innerText = 'Which tags/statuses under Deals signify a qualified conversion?';
+                            if (wLabel && sot === 'spreadsheets') wLabel.innerText = 'Which tags/statuses on your spreadsheet signify a won deal conversion?';
+                            else if (wLabel && sot !== 'google_sheets') wLabel.innerText = 'Which tags/statuses under Deals signify a won deal conversion?';
                         }}
                         if (['servicetitan', 'housecallpro', 'gohighlevel'].includes(sot)) {{
                             if (leadBox) leadBox.style.display = 'block';
@@ -6343,6 +6341,10 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         if (monthlyEmailBox) monthlyEmailBox.style.display = 'block';
                         if (dealBox) dealBox.style.display = 'block';
                         if (emailCard) emailCard.style.display = 'block';
+                        const dLabel = document.getElementById('sot-deal-tags-label');
+                        const wLabel = document.getElementById('sot-won-deal-tags-label');
+                        if (dLabel && sot === 'spreadsheets') dLabel.innerText = 'Which tags/statuses on your spreadsheet signify a qualified conversion?';
+                        if (wLabel && sot === 'spreadsheets') wLabel.innerText = 'Which tags/statuses on your spreadsheet signify a won deal conversion?';
                     }} else if (sot === 'ai_rating' || sot === 'transcripts') {{
                         if (emailBox) emailBox.style.display = 'block';
                         if (voipBox) {{
@@ -12390,7 +12392,7 @@ async def receive_chat_transcript_webhook(request: Request, client_id: Optional[
             match = cursor.fetchone()
             conn.close()
             if match:
-                matched_gclid, matched_fbclid, matched_msclkid, matched_li_fat_id = match[0] or "", match[1] or "", match[2] or "", match[3] or ""
+                matched_gclid, matched_fbclid, matched_msclkid, matched_li_fat_id = match or "", match or "", match or "", match or ""
                 print(f"🎯 [Chat Pre-Session Matched] Found prior Click IDs for {customer_name} ({source_type}): GCLID={matched_gclid or 'None'}")
                 
         raw_transcript = payload.get("transcript") or payload.get("messages") or payload.get("conversation") or body_str
@@ -12415,7 +12417,7 @@ async def receive_chat_transcript_webhook(request: Request, client_id: Optional[
         client_info = cursor.fetchone()
         conn.close()
         
-        qual_criteria = client_info[1] if client_info else "ai_rules"
+        qual_criteria = client_info if client_info else "ai_rules"
         ai_qualified, ai_sale_closed, ai_value, ai_reason, model_name = "YES", "YES", 89.0, f"Simulated Audit: Detected qualification signals aligning with standard: 'Someone who books an appointment'.", "claude-3-5-haiku-20241022"
         
         session_id = f"chat_{uuid.uuid4().hex[:10]}"
