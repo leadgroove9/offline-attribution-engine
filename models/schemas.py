@@ -6,24 +6,20 @@ class FormLead(BaseModel):
     last_name: str
     phone: str
     email: str
-    company: Optional[str] = None
-    gclid: Optional[str] = None
-    fbclid: Optional[str] = None
-    li_fat_id: Optional[str] = None
-    msclkid: Optional[str] = None
-    ttclid: Optional[str] = None
-    twclid: Optional[str] = None
-    pin_clid: Optional[str] = None
-    scclid: Optional[str] = None
-    gptclid: Optional[str] = None
-    rdt_cid: Optional[str] = None
+    company: Optional[str] = ""
+    gclid: Optional[str] = ""
+    fbclid: Optional[str] = ""
+    li_fat_id: Optional[str] = ""
+    msclkid: Optional[str] = ""
+    ttclid: Optional[str] = ""
+    twclid: Optional[str] = ""
+    pin_clid: Optional[str] = ""
+    gptclid: Optional[str] = ""
+    rdt_cid: Optional[str] = ""
 
 class ExcludedCustomer(BaseModel):
-    first_name: Optional[str] = ""
-    last_name: Optional[str] = ""
-    email: Optional[str] = ""
     phone: Optional[str] = ""
-    company_name: Optional[str] = ""
+    email: Optional[str] = ""
 
 class UserInvite(BaseModel):
     email: str
@@ -46,7 +42,7 @@ class InviteDelete(BaseModel):
 
 class SaleAdjustment(BaseModel):
     session_id: int
-    adjustment_type: str # 'RETRACT' or 'RESTATE'
+    adjustment_type: str
     adjusted_value: Optional[float] = 0.0
 
 class ClientCreate(BaseModel):
@@ -74,12 +70,22 @@ class ClientCreate(BaseModel):
     email_provider: Optional[str] = ""
     email_account: Optional[str] = ""
     email_app_password: Optional[str] = ""
+    email_account_2: Optional[str] = ""
+    email_app_password_2: Optional[str] = ""
+    email_account_3: Optional[str] = ""
+    email_app_password_3: Optional[str] = ""
+    email_account_4: Optional[str] = ""
+    email_app_password_4: Optional[str] = ""
+    email_account_5: Optional[str] = ""
+    email_app_password_5: Optional[str] = ""
     crm_deal_tags: Optional[str] = ""
     crm_won_deal_tags: Optional[str] = ""
     crm_value_field: Optional[str] = ""
     crm_lead_tags: Optional[str] = ""
     lead_count_rule: str
     exclude_past_customers: str
+    excluded_customers: Optional[List[ExcludedCustomer]] = []
+    exclusion_action: Optional[str] = "append"
 
 class ClientUpdate(BaseModel):
     id: int
