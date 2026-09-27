@@ -2,8 +2,7 @@ import os
 import sqlite3
 import re
 from fastapi import APIRouter, Request, HTTPException, UploadFile, File, Form
-from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from typing import Optional
 from database.connection import db_router
 from services.auth_service import is_authenticated, get_user_role_and_client
@@ -3103,11 +3102,15 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             if (wLabel) wLabel.innerText = 'Which tags/statuses on Google sheet signify a won deal conversion?';
                         }}
                         else if (sot === 'zapier' && zapierBox) {{ zapierBox.style.display = 'block'; if (dealBox) dealBox.style.display = 'block'; }}
-                    }} else if (sot === 'email') {{
+                    }} else if (sot === 'email' || sot === 'spreadsheets') {{
                         if (monthlyEmailBox) monthlyEmailBox.style.display = 'block';
                         if (dealBox) dealBox.style.display = 'block';
                         if (emailCard) emailCard.style.display = 'block';
-                    }} else if (sot === 'ai_rating') {{
+                        const dLabel = document.getElementById('sot-deal-tags-label');
+                        const wLabel = document.getElementById('sot-won-deal-tags-label');
+                        if (dLabel) dLabel.innerText = 'Which tags/statuses on your spreadsheet signify a qualified conversion?';
+                        if (wLabel) wLabel.innerText = 'Which tags/statuses on your spreadsheet signify a won deal conversion?';
+                    }} else if (sot === 'ai_rating' || sot === 'transcripts') {{
                         if (emailBox) emailBox.style.display = 'block';
                         if (voipBox) {{
                             voipBox.style.display = 'block';
@@ -3436,10 +3439,13 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         twitter_ads_id: document.getElementById('twitter_ads_id').value.trim(),
                         pinterest_ads_id: document.getElementById('pinterest_ads_id').value.trim(),
                         snapchat_ads_id: document.getElementById('snapchat_ads_id').value.trim(),
+                        snapchat_ads_id: document.getElementById('snapchat_ads_id').value.trim(),
+                        chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
+                        reddit_ads_id: document.getElementById('reddit_ads_id').value.trim(),
                         chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
                         reddit_ads_id: document.getElementById('reddit_ads_id').value.trim(),
                         lead_gen_method: (function() {{
-                            const checkedLgList = Array.from(document.querySelectorAll('input[name="lead_gen_method"]:checked')).map(cb => cb.value);
+                            const checkedLgList = Array.from(document.querySelectorAll('input[name="lead_gen_method"]:checked')).map(function(cb) {{ return cb.value; }});
                             return checkedLgList.length > 0 ? checkedLgList.join(',') : 'both';
                         }})(),
                         qualification_criteria: document.getElementById('qualification_criteria').value,
@@ -3455,6 +3461,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         email_app_password_4: document.getElementById('email_app_password_4') ? document.getElementById('email_app_password_4').value.trim() : '',
                         email_account_5: document.getElementById('email_account_5') ? document.getElementById('email_account_5').value.trim() : '',
                         email_app_password_5: document.getElementById('email_app_password_5') ? document.getElementById('email_app_password_5').value.trim() : '',
+                        email_app_password: document.getElementById('email_app_password').value.trim(),
                         email_account_2: document.getElementById('email_account_2') ? document.getElementById('email_account_2').value.trim() : '',
                         email_app_password_2: document.getElementById('email_app_password_2') ? document.getElementById('email_app_password_2').value.trim() : '',
                         email_account_3: document.getElementById('email_account_3') ? document.getElementById('email_account_3').value.trim() : '',
@@ -6224,10 +6231,10 @@ def add_client_page(request: Request):
                         snapchat_ads_id: document.getElementById('snapchat_ads_id').value.trim(),
                         chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
                         reddit_ads_id: document.getElementById('reddit_ads_id').value.trim(),
-                        lead_gen_method: (function() {
-                            const checkedLgList = Array.from(document.querySelectorAll('input[name="lead_gen_method"]:checked')).map(cb => cb.value);
+                        lead_gen_method: (function() {{
+                            const checkedLgList = Array.from(document.querySelectorAll('input[name="lead_gen_method"]:checked')).map(function(cb) {{ return cb.value; }});
                             return checkedLgList.length > 0 ? checkedLgList.join(',') : 'both';
-                        })(),
+                        }})(),
                         qualification_criteria: document.getElementById('qualification_criteria').value,
                         source_of_truth: document.getElementById('source_of_truth').value,
                         email_provider: document.getElementById('email_provider').value,
@@ -6682,7 +6689,23 @@ def create_client(request: Request, client: ClientCreate):
             client.reddit_ads_id or ""
         ))
         
-        client_id = cursor.lastrowid
+        client_id = getattr(cursor, "lastrowid", None)
+        if not client_id:
+            try:
+                cursor.execute("SELECT lastval()")
+                row = cursor.fetchone()
+                if row and row[0]:
+                    client_id = row[0]
+            except Exception:
+                pass
+                
+        if not client_id:
+            try:
+                cursor.execute("SELECT id FROM clients WHERE name = ? ORDER BY id DESC LIMIT 1", (client.name,))
+                row = cursor.fetchone()
+                client_id = row[0] if row else 1
+            except Exception:
+                client_id = 1
         
         # Handle excluded customers updates for new onboarding if uploaded
         if client.excluded_customers is not None and len(client.excluded_customers) > 0:

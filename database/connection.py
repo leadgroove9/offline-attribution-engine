@@ -1,6 +1,5 @@
 import os
 import sqlite3
-import psycopg2
 from config import DATABASE_URL
 
 DB_PATH = "offline_attribution.db"
@@ -8,6 +7,13 @@ DB_PATH = "offline_attribution.db"
 class PostgreSQLCursorWrapper:
     def __init__(self, pg_cursor):
         self._cursor = pg_cursor
+
+    @property
+    def lastrowid(self):
+        try:
+            return getattr(self._cursor, "lastrowid", None)
+        except Exception:
+            return None
 
     def execute(self, query, params=None):
         pg_query = query.replace("?", "%s")
@@ -42,6 +48,7 @@ class DatabaseRouter:
     def connect(self):
         if DATABASE_URL:
             try:
+                import psycopg2
                 pg_conn = psycopg2.connect(DATABASE_URL)
                 return PostgreSQLConnectionWrapper(pg_conn)
             except Exception as e:

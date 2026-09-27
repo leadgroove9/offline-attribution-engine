@@ -1,5 +1,5 @@
-from config import ADMIN_EMAILS, CRITERIA_MAP, SOT_MAP
-from pydantic import BaseModel, EmailStr
+from config import ADMIN_EMAILS
+from pydantic import BaseModel
 import os
 import re
 import json
@@ -12,9 +12,9 @@ from typing import Optional
 from database.connection import db_router
 from services.auth_service import is_authenticated, get_user_role_and_client
 from services.identity_matcher import (
-    normalize_phone, calculate_company_similarity, check_name_transposition
+    normalize_phone, calculate_company_similarity, check_name_transposition, find_dynamic_columns_custom
 )
-from models.schemas import SaleAdjustment, ExcludedCustomer, ClientCreate, ClientUpdate, UserInvite, UserRoleUpdate, UserDelete, InviteRoleUpdate, InviteDelete
+from models.schemas import SaleAdjustment
 
 router = APIRouter()
 
@@ -1243,74 +1243,5 @@ def view_dashboard(request: Request, client_id: Optional[int] = None, date_range
     </html>
     """
 
-
-
-class UserInvite(BaseModel):
-    email: str
-    role: str
-    client_id: Optional[int] = None
-
-class UserRoleUpdate(BaseModel):
-    email: str
-    role: str
-
-class UserDelete(BaseModel):
-    email: str
-
-class InviteRoleUpdate(BaseModel):
-    token: str
-    role: str
-
-class InviteDelete(BaseModel):
-    token: str
-
-class SaleAdjustment(BaseModel):
-    session_id: int
-    adjustment_type: str # 'RETRACT' or 'RESTATE'
-    adjusted_value: Optional[float] = 0.0
-
-class ClientUpdate(BaseModel):
-    id: int
-    name: str
-    call_tracking_provider: Optional[str] = "callrail"
-    callrail_account_id: Optional[str] = ""
-    callrail_company_id: Optional[str] = ""
-    ctm_account_id: Optional[str] = ""
-    ctm_profile_id: Optional[str] = ""
-    wc_account_id: Optional[str] = ""
-    wc_profile_id: Optional[str] = "" 
-    google_ads_customer_id: Optional[str] = ""
-    facebook_ads_id: Optional[str] = ""
-    tiktok_ads_id: Optional[str] = ""
-    twitter_ads_id: Optional[str] = ""
-    pinterest_ads_id: Optional[str] = ""
-    snapchat_ads_id: Optional[str] = ""
-    snapchat_ads_id: Optional[str] = ""
-    chatgpt_ads_id: Optional[str] = ""
-    reddit_ads_id: Optional[str] = ""
-    linkedin_ads_id: Optional[str] = ""
-    microsoft_ads_id: Optional[str] = ""
-    lead_gen_method: str
-    qualification_criteria: str
-    source_of_truth: str
-    email_provider: Optional[str] = ""
-    email_account: Optional[str] = ""
-    email_app_password: Optional[str] = ""
-    email_account_2: Optional[str] = ""
-    email_app_password_2: Optional[str] = ""
-    email_account_3: Optional[str] = ""
-    email_app_password_3: Optional[str] = ""
-    email_account_4: Optional[str] = ""
-    email_app_password_4: Optional[str] = ""
-    email_account_5: Optional[str] = ""
-    email_app_password_5: Optional[str] = ""
-    crm_deal_tags: Optional[str] = ""
-    crm_won_deal_tags: Optional[str] = ""
-    crm_value_field: Optional[str] = ""
-    crm_lead_tags: Optional[str] = ""
-    lead_count_rule: str
-    exclude_past_customers: str
-    excluded_customers: Optional[list[ExcludedCustomer]] = None
-    exclusion_action: Optional[str] = "append"
 
 
