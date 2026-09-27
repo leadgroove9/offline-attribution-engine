@@ -232,7 +232,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
         conn.commit()
         
         cursor.execute("""
-            SELECT subject, datetime(analyzed_at, 'localtime') 
+            SELECT subject, analyzed_at 
             FROM analyzed_emails 
             WHERE client_id = ? 
             ORDER BY analyzed_at DESC LIMIT 5
@@ -263,7 +263,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
         conn.commit()
         
         cursor.execute("""
-            SELECT contact_name, stage, amount, datetime(received_at, 'localtime') 
+            SELECT contact_name, stage, amount, received_at 
             FROM crm_webhook_logs 
             WHERE client_id = ? 
             ORDER BY received_at DESC LIMIT 5
@@ -295,7 +295,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
         conn.commit()
         
         cursor.execute("""
-            SELECT customer_name, invoice_number, amount, datetime(received_at, 'localtime') 
+            SELECT customer_name, invoice_number, amount, received_at 
             FROM billing_webhook_logs 
             WHERE client_id = ? 
             ORDER BY received_at DESC LIMIT 5
@@ -319,7 +319,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
         
         # Query configuration change history for active_client_id
         cursor.execute("""
-            SELECT feature_name, old_value, new_value, datetime(changed_at, 'localtime'), changed_by
+            SELECT feature_name, old_value, new_value, changed_at, changed_by
             FROM client_config_history
             WHERE client_id = ?
             ORDER BY changed_at DESC
