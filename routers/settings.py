@@ -232,7 +232,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
         conn.commit()
         
         cursor.execute("""
-            SELECT subject, analyzed_at 
+            SELECT subject, datetime(analyzed_at, 'localtime') 
             FROM analyzed_emails 
             WHERE client_id = ? 
             ORDER BY analyzed_at DESC LIMIT 5
@@ -263,7 +263,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
         conn.commit()
         
         cursor.execute("""
-            SELECT contact_name, stage, amount, received_at 
+            SELECT contact_name, stage, amount, datetime(received_at, 'localtime') 
             FROM crm_webhook_logs 
             WHERE client_id = ? 
             ORDER BY received_at DESC LIMIT 5
@@ -295,7 +295,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
         conn.commit()
         
         cursor.execute("""
-            SELECT customer_name, invoice_number, amount, received_at 
+            SELECT customer_name, invoice_number, amount, datetime(received_at, 'localtime') 
             FROM billing_webhook_logs 
             WHERE client_id = ? 
             ORDER BY received_at DESC LIMIT 5
@@ -319,7 +319,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
         
         # Query configuration change history for active_client_id
         cursor.execute("""
-            SELECT feature_name, old_value, new_value, changed_at, changed_by
+            SELECT feature_name, old_value, new_value, datetime(changed_at, 'localtime'), changed_by
             FROM client_config_history
             WHERE client_id = ?
             ORDER BY changed_at DESC
@@ -4133,6 +4133,10 @@ def update_client_settings(request: Request, client: ClientUpdate):
 
 @router.get("/dashboard/add-client", response_class=HTMLResponse)
 def add_client_page(request: Request):
+    wiz_sot_options = ""
+    for code, label in SOT_MAP.items():
+        is_sel = "selected" if code == "transcripts" else ""
+        wiz_sot_options += f'<option value="{code}" {is_sel}>{label}</option>'
     email = is_authenticated(request)
     if not email:
         return RedirectResponse(url="/login", status_code=303)
@@ -4574,23 +4578,8 @@ def add_client_page(request: Request):
                                 i.e. Where does your sales data exist that indicates which of your incoming leads close into sales or not?
                             </small>
                             <select id="source_of_truth" onchange="toggleSOTFields()">
-                                <option value="transcripts" selected>Phone/Email Transcripts (AI-Graded Lead Qualification & Sales Tracking)</option>
-                                <option value="spreadsheets">Spreadsheets (Manual CSV / Spreadsheet Ingestion)</option>
-                                <option value="hubspot">HubSpot CRM</option>
-                                <option value="zoho">Zoho CRM</option>
-                                <option value="salesforce">Salesforce CRM</option>
-                                <option value="servicetitan">ServiceTitan CRM</option>
-                                <option value="housecallpro">Housecall Pro CRM</option>
-                                <option value="gohighlevel">GoHighLevel (GHL) CRM</option>
-                                <option value="quickbooks">QuickBooks Billing</option>
-                                <option value="xero">Xero Accounting</option>
-                                <option value="zoho_books">Zoho Books Accounting</option>
-                                <option value="netsuite">NetSuite ERP/Accounting</option>
-                                <option value="sage">Sage Accounting</option>
-                                <option value="freshbooks">FreshBooks Billing</option>
-                                <option value="google_sheets">Google Sheets (Live Sync)</option>
-                                <option value="zapier">Zapier Custom Integration</option>
-                            </select>
+                                    {wiz_sot_options}
+                                </select>
                         </div>
                         
                         <!-- CONDITIONAL INPUT: CRM Deal status tags (HubSpot, Salesforce, Zoho) -->
@@ -5594,7 +5583,6 @@ def add_client_page(request: Request):
                     document.getElementById(`step-panel-${currentStep}`).classList.remove('active');
                     currentStep += direction;
                     document.getElementById(`step-panel-${currentStep}`).classList.add('active');
-                    if (currentStep === 3) { toggleSOTFields(); }
                     
                     if (currentStep === 5) {{
                         generateStep5Instructions();
@@ -6165,15 +6153,12 @@ def add_client_page(request: Request):
                     } else if (sot === 'email') {
                         if (monthlyEmailBox) monthlyEmailBox.style.display = 'block';
                         if (dealBox) dealBox.style.display = 'block';
-                    } else if (['ai_rating', 'transcripts'].includes(sot)) {
+                    } else if (sot === 'ai_rating') {
                         if (emailBox) emailBox.style.display = 'block';
                         if (voipBox) {
                             voipBox.style.display = 'block';
                             toggleVoipInstructions();
                         }
-                    } else if (['manual', 'spreadsheets', 'email'].includes(sot)) {
-                        if (monthlyEmailBox) monthlyEmailBox.style.display = 'block';
-                        if (dealBox) dealBox.style.display = 'block';
                     }
                 }
 
@@ -6398,6 +6383,7 @@ def add_client_page(request: Request):
     </html>
     """
     html_content = html_content.replace('<body>\n            <div class="container">', f'<body>\n            <div class="container">\n                {user_header_bar}')
+    html_content = html_content.replace("{wiz_sot_options}", wiz_sot_options)
     html_content = html_content.replace("conversions-[id]", f"conversions-{next_id}")
     return HTMLResponse(html_content)
 
