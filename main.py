@@ -6674,7 +6674,11 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         reddit_ads_id: document.getElementById('reddit_ads_id').value.trim(),
                         chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
                         reddit_ads_id: document.getElementById('reddit_ads_id').value.trim(),
-                        lead_gen_method: document.querySelector('input[name="lead_gen_method"]:checked').value,
+                        lead_gen_method: (() => {{
+                            const checkedLg = document.querySelectorAll('input[name="lead_gen_method"]:checked');
+                            const lgMethods = Array.from(checkedLg).map(cb => cb.value);
+                            return lgMethods.length > 0 ? lgMethods.join(',') : 'both';
+                        }})(),
                         qualification_criteria: document.getElementById('qualification_criteria').value,
                         source_of_truth: document.getElementById('source_of_truth').value,
                         email_provider: document.getElementById('email_provider').value,
@@ -7732,7 +7736,7 @@ def add_client_page(request: Request):
                     <div class="wizard-step" id="step-panel-2">
                         <div class="instructions">
                             🧠 <strong>Step 2: Lead Generation & Qualification Preferences</strong><br>
-                            Tell us the total ways you receive leads now so that our systems can track all possible lead sources.
+                            Tell us the total ways you receive leads now so that our systems can track all possible lead sources
                         </div>
                         
                         <div class="form-group">
@@ -7830,14 +7834,14 @@ def add_client_page(request: Request):
                         <!-- CONDITIONAL INPUT: CRM Deal status tags (HubSpot, Salesforce, Zoho) -->
                         <div id="sot-deal-tags-box" class="conditional-box" style="display: block;">
                             <div style="margin-bottom: 15px;">
-                                <label for="crm_deal_tags">Which tags/statuses under <strong>Deals</strong> signify a qualified conversion?</label>
+                                <label id="sot-deal-tags-label" for="crm_deal_tags">Which tags/statuses under <strong>Deals</strong> signify a qualified conversion?</label>
                                 <input type="text" id="crm_deal_tags" placeholder="e.g. appointment-booked, estimate-given">
                                 <small style="color: #666; font-size: 11px; margin-top: 4px; display: block;">
                                     List comma-separated tags that trigger a qualified lead conversion.
                                 </small>
                             </div>
                             <div>
-                                <label for="crm_won_deal_tags">Which tags/statuses under <strong>Deals</strong> signify a won deal conversion?</label>
+                                <label id="sot-won-deal-tags-label" for="crm_won_deal_tags">Which tags/statuses under <strong>Deals</strong> signify a won deal conversion?</label>
                                 <input type="text" id="crm_won_deal_tags" placeholder="e.g. closed-won, job-completed">
                                 <small style="color: #666; font-size: 11px; margin-top: 4px; display: block;">
                                     List comma-separated tags that trigger a won deal conversion.
@@ -8328,121 +8332,7 @@ def add_client_page(request: Request):
                             </div>
 
 
-                        <div id="sot-email-box" class="conditional-box">
-                            <div class="form-group">
-                                <label for="email_provider">Email Provider</label>
-                                <select id="email_provider">
-                                    <option value="gmail">Google Gmail API</option>
-                                    <option value="outlook">Microsoft Outlook 365</option>
-                                    <option value="custom_imap">Custom IMAP (Secure Server)</option>
-                                </select>
-                            </div>
 
-                            <!-- Sales Agent Inbox #1 (Primary) -->
-                            <div class="form-group">
-                                <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 5px;">
-                                    <label for="email_account" style="font-weight: bold; margin-bottom: 0;">Sales Agent Inbox #1 (Primary Email to Monitor)</label>
-                                    
-                                    <!-- Speech Bubble Tooltip -->
-                                    <span class="tooltip-icon">
-                                        💬
-                                        <span class="tooltip-text">
-                                            As a secondary option, you can also have AI monitor your incoming emails by cc'ing a copy of every email correspondence to:<br>
-                                            <strong class="wizard-forwarding-email" style="color: #81c784; word-break: break-all;">conversions-[id]@your-agency.com</strong><br>
-                                            <span style="font-size: 9px; color: #ccc;">(Your actual ID will show up on the next screen once profile is created)</span>
-                                        </span>
-                                    </span>
-                                    
-                                    <!-- Check Logs Hover Link -->
-                                    <span class="tooltip-icon" style="font-size: 11px; font-weight: bold; margin-left: 5px;">
-                                        <a href="javascript:void(0)" style="color: #1a237e; text-decoration: underline;">check logs</a>
-                                        <span class="tooltip-text" style="width: 290px;">
-                                            <strong>Last 5 Emails Analyzed by System:</strong><br>
-                                            <span style="color: #ccc; font-style: italic;">No emails analyzed yet (Onboarding in progress).</span>
-                                        </span>
-                                    </span>
-                                </div>
-                                <input type="text" id="email_account" placeholder="e.g. agent1@clientcompany.com">
-                                <small style="color: #666; font-size: 11px; margin-top: 4px; display: block;">
-                                    Enter primary sales agent email address where form leads arrive.
-                                </small>
-                            </div>
-                            <div class="form-group" style="margin-top: 12px;">
-                                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 5px;">
-                                    <label for="email_app_password" style="font-weight: bold; margin-bottom: 0;">Inbox #1 App Password / IMAP Key</label>
-                                    <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none; display: flex; align-items: center; gap: 4px;">
-                                        🔑 How to get an App Password?
-                                    </a>
-                                </div>
-                                <input type="password" id="email_app_password" placeholder="e.g. abcd efgh ijkl mnop">
-                            </div>
-
-                            <!-- Sales Agent Inbox #2 -->
-                            <div id="wiz-agent-inbox-2" style="margin-top: 20px; padding-top: 15px; border-top: 1px dashed #ccc; display: none;">
-                                <div class="form-group">
-                                    <label for="email_account_2" style="font-weight: bold;">Sales Agent Inbox #2 (Optional Email to Monitor)</label>
-                                    <input type="text" id="email_account_2" placeholder="e.g. agent2@clientcompany.com">
-                                </div>
-                                <div class="form-group" style="margin-top: 10px;">
-                                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 5px;">
-                                        <label for="email_app_password_2" style="font-weight: bold;">Inbox #2 App Password / IMAP Key</label>
-                                        <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none;">🔑 How to get an App Password?</a>
-                                    </div>
-                                    <input type="password" id="email_app_password_2" placeholder="e.g. abcd efgh ijkl mnop">
-                                </div>
-                            </div>
-
-                            <!-- Sales Agent Inbox #3 -->
-                            <div id="wiz-agent-inbox-3" style="margin-top: 20px; padding-top: 15px; border-top: 1px dashed #ccc; display: none;">
-                                <div class="form-group">
-                                    <label for="email_account_3" style="font-weight: bold;">Sales Agent Inbox #3 (Optional Email to Monitor)</label>
-                                    <input type="text" id="email_account_3" placeholder="e.g. agent3@clientcompany.com">
-                                </div>
-                                <div class="form-group" style="margin-top: 10px;">
-                                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 5px;">
-                                        <label for="email_app_password_3" style="font-weight: bold;">Inbox #3 App Password / IMAP Key</label>
-                                        <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none;">🔑 How to get an App Password?</a>
-                                    </div>
-                                    <input type="password" id="email_app_password_3" placeholder="e.g. abcd efgh ijkl mnop">
-                                </div>
-                            </div>
-
-                            <!-- Sales Agent Inbox #4 -->
-                            <div id="wiz-agent-inbox-4" style="margin-top: 20px; padding-top: 15px; border-top: 1px dashed #ccc; display: none;">
-                                <div class="form-group">
-                                    <label for="email_account_4" style="font-weight: bold;">Sales Agent Inbox #4 (Optional Email to Monitor)</label>
-                                    <input type="text" id="email_account_4" placeholder="e.g. agent4@clientcompany.com">
-                                </div>
-                                <div class="form-group" style="margin-top: 10px;">
-                                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 5px;">
-                                        <label for="email_app_password_4" style="font-weight: bold;">Inbox #4 App Password / IMAP Key</label>
-                                        <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none;">🔑 How to get an App Password?</a>
-                                    </div>
-                                    <input type="password" id="email_app_password_4" placeholder="e.g. abcd efgh ijkl mnop">
-                                </div>
-                            </div>
-
-                            <!-- Sales Agent Inbox #5 -->
-                            <div id="wiz-agent-inbox-5" style="margin-top: 20px; padding-top: 15px; border-top: 1px dashed #ccc; display: none;">
-                                <div class="form-group">
-                                    <label for="email_account_5" style="font-weight: bold;">Sales Agent Inbox #5 (Optional Email to Monitor)</label>
-                                    <input type="text" id="email_account_5" placeholder="e.g. agent5@clientcompany.com">
-                                </div>
-                                <div class="form-group" style="margin-top: 10px;">
-                                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 5px;">
-                                        <label for="email_app_password_5" style="font-weight: bold;">Inbox #5 App Password / IMAP Key</label>
-                                        <a href="javascript:void(0)" onclick="openAppPasswordModal()" style="font-size: 12px; color: #1a237e; font-weight: bold; text-decoration: none;">🔑 How to get an App Password?</a>
-                                    </div>
-                                    <input type="password" id="email_app_password_5" placeholder="e.g. abcd efgh ijkl mnop">
-                                </div>
-                            </div>
-
-                            <div style="margin-top: 15px; text-align: left;">
-                                <button type="button" id="wiz-btn-add-sales-agent" onclick="addSalesAgentInboxRowWiz()" style="background: #e8eaf6; color: #1a237e; border: 1px solid #c5cae9; padding: 8px 14px; border-radius: 6px; font-weight: bold; font-size: 12px; cursor: pointer; transition: all 0.2s;">
-                                    ➕ Add Another Sales Agent Inbox (Up to 5 Inboxes)
-                                </button>
-                            </div>
-                        </div>
                     </div>
                     
                     <!-- STEP 4: Conversion & Deduplication Rules -->
@@ -9497,7 +9387,11 @@ def add_client_page(request: Request):
                         snapchat_ads_id: document.getElementById('snapchat_ads_id').value.trim(),
                         chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
                         reddit_ads_id: document.getElementById('reddit_ads_id').value.trim(),
-                        lead_gen_method: document.querySelector('input[name="lead_gen_method"]:checked').value,
+                        lead_gen_method: (() => {{
+                            const checkedLg = document.querySelectorAll('input[name="lead_gen_method"]:checked');
+                            const lgMethods = Array.from(checkedLg).map(cb => cb.value);
+                            return lgMethods.length > 0 ? lgMethods.join(',') : 'both';
+                        }})(),
                         qualification_criteria: document.getElementById('qualification_criteria').value,
                         source_of_truth: document.getElementById('source_of_truth').value,
                         email_provider: document.getElementById('email_provider').value,
@@ -12459,7 +12353,7 @@ async def receive_chat_transcript_webhook(request: Request, client_id: Optional[
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO sessions 
-            (client_id, session_id, phone, email, name, gclid, fbclid, msclkid, li_fat_id, qualified, sale_closed, sale_value, qual_reason, created_at)
+            (client_id, session_id, phone, email, name, gclid, fbclid, msclkid, li_fat_id, qualified, sale_closed, value, reason, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             resolved_client_id, session_id, customer_phone, customer_email, customer_name,
