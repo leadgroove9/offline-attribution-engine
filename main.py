@@ -674,6 +674,34 @@ def init_db():
             VALUES (?, ?, 'full')
         """, (default_admin_email, default_admin_pass))
         print(f"Seeded default admin user '{default_admin_email}' successfully!")
+
+    # Create chat_pre_sessions Table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS chat_pre_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            client_id INTEGER DEFAULT 1,
+            ref_id TEXT UNIQUE NOT NULL,
+            phone TEXT,
+            email TEXT,
+            gclid TEXT,
+            fbclid TEXT,
+            li_fat_id TEXT,
+            msclkid TEXT,
+            ttclid TEXT,
+            twclid TEXT,
+            pin_clid TEXT,
+            scclid TEXT,
+            gptclid TEXT,
+            rdt_cid TEXT,
+            landing_page_url TEXT,
+            referrer_url TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_chat_pre_sessions_ref ON chat_pre_sessions(ref_id);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_chat_pre_sessions_phone ON chat_pre_sessions(phone);")
+
+
     
     conn.commit()
     conn.close()
@@ -700,7 +728,7 @@ def startup_db_init():
 # ANTHROPIC CLAUDE CONFIGURATION
 # ---------------------------------------------------------
 API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()
-client = Anthropic(api_key=API_KEY, max_retries=3, timeout=30.0) if (API_KEY and Anthropic is not None) else None
+client = Anthropic(api_key=API_KEY, max_retries=3, timeout=30.0) if API_KEY else None
 
 def clean_json_string(text: str) -> str:
     text = text.strip()
@@ -876,6 +904,213 @@ def check_is_excluded_customer(client_id: int, phone: str = "", email: str = "")
         print(f"⚠️ Error checking customer exclusion: {e}")
     return None
 
+
+def normalize_chat_transcript(raw_data) -> str:
+    """
+    Universal chat transcript normalizer for WhatsApp, Telegram, Viber, LiveChat, Intercom, Crisp, Drift, Tidio, Zendesk, etc.
+    Converts diverse JSON message arrays/objects/strings into clean '[Visitor]: ... \n [Agent]: ...' dialogue.
+    """
+    if not raw_data:
+        return ""
+    if isinstance(raw_data, str):
+        return raw_data.strip()
+    
+    messages = []
+    
+    # Extract list of message items if wrapped in a dict
+    if isinstance(raw_data, dict):
+        if "messages" in raw_data and isinstance(raw_data["messages"], list):
+            raw_items = raw_data["messages"]
+        elif "events" in raw_data and isinstance(raw_data["events"], list):
+            raw_items = raw_data["events"]
+        elif "conversation_parts" in raw_data and isinstance(raw_data["conversation_parts"], dict):
+            raw_items = raw_data["conversation_parts"].get("conversation_parts", [])
+        elif "comments" in raw_data and isinstance(raw_data["comments"], list):
+            raw_items = raw_data["comments"]
+        elif "thread" in raw_data and isinstance(raw_data["thread"], dict):
+            raw_items = raw_data["thread"].get("events", [])
+        else:
+            raw_items = [raw_data]
+    elif isinstance(raw_data, list):
+        raw_items = raw_data
+    else:
+        return str(raw_data)
+
+    for item in raw_items:
+        if isinstance(item, str):
+            messages.append(item)
+            continue
+        if not isinstance(item, dict):
+            continue
+            
+        # Determine sender/role
+        sender_type = "Visitor"
+        author = item.get("author") or item.get("speaker") or item.get("sender") or item.get("user") or item.get("type") or item.get("from") or {}
+        
+        if isinstance(author, dict):
+            type_str = str(author.get("type") or author.get("role") or author.get("user_type") or "").lower()
+            name_str = author.get("name") or author.get("first_name") or "User"
+            if any(k in type_str for k in ["agent", "admin", "operator", "bot", "support", "rep"]):
+                sender_type = f"Agent ({name_str})" if name_str != "User" else "Agent"
+            elif any(k in type_str for k in ["visitor", "customer", "user", "lead", "client"]):
+                sender_type = f"Visitor ({name_str})" if name_str != "User" else "Visitor"
+            else:
+                sender_type = name_str
+        elif isinstance(author, str):
+            auth_lower = author.lower()
+            if any(k in auth_lower for k in ["agent", "admin", "operator", "bot", "support", "rep"]):
+                sender_type = f"Agent ({author})"
+            elif any(k in auth_lower for k in ["visitor", "customer", "user", "lead", "client"]):
+                sender_type = f"Visitor ({author})"
+            else:
+                sender_type = author
+                
+        # Extract text body
+        text_body = ""
+        if "text" in item and isinstance(item["text"], str):
+            text_body = item["text"]
+        elif "body" in item and isinstance(item["body"], str):
+            text_body = item["body"]
+        elif "message" in item:
+            msg_val = item["message"]
+            if isinstance(msg_val, str):
+                text_body = msg_val
+            elif isinstance(msg_val, dict):
+                text_body = msg_val.get("text") or msg_val.get("caption") or msg_val.get("body") or ""
+        elif "content" in item and isinstance(item["content"], str):
+            text_body = item["content"]
+        elif "caption" in item and isinstance(item["caption"], str):
+            text_body = item["caption"]
+            
+        if text_body and text_body.strip():
+            messages.append(f"[{sender_type}]: {text_body.strip()}")
+            
+    return "\n".join(messages)
+
+
+def resolve_chat_click_ids(payload: dict, client_id: int) -> dict:
+    """
+    Universal Click ID Resolver for LiveChat and Messaging Webhooks.
+    1. Checks for embedded session token (Ref: lg_XXXXX) and looks up chat_pre_sessions.
+    2. Checks phone number in chat_pre_sessions / sessions.
+    3. Scans custom attributes / properties / URL params in payload.
+    """
+    gclid = payload.get("gclid") or payload.get("google_click_id")
+    fbclid = payload.get("fbclid") or payload.get("facebook_click_id")
+    li_fat_id = payload.get("li_fat_id") or payload.get("linkedin_click_id")
+    msclkid = payload.get("msclkid") or payload.get("microsoft_click_id")
+    ttclid = payload.get("ttclid") or payload.get("tiktok_click_id")
+    twclid = payload.get("twclid") or payload.get("twitter_click_id") or payload.get("x_click_id")
+    pin_clid = payload.get("pin_clid") or payload.get("pinterest_click_id")
+    scclid = payload.get("scclid") or payload.get("snapchat_click_id")
+    gptclid = payload.get("gptclid") or payload.get("chatgpt_click_id")
+    rdt_cid = payload.get("rdt_cid") or payload.get("reddit_click_id")
+
+    # Search for embedded reference token lg_XXXXX in payload text/transcript
+    full_text = str(payload)
+    ref_match = re.search(r"lg_[a-zA-Z0-9]+", full_text)
+    ref_id = ref_match.group(0) if ref_match else None
+    
+    # Try chat_pre_sessions lookup by ref_id
+    pre_session = None
+    if ref_id:
+        try:
+            conn = db_router.connect()
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, scclid, gptclid, rdt_cid, client_id 
+                FROM chat_pre_sessions WHERE ref_id = ?
+            """, (ref_id,))
+            pre_session = cursor.fetchone()
+            conn.close()
+        except Exception as e:
+            print(f"⚠️ chat_pre_sessions lookup error: {e}")
+            
+    # Fallback lookup by phone if ref_id didn't match
+    raw_phone = payload.get("phone") or payload.get("customer_phone_number") or payload.get("caller_number") or payload.get("from")
+    norm_phone = normalize_phone(str(raw_phone)) if raw_phone else ""
+    if not pre_session and norm_phone:
+        try:
+            conn = db_router.connect()
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, scclid, gptclid, rdt_cid, client_id 
+                FROM chat_pre_sessions WHERE phone = ? AND client_id = ? ORDER BY id DESC LIMIT 1
+            """, (norm_phone, client_id))
+            pre_session = cursor.fetchone()
+            conn.close()
+        except Exception as e:
+            print(f"⚠️ chat_pre_sessions phone lookup error: {e}")
+
+    if pre_session:
+        gclid = gclid or pre_session[0]
+        fbclid = fbclid or pre_session[1]
+        li_fat_id = li_fat_id or pre_session[2]
+        msclkid = msclkid or pre_session[3]
+        ttclid = ttclid or pre_session[4]
+        twclid = twclid or pre_session[5]
+        pin_clid = pin_clid or pre_session[6]
+        scclid = scclid or pre_session[7]
+        gptclid = gptclid or pre_session[8]
+        rdt_cid = rdt_cid or pre_session[9]
+
+    # Recursive scan of custom_variables / properties / attributes arrays in chat payloads
+    def scan_custom_props(obj):
+        nonlocal gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, scclid, gptclid, rdt_cid
+        if isinstance(obj, list):
+            for item in obj:
+                scan_custom_props(item)
+        elif isinstance(obj, dict):
+            key_str = str(obj.get("name") or obj.get("key") or obj.get("id") or "").lower()
+            val_str = str(obj.get("value") or obj.get("val") or "")
+            if val_str and val_str != "None":
+                if "gclid" in key_str and not gclid: gclid = val_str
+                elif "fbclid" in key_str and not fbclid: fbclid = val_str
+                elif "li_fat_id" in key_str and not li_fat_id: li_fat_id = val_str
+                elif "msclkid" in key_str and not msclkid: msclkid = val_str
+                elif "ttclid" in key_str and not ttclid: ttclid = val_str
+                elif "twclid" in key_str and not twclid: twclid = val_str
+                elif "pin_clid" in key_str and not pin_clid: pin_clid = val_str
+                elif "scclid" in key_str and not scclid: scclid = val_str
+                elif "gptclid" in key_str and not gptclid: gptclid = val_str
+                elif "rdt_cid" in key_str and not rdt_cid: rdt_cid = val_str
+            for v in obj.values():
+                if isinstance(v, (dict, list)):
+                    scan_custom_props(v)
+
+    for prop_key in ["custom_variables", "custom_attributes", "custom_properties", "session_data", "user_data", "properties", "fields"]:
+        if prop_key in payload:
+            scan_custom_props(payload[prop_key])
+
+    # Check page_url / landing_page URL query parameters as final fallback
+    page_url = payload.get("page_url") or payload.get("landing_page") or payload.get("url") or payload.get("referrer") or ""
+    if page_url and isinstance(page_url, str):
+        if not gclid: gclid = extract_param_from_url(page_url, "gclid")
+        if not fbclid: fbclid = extract_param_from_url(page_url, "fbclid")
+        if not li_fat_id: li_fat_id = extract_param_from_url(page_url, "li_fat_id")
+        if not msclkid: msclkid = extract_param_from_url(page_url, "msclkid")
+        if not ttclid: ttclid = extract_param_from_url(page_url, "ttclid")
+        if not twclid: twclid = extract_param_from_url(page_url, "twclid")
+        if not pin_clid: pin_clid = extract_param_from_url(page_url, "pin_clid")
+        if not scclid: scclid = extract_param_from_url(page_url, "scclid")
+        if not gptclid: gptclid = extract_param_from_url(page_url, "gptclid")
+        if not rdt_cid: rdt_cid = extract_param_from_url(page_url, "rdt_cid")
+
+    return {
+        "gclid": gclid or None,
+        "fbclid": fbclid or None,
+        "li_fat_id": li_fat_id or None,
+        "msclkid": msclkid or None,
+        "ttclid": ttclid or None,
+        "twclid": twclid or None,
+        "pin_clid": pin_clid or None,
+        "scclid": scclid or None,
+        "gptclid": gptclid or None,
+        "rdt_cid": rdt_cid or None,
+        "ref_id": ref_id
+    }
+
+
 def normalize_phone(phone_str: str) -> str:
     if not phone_str:
         return ""
@@ -926,6 +1161,26 @@ SOT_MAP = {
 # ---------------------------------------------------------
 # WEBHOOK DATA SCHEMAS (Pydantic Models)
 # ---------------------------------------------------------
+
+class ChatPreSessionPayload(BaseModel):
+    client_id: Optional[int] = 1
+    ref_id: str
+    phone: Optional[str] = ""
+    email: Optional[str] = ""
+    gclid: Optional[str] = ""
+    fbclid: Optional[str] = ""
+    li_fat_id: Optional[str] = ""
+    msclkid: Optional[str] = ""
+    ttclid: Optional[str] = ""
+    twclid: Optional[str] = ""
+    pin_clid: Optional[str] = ""
+    scclid: Optional[str] = ""
+    gptclid: Optional[str] = ""
+    rdt_cid: Optional[str] = ""
+    landing_page_url: Optional[str] = ""
+    referrer_url: Optional[str] = ""
+
+
 class FormLead(BaseModel):
     first_name: str
     last_name: str
@@ -3309,7 +3564,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
         # Dynamic Layer b) Won Deals overlay based on selected Single Source of Truth
         # Dynamic SOT Labels and Value Field
         if sot == "google_sheets":
-            deal_tags_label_text = "Which tags/statuses on Google sheet signify a qualified lead conversion?"
+            deal_tags_label_text = "Which tags/statuses on Google sheet signify a qualified conversion?"
             won_tags_label_text = "Which tags/statuses on Google sheet signify a won deal conversion?"
             value_box_display_style = "block"
         elif sot in ["quickbooks", "xero", "zoho_books", "netsuite", "sage", "freshbooks", "zapier"]:
@@ -4241,6 +4496,10 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                                 <div style="margin-bottom: 15px;">
                                     <label id="sot-won-deal-tags-label" for="crm_won_deal_tags">{won_tags_label_text}</label>
                                     <input type="text" id="crm_won_deal_tags" value="{client_data.get("crm_won_deal_tags", "") or ""}" placeholder="e.g. closed-won, job-completed">
+                                </div>
+                                <div id="sot-value-tags-group" style="display: {value_box_display_style};">
+                                    <label id="sot-value-tags-label" for="crm_value_field">Which tags/statuses on Google sheet signify the won deal transaction value?</label>
+                                    <input type="text" id="crm_value_field" value="{client_data.get("crm_value_field", "") or ""}" placeholder="e.g. Total Amount, Sale Price, Invoice Total, Column E">
                                 </div>
                             </div>
                             
@@ -6239,7 +6498,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             if (valGroup) valGroup.style.display = 'block';
                             const dLabel = document.getElementById('sot-deal-tags-label');
                             const wLabel = document.getElementById('sot-won-deal-tags-label');
-                            if (dLabel) dLabel.innerText = 'Which tags/statuses on Google sheet signify a qualified lead conversion?';
+                            if (dLabel) dLabel.innerText = 'Which tags/statuses on Google sheet signify a qualified conversion?';
                             if (wLabel) wLabel.innerText = 'Which tags/statuses on Google sheet signify a won deal conversion?';
                         }}
                         else if (sot === 'zapier' && zapierBox) {{ zapierBox.style.display = 'block'; if (dealBox) dealBox.style.display = 'block'; }}
@@ -11311,7 +11570,6 @@ async def receive_calltrackingmetrics_webhook(request: Request, client_id: Optio
             twclid,
             pin_clid,
             gptclid,
-            rdt_cid,
             "calltrackingmetrics", 
             ai_qualified, 
             ai_sale_closed, 
@@ -11515,7 +11773,6 @@ async def receive_whatconverts_webhook(request: Request, client_id: Optional[int
             twclid,
             pin_clid,
             gptclid,
-            rdt_cid,
             "whatconverts", 
             ai_qualified, 
             ai_sale_closed, 
@@ -11781,6 +12038,340 @@ async def receive_voip_webhook(request: Request, client_id: Optional[int] = None
         raise HTTPException(status_code=400, detail=str(e))
 
 
+
+@app.post("/webhooks/chat-session")
+@app.get("/webhooks/chat-session")
+async def save_chat_pre_session(request: Request, client_id: Optional[int] = None):
+    """
+    Pre-Chat Click ID Logging Endpoint.
+    Stores website visitor ad Click IDs alongside a reference ID (lg_XXXXX) before they launch WhatsApp, Telegram, Viber, or Live Chat.
+    """
+    try:
+        content_type = request.headers.get("content-type", "")
+        if "application/json" in content_type:
+            payload = await request.json()
+        else:
+            try:
+                form_data = await request.form()
+                payload = dict(form_data)
+            except Exception:
+                payload = dict(request.query_params)
+                
+        resolved_client_id = client_id or payload.get("client_id") or 1
+        try:
+            resolved_client_id = int(resolved_client_id)
+        except Exception:
+            resolved_client_id = 1
+            
+        ref_id = payload.get("ref_id") or f"lg_{uuid.uuid4().hex[:8]}"
+        phone = normalize_phone(payload.get("phone") or "")
+        email = str(payload.get("email") or "").strip().lower()
+        
+        gclid = payload.get("gclid") or extract_param_from_url(payload.get("landing_page_url"), "gclid")
+        fbclid = payload.get("fbclid") or extract_param_from_url(payload.get("landing_page_url"), "fbclid")
+        li_fat_id = payload.get("li_fat_id") or extract_param_from_url(payload.get("landing_page_url"), "li_fat_id")
+        msclkid = payload.get("msclkid") or extract_param_from_url(payload.get("landing_page_url"), "msclkid")
+        ttclid = payload.get("ttclid") or extract_param_from_url(payload.get("landing_page_url"), "ttclid")
+        twclid = payload.get("twclid") or extract_param_from_url(payload.get("landing_page_url"), "twclid")
+        pin_clid = payload.get("pin_clid") or extract_param_from_url(payload.get("landing_page_url"), "pin_clid")
+        scclid = payload.get("scclid") or extract_param_from_url(payload.get("landing_page_url"), "scclid")
+        gptclid = payload.get("gptclid") or extract_param_from_url(payload.get("landing_page_url"), "gptclid")
+        rdt_cid = payload.get("rdt_cid") or extract_param_from_url(payload.get("landing_page_url"), "rdt_cid")
+
+        conn = db_router.connect()
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO chat_pre_sessions (
+                client_id, ref_id, phone, email, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, scclid, gptclid, rdt_cid, landing_page_url, referrer_url
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            resolved_client_id, ref_id, phone or None, email or None,
+            gclid or None, fbclid or None, li_fat_id or None, msclkid or None,
+            ttclid or None, twclid or None, pin_clid or None, scclid or None,
+            gptclid or None, rdt_cid or None, payload.get("landing_page_url"), payload.get("referrer_url")
+        ))
+        conn.commit()
+        conn.close()
+        
+        return {"status": "success", "ref_id": ref_id, "client_id": resolved_client_id, "message": "Pre-chat click session saved successfully."}
+    except Exception as e:
+        return {"status": "error", "message": f"Failed to save pre-chat session: {str(e)}"}
+
+
+@app.post("/webhooks/whatsapp")
+@app.get("/webhooks/whatsapp")
+async def receive_whatsapp_webhook(request: Request, client_id: Optional[int] = None):
+    """
+    Meta WhatsApp Business API Webhook Ingestion Receiver.
+    Supports Meta verification challenges (GET hub.challenge) and incoming chat thread payloads.
+    """
+    # Meta webhook verification challenge
+    if request.method == "GET":
+        mode = request.query_params.get("hub.mode")
+        token = request.query_params.get("hub.verify_token")
+        challenge = request.query_params.get("hub.challenge")
+        if mode == "subscribe" and challenge:
+            return PlainTextResponse(content=challenge, status_code=200)
+
+    try:
+        payload = await request.json() if "application/json" in request.headers.get("content-type", "") else dict(await request.form())
+    except Exception:
+        payload = {}
+
+    resolved_client_id = client_id or 1
+    
+    # Extract sender info from WhatsApp Meta Business structure
+    sender_name = "WhatsApp Lead"
+    raw_phone = ""
+    messages_data = []
+
+    if isinstance(payload, dict) and "entry" in payload and isinstance(payload["entry"], list):
+        for entry in payload["entry"]:
+            changes = entry.get("changes", [])
+            for change in changes:
+                value = change.get("value", {})
+                contacts = value.get("contacts", [])
+                if contacts and isinstance(contacts, list):
+                    sender_name = contacts[0].get("profile", {}).get("name", sender_name)
+                    raw_phone = contacts[0].get("wa_id", raw_phone)
+                msgs = value.get("messages", [])
+                if msgs:
+                    messages_data.extend(msgs)
+    else:
+        sender_name = payload.get("name") or payload.get("customer_name") or "WhatsApp Lead"
+        raw_phone = payload.get("phone") or payload.get("wa_id") or payload.get("from") or ""
+        messages_data = payload.get("messages") or payload.get("transcript") or payload
+
+    norm_phone = normalize_phone(str(raw_phone)) if raw_phone else "15550001111"
+    click_ids = resolve_chat_click_ids(payload if isinstance(payload, dict) else {}, resolved_client_id)
+    transcript = normalize_chat_transcript(messages_data)
+
+    return await process_chat_audit_and_save(
+        client_id=resolved_client_id,
+        phone=norm_phone,
+        name=sender_name,
+        source="whatsapp",
+        transcript=transcript,
+        click_ids=click_ids,
+        raw_payload=payload
+    )
+
+
+@app.post("/webhooks/telegram")
+async def receive_telegram_webhook(request: Request, client_id: Optional[int] = None):
+    """
+    Telegram Bot API Webhook Ingestion Receiver.
+    """
+    try:
+        payload = await request.json() if "application/json" in request.headers.get("content-type", "") else dict(await request.form())
+    except Exception:
+        payload = {}
+
+    resolved_client_id = client_id or 1
+    
+    message_obj = payload.get("message") or payload.get("edited_message") or payload
+    chat_obj = message_obj.get("chat", {}) if isinstance(message_obj, dict) else {}
+    from_obj = message_obj.get("from", {}) if isinstance(message_obj, dict) else {}
+
+    first_name = from_obj.get("first_name") or chat_obj.get("first_name") or "Telegram"
+    last_name = from_obj.get("last_name") or chat_obj.get("last_name") or "User"
+    full_name = f"{first_name} {last_name}".strip()
+    
+    contact_phone = message_obj.get("contact", {}).get("phone_number") if isinstance(message_obj, dict) else ""
+    norm_phone = normalize_phone(str(contact_phone)) if contact_phone else f"1999{chat_obj.get('id', '12345')}"[:11]
+    
+    click_ids = resolve_chat_click_ids(payload, resolved_client_id)
+    transcript = normalize_chat_transcript(message_obj)
+
+    return await process_chat_audit_and_save(
+        client_id=resolved_client_id,
+        phone=norm_phone,
+        name=full_name,
+        source="telegram",
+        transcript=transcript,
+        click_ids=click_ids,
+        raw_payload=payload
+    )
+
+
+@app.post("/webhooks/viber")
+async def receive_viber_webhook(request: Request, client_id: Optional[int] = None):
+    """
+    Viber Business / Bot API Webhook Ingestion Receiver.
+    """
+    try:
+        payload = await request.json() if "application/json" in request.headers.get("content-type", "") else dict(await request.form())
+    except Exception:
+        payload = {}
+
+    resolved_client_id = client_id or 1
+    
+    sender_obj = payload.get("sender") or payload.get("user") or {}
+    full_name = sender_obj.get("name") or "Viber Lead"
+    raw_phone = sender_obj.get("phone") or payload.get("phone") or ""
+    norm_phone = normalize_phone(str(raw_phone)) if raw_phone else f"1888{sender_obj.get('id', '99999')[:7]}"
+
+    click_ids = resolve_chat_click_ids(payload, resolved_client_id)
+    transcript = normalize_chat_transcript(payload.get("message") or payload)
+
+    return await process_chat_audit_and_save(
+        client_id=resolved_client_id,
+        phone=norm_phone,
+        name=full_name,
+        source="viber",
+        transcript=transcript,
+        click_ids=click_ids,
+        raw_payload=payload
+    )
+
+
+@app.post("/webhooks/livechat")
+async def receive_livechat_webhook(request: Request, client_id: Optional[int] = None):
+    """
+    Unified Website Live Chat Webhook Receiver.
+    Supports LiveChat, Intercom, Drift, Zendesk, Crisp, Tidio, HubSpot Chat, Olark, Zoho SalesIQ, Help Scout.
+    """
+    try:
+        content_type = request.headers.get("content-type", "")
+        if "application/json" in content_type:
+            payload = await request.json()
+        else:
+            try:
+                payload = dict(await request.form())
+            except Exception:
+                payload = {}
+    except Exception:
+        payload = {}
+
+    resolved_client_id = client_id or 1
+    
+    # Extract Visitor Info
+    visitor_name = "LiveChat Visitor"
+    visitor_email = ""
+    visitor_phone = ""
+    
+    # Detect provider specifics or standard structure
+    visitor_obj = payload.get("visitor") or payload.get("user") or payload.get("customer") or payload.get("contact") or {}
+    if isinstance(visitor_obj, dict):
+        visitor_name = visitor_obj.get("name") or f"{visitor_obj.get('first_name', '')} {visitor_obj.get('last_name', '')}".strip() or visitor_name
+        visitor_email = visitor_obj.get("email") or ""
+        visitor_phone = visitor_obj.get("phone") or visitor_obj.get("phone_number") or ""
+        
+    visitor_name = payload.get("name") or payload.get("customer_name") or visitor_name
+    visitor_email = payload.get("email") or payload.get("customer_email") or visitor_email
+    visitor_phone = payload.get("phone") or payload.get("customer_phone") or visitor_phone
+    
+    norm_phone = normalize_phone(visitor_phone) if visitor_phone else "15551234567"
+    click_ids = resolve_chat_click_ids(payload, resolved_client_id)
+    transcript = normalize_chat_transcript(payload)
+
+    # Detect provider name for logging source
+    provider_source = "livechat"
+    if "intercom" in str(payload).lower(): provider_source = "livechat_intercom"
+    elif "drift" in str(payload).lower(): provider_source = "livechat_drift"
+    elif "crisp" in str(payload).lower(): provider_source = "livechat_crisp"
+    elif "zendesk" in str(payload).lower(): provider_source = "livechat_zendesk"
+    elif "tidio" in str(payload).lower(): provider_source = "livechat_tidio"
+    elif "hubspot" in str(payload).lower(): provider_source = "livechat_hubspot"
+
+    return await process_chat_audit_and_save(
+        client_id=resolved_client_id,
+        phone=norm_phone,
+        email=visitor_email,
+        name=visitor_name,
+        source=provider_source,
+        transcript=transcript,
+        click_ids=click_ids,
+        raw_payload=payload
+    )
+
+
+async def process_chat_audit_and_save(client_id: int, phone: str, name: str, source: str, transcript: str, click_ids: dict, raw_payload: dict, email: str = ""):
+    """Helper pipeline to audit chat transcript with Claude and save to sessions DB."""
+    try:
+        qualification_definition_desc = "Someone who expresses real intent to buy or schedule a service."
+        
+        conn = db_router.connect()
+        cursor = conn.cursor()
+        cursor.execute("SELECT name, qualification_criteria, exclude_past_customers FROM clients WHERE id = ?", (client_id,))
+        client_info = cursor.fetchone()
+        conn.close()
+        
+        if client_info and client_info[1]:
+            criteria_code = client_info[1]
+            qualification_definition_desc = CRITERIA_MAP.get(criteria_code, qualification_definition_desc)
+
+        is_excluded = False
+        exclusion_reason = ""
+        if client_info and client_info[2] == "YES":
+            match_type = check_is_excluded_customer(client_id, phone=phone, email=email)
+            if match_type:
+                is_excluded = True
+                exclusion_reason = f"Chat session ignored: Customer matches your uploaded past customer list ({match_type})."
+
+        ai_qualified = "NO"
+        ai_sale_closed = "NO"
+        ai_value = 0.0
+        ai_reason = "No transcript provided."
+        model_name = "None"
+
+        if is_excluded:
+            ai_reason = exclusion_reason
+        elif transcript.strip():
+            ai_result = analyze_transcript_with_claude(transcript, qualification_definition_desc)
+            ai_qualified = ai_result.get("qualified", "NO")
+            ai_sale_closed = ai_result.get("sale_closed", "NO")
+            ai_value = float(ai_result.get("value", 0.0))
+            ai_reason = ai_result.get("reason", "No reason parsed.")
+            model_name = "claude-haiku-4-5-20251001"
+
+        conn = db_router.connect()
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO sessions (
+                client_id, phone, name, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, gptclid, rdt_cid, source, qualified, sale_closed, value, reason, model_used, raw_data
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            client_id,
+            phone,
+            name,
+            click_ids.get("gclid"),
+            click_ids.get("fbclid"),
+            click_ids.get("li_fat_id"),
+            click_ids.get("msclkid"),
+            click_ids.get("ttclid"),
+            click_ids.get("twclid"),
+            click_ids.get("pin_clid"),
+            click_ids.get("gptclid"),
+            click_ids.get("rdt_cid"),
+            source,
+            ai_qualified,
+            ai_sale_closed,
+            ai_value,
+            ai_reason,
+            model_name,
+            str(raw_payload)
+        ))
+        conn.commit()
+        conn.close()
+
+        return {
+            "status": "success",
+            "client_id": client_id,
+            "source": source,
+            "message": f"{source.upper()} chat transcript successfully audited and logged.",
+            "ai_audit": {
+                "qualified": ai_qualified,
+                "sale_closed": ai_sale_closed,
+                "value": ai_value,
+                "reason": ai_reason
+            }
+        }
+    except Exception as e:
+        return {"status": "error", "message": f"Error processing {source} chat audit: {str(e)}"}
+
+
 @app.post("/webhooks/callrail")
 async def receive_callrail_webhook(request: Request, client_id: Optional[int] = None):
     """
@@ -12000,7 +12591,6 @@ async def receive_callrail_webhook(request: Request, client_id: Optional[int] = 
             twclid,
             pin_clid,
             gptclid,
-            rdt_cid,
             "callrail", 
             ai_qualified, 
             ai_sale_closed, 
@@ -12069,7 +12659,7 @@ async def receive_form_lead(lead: FormLead, client_id: Optional[int] = None):
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO sessions (client_id, phone, email, name, company, gclid, fbclid, li_fat_id, msclkid, ttclid, twclid, pin_clid, gptclid, rdt_cid, source, qualified, sale_closed, reason)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             resolved_client_id, 
             normalized_phone, 
@@ -12084,7 +12674,6 @@ async def receive_form_lead(lead: FormLead, client_id: Optional[int] = None):
             lead.twclid,
             lead.pin_clid,
             lead.gptclid,
-            lead.rdt_cid if hasattr(lead, 'rdt_cid') else None,
             "form",
             qualified_val,
             sale_closed_val,
@@ -13053,14 +13642,4 @@ def resolve_unmatched_record(request: Request, record_id: int = Form(...), clien
     conn.commit()
     conn.close()
     
-    return RedirectResponse(url=f"/dashboard/health?client_id={client_id}", status_code=303)@app.get("/health")
-
-def root_health_probe():
-    return {"status": "ok", "service": "LeadGroove Engine", "version": "15.2.0"}
-
-@app.get("/health", response_model=None)
-@app.get("/healthz", response_model=None)
-def root_system_health_probe():
-    return {"status": "ok", "service": "LeadGroove Engine", "version": "15.2.0"}
-
-
+    return RedirectResponse(url=f"/dashboard/health?client_id={client_id}", status_code=303)
