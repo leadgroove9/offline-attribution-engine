@@ -1,12 +1,13 @@
 import os
 import sqlite3
 import re
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request, HTTPException, File, UploadFile, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from typing import Optional
 from database.connection import db_router
 from services.auth_service import is_authenticated, get_user_role_and_client
-from models.schemas import ClientCreate, ClientUpdate, UserInvite, UserRoleUpdate, UserDelete, InviteRoleUpdate, InviteDelete
+from services.identity_matcher import normalize_phone, find_dynamic_columns_custom, check_is_excluded_customer
+from models.schemas import ClientCreate, ClientUpdate, UserInvite, UserRoleUpdate, UserDelete, InviteRoleUpdate, InviteDelete, SaleAdjustment, ExcludedCustomer
 from config import CRITERIA_MAP, SOT_MAP, ADMIN_EMAILS
 
 router = APIRouter()
@@ -3440,10 +3441,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         reddit_ads_id: document.getElementById('reddit_ads_id').value.trim(),
                         chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
                         reddit_ads_id: document.getElementById('reddit_ads_id').value.trim(),
-                        lead_gen_method: (function() {
-                            const checkedLgList = Array.from(document.querySelectorAll('input[name="lead_gen_method"]:checked')).map(cb => cb.value);
-                            return checkedLgList.length > 0 ? checkedLgList.join(',') : 'both';
-                        })(),
+                        lead_gen_method: document.querySelector('input[name="lead_gen_method"]:checked').value,
                         qualification_criteria: document.getElementById('qualification_criteria').value,
                         source_of_truth: document.getElementById('source_of_truth').value,
                         email_provider: document.getElementById('email_provider').value,
@@ -4501,41 +4499,31 @@ def add_client_page(request: Request):
                     <div class="wizard-step" id="step-panel-2">
                         <div class="instructions">
                              <strong>Step 2: Lead Generation & Qualification Preferences</strong><br>
-                            Tell us the total ways you receive leads now so that our systems can track all possible lead sources
+                            Tell us how this client receives and identifies a qualified lead so that Claude's sales auditing aligns perfectly.
                         </div>
                         
                         <div class="form-group">
-                            <label>Which lead generation channels do you want to track?</label>
-                            <small style="color: #666; font-size: 12px; display: block; margin-top: -4px; margin-bottom: 10px;">
-                                Select all that apply to you:
-                            </small>
+                            <label>How do you generate your leads?</label>
                             <div class="card-radio-group">
-                                <div class="card-radio selected" onclick="toggleCardCheckbox(this)">
-                                    <input type="checkbox" name="lead_gen_method" value="phone" checked>
+                                <div class="card-radio selected" onclick="selectCardRadio('lead_gen_method', 'both', this)">
+                                    <input type="radio" name="lead_gen_method" value="both" checked>
                                     <div>
-                                        <div class="card-checkbox-label" style="font-weight: bold; font-size: 14px;">📞 Phone Calls</div>
-                                        <div class="card-radio-sub" style="font-size: 11px; color: #666;">CallRail, CallTrackingMetrics, WhatConverts & VoIP transcripts</div>
+                                        <div class="card-radio-label">Both Phone Calls & Web Forms</div>
+                                        <div class="card-radio-sub">Full multi-channel capture (Recommended)</div>
                                     </div>
                                 </div>
-                                <div class="card-radio selected" onclick="toggleCardCheckbox(this)">
-                                    <input type="checkbox" name="lead_gen_method" value="form" checked>
+                                <div class="card-radio" onclick="selectCardRadio('lead_gen_method', 'phone', this)">
+                                    <input type="radio" name="lead_gen_method" value="phone">
                                     <div>
-                                        <div class="card-checkbox-label" style="font-weight: bold; font-size: 14px;">📝 Web Form Submissions</div>
-                                        <div class="card-radio-sub" style="font-size: 11px; color: #666;">Website contact forms with ad Click IDs (GCLID, FBCLID, etc.)</div>
+                                        <div class="card-radio-label">Phone Calls Only</div>
+                                        <div class="card-radio-sub">Auditing CallRail phone transcripts exclusively</div>
                                     </div>
                                 </div>
-                                <div class="card-radio" onclick="toggleCardCheckbox(this)">
-                                    <input type="checkbox" name="lead_gen_method" value="chat">
+                                <div class="card-radio" onclick="selectCardRadio('lead_gen_method', 'form', this)">
+                                    <input type="radio" name="lead_gen_method" value="form">
                                     <div>
-                                        <div class="card-checkbox-label" style="font-weight: bold; font-size: 14px;">💬 Live Chat Widgets</div>
-                                        <div class="card-radio-sub" style="font-size: 11px; color: #666;">LiveChat, Intercom, Drift, Crisp, Zendesk, Tidio, HubSpot Chat, etc.</div>
-                                    </div>
-                                </div>
-                                <div class="card-radio" onclick="toggleCardCheckbox(this)">
-                                    <input type="checkbox" name="lead_gen_method" value="messaging">
-                                    <div>
-                                        <div class="card-checkbox-label" style="font-weight: bold; font-size: 14px;">📱 Direct Messaging Apps</div>
-                                        <div class="card-radio-sub" style="font-size: 11px; color: #666;">WhatsApp Business, Telegram Bot, Viber Business</div>
+                                        <div class="card-radio-label">Form Submissions Only</div>
+                                        <div class="card-radio-sub">Matching visitor website form GCLIDs only</div>
                                     </div>
                                 </div>
                             </div>
@@ -4568,24 +4556,19 @@ def add_client_page(request: Request):
                     <div class="wizard-step" id="step-panel-3">
                         <div class="instructions">
                              <strong>Step 3: Single Source of Truth & Integration Mapping</strong><br>
-                            Identify where your lead information lives. LeadGrove will continuously scan this resource to upload relevant lead qualification data to your Ad networks.
+                            Identify where your conversion status lives. Your platform scans this resource to upload revenue data to Ad Networks.
                         </div>
                         
                         <div class="form-group">
                             <label for="source_of_truth">Where is your Single Source of Truth?</label>
-                            <small style="color: #666; font-size: 12px; display: block; margin-top: -4px; margin-bottom: 8px;">
-                                i.e. Where does your sales data exist that indicates which of your incoming leads close into sales or not?
-                            </small>
                             <select id="source_of_truth" onchange="toggleSOTFields()">
-                                <option value="transcripts" selected>Phone/Email Transcripts (AI-Graded Lead Qualification & Sales Tracking)</option>
-                                <option value="spreadsheets">Spreadsheets (Manual CSV / Spreadsheet Ingestion)</option>
                                 <option value="hubspot">HubSpot CRM</option>
-                                <option value="zoho">Zoho CRM</option>
                                 <option value="salesforce">Salesforce CRM</option>
-                                <option value="servicetitan">ServiceTitan CRM</option>
-                                <option value="housecallpro">Housecall Pro CRM</option>
-                                <option value="gohighlevel">GoHighLevel (GHL) CRM</option>
-                                <option value="quickbooks">QuickBooks Billing</option>
+                                <option value="zoho">Zoho CRM</option>
+                                <option value="servicetitan">ServiceTitan (Home Services)</option>
+                                <option value="housecallpro">Housecall Pro (Home Services)</option>
+                                <option value="gohighlevel">GoHighLevel / GHL (CRM & Funnels)</option>
+                                <option value="quickbooks">QuickBooks Accounting</option>
                                 <option value="xero">Xero Accounting</option>
                                 <option value="zoho_books">Zoho Books Accounting</option>
                                 <option value="netsuite">NetSuite ERP/Accounting</option>
@@ -4593,6 +4576,8 @@ def add_client_page(request: Request):
                                 <option value="freshbooks">FreshBooks Billing</option>
                                 <option value="google_sheets">Google Sheets (Live Sync)</option>
                                 <option value="zapier">Zapier Custom Integration</option>
+                                <option value="email">Monthly Sales Spreadsheet Ingestion via Email</option>
+                                <option value="ai_rating">AI Rating (Direct Call Audits & Dynamic Form-Email Monitoring)</option>
                             </select>
                         </div>
                         
@@ -6227,10 +6212,7 @@ def add_client_page(request: Request):
                         snapchat_ads_id: document.getElementById('snapchat_ads_id').value.trim(),
                         chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
                         reddit_ads_id: document.getElementById('reddit_ads_id').value.trim(),
-                        lead_gen_method: (function() {
-                            const checkedLgList = Array.from(document.querySelectorAll('input[name="lead_gen_method"]:checked')).map(cb => cb.value);
-                            return checkedLgList.length > 0 ? checkedLgList.join(',') : 'both';
-                        })(),
+                        lead_gen_method: document.querySelector('input[name="lead_gen_method"]:checked').value,
                         qualification_criteria: document.getElementById('qualification_criteria').value,
                         source_of_truth: document.getElementById('source_of_truth').value,
                         email_provider: document.getElementById('email_provider').value,

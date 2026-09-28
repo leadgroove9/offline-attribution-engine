@@ -1,3 +1,5 @@
+from pydantic import BaseModel
+from models.schemas import ExcludedCustomer
 import os
 import re
 import json
