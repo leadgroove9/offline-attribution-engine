@@ -1,5 +1,3 @@
-from config import ADMIN_EMAILS, CRITERIA_MAP, SOT_MAP
-from pydantic import BaseModel, EmailStr
 import os
 import re
 import json
@@ -12,9 +10,9 @@ from typing import Optional
 from database.connection import db_router
 from services.auth_service import is_authenticated, get_user_role_and_client
 from services.identity_matcher import (
-    normalize_phone, calculate_company_similarity, check_name_transposition
+    normalize_phone, calculate_company_similarity, check_name_transposition, find_dynamic_columns_custom
 )
-from models.schemas import SaleAdjustment, ExcludedCustomer, ClientCreate, ClientUpdate, UserInvite, UserRoleUpdate, UserDelete, InviteRoleUpdate, InviteDelete
+from models.schemas import SaleAdjustment
 
 router = APIRouter()
 

@@ -114,36 +114,3 @@ def extract_param_from_url(url: str, param_name: str) -> Optional[str]:
         return None
     match = re.search(rf"[?&]{param_name}=([^&#]+)", url)
     return match.group(1) if match else None
-
-
-def is_in_date_range(created_at_str: str, date_range: str, start_date: Optional[str] = None, end_date: Optional[str] = None) -> bool:
-    if not created_at_str:
-        return True
-    if date_range == "all":
-        return True
-    try:
-        dt = datetime.strptime(str(created_at_str)[:19], "%Y-%m-%d %H:%M:%S")
-    except Exception:
-        try:
-            dt = datetime.strptime(str(created_at_str)[:10], "%Y-%m-%d")
-        except Exception:
-            return True
-    now = datetime.now()
-    if date_range == "today":
-        return dt.date() == now.date()
-    elif date_range == "yesterday":
-        return dt.date() == (now - timedelta(days=1)).date()
-    elif date_range == "7d":
-        return dt >= now - timedelta(days=7)
-    elif date_range == "30d":
-        return dt >= now - timedelta(days=30)
-    elif date_range == "90d":
-        return dt >= now - timedelta(days=90)
-    elif date_range == "custom" and start_date and end_date:
-        try:
-            s_dt = datetime.strptime(start_date, "%Y-%m-%d")
-            e_dt = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
-            return s_dt <= dt <= e_dt
-        except Exception:
-            return True
-    return True
