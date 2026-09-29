@@ -1,6 +1,5 @@
 import os
 import sqlite3
-import re
 import psycopg2
 from config import DATABASE_URL
 
@@ -10,29 +9,9 @@ class PostgreSQLCursorWrapper:
     def __init__(self, pg_cursor):
         self._cursor = pg_cursor
 
-    @property
-    def lastrowid(self):
-        try:
-            self._cursor.execute("SELECT lastval()")
-            row = self._cursor.fetchone()
-            return row[0] if row else 1
-        except Exception:
-            return 1
-
     def execute(self, query, params=None):
         pg_query = query.replace("?", "%s")
-        
-        pragma_match = re.search(r"PRAGMA\s+table_info\((.*?)\)", pg_query, re.IGNORECASE)
-        if pragma_match:
-            table_name = pragma_match.group(1).strip("'\" ")
-            pg_query = f"SELECT 0, column_name FROM information_schema.columns WHERE table_name = '{table_name}'"
-        else:
-            pg_query = pg_query.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY")
-            pg_query = pg_query.replace("PRIMARY KEY AUTOINCREMENT", "PRIMARY KEY")
-            pg_query = pg_query.replace("AUTOINCREMENT", "")
-            pg_query = pg_query.replace("INSERT OR REPLACE INTO", "INSERT INTO")
-            pg_query = pg_query.replace("INSERT OR IGNORE INTO", "INSERT INTO")
-            
+        pg_query = pg_query.replace("AUTOINCREMENT", "SERIAL")
         if params is None:
             return self._cursor.execute(pg_query)
         return self._cursor.execute(pg_query, params)

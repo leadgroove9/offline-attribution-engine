@@ -444,18 +444,9 @@ def view_settings(request: Request, client_id: Optional[int] = None):
             dropdown_options += f'<option value="{c_id}" {is_selected}> {c_name} (Ads: {c_ads})</option>'
 
     # Handle dropdown lists with pre-selected options
-    lg_val = str(client_data.get("lead_gen_method", "both") or "both").lower()
-    lg_phone_checked = "checked" if ("phone" in lg_val or lg_val == "both") else ""
-    lg_phone_selected = "selected" if lg_phone_checked else ""
-    
-    lg_form_checked = "checked" if ("form" in lg_val or lg_val == "both") else ""
-    lg_form_selected = "selected" if lg_form_checked else ""
-    
-    lg_chat_checked = "checked" if "chat" in lg_val else ""
-    lg_chat_selected = "selected" if lg_chat_checked else ""
-    
-    lg_messaging_checked = "checked" if "messaging" in lg_val else ""
-    lg_messaging_selected = "selected" if lg_messaging_checked else ""
+    lead_gen_both_checked = "checked" if client_data.get("lead_gen_method") == "both" else ""
+    lead_gen_phone_checked = "checked" if client_data.get("lead_gen_method") == "phone" else ""
+    lead_gen_form_checked = "checked" if client_data.get("lead_gen_method") == "form" else ""
 
     lead_count_all_checked = "checked" if client_data.get("lead_count_rule") == "all" else ""
     lead_count_max_checked = "checked" if client_data.get("lead_count_rule") == "maximum_one" else ""
@@ -969,37 +960,24 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             <div class="section-title"> Lead Generation & AI Auditing</div>
                             
                             <div class="form-group">
-                                <label>Which lead generation channels do you want to track?</label>
-                                <small style="color: #666; font-size: 12px; display: block; margin-top: -4px; margin-bottom: 10px;">
-                                    Select all that apply to you:
-                                </small>
+                                <label>How do you generate your leads?</label>
                                 <div class="card-radio-group">
-                                    <div class="card-radio {lg_phone_selected}" onclick="toggleCardCheckbox(this, event)">
-                                        <input type="checkbox" name="lead_gen_method" value="phone" {lg_phone_checked}>
+                                    <div class="card-radio {lead_gen_both_checked and 'selected'}" onclick="selectCardRadio('lead_gen_method', 'both', this)">
+                                        <input type="radio" name="lead_gen_method" value="both" {lead_gen_both_checked}>
                                         <div>
-                                            <div class="card-checkbox-label" style="font-weight: bold; font-size: 14px;">📞 Phone Calls</div>
-                                            <div class="card-radio-sub" style="font-size: 11px; color: #666;">CallRail, CallTrackingMetrics, WhatConverts & VoIP transcripts</div>
+                                            <div class="card-radio-label">Both Phone Calls & Web Forms</div>
                                         </div>
                                     </div>
-                                    <div class="card-radio {lg_form_selected}" onclick="toggleCardCheckbox(this, event)">
-                                        <input type="checkbox" name="lead_gen_method" value="form" {lg_form_checked}>
+                                    <div class="card-radio {lead_gen_phone_checked and 'selected'}" onclick="selectCardRadio('lead_gen_method', 'phone', this)">
+                                        <input type="radio" name="lead_gen_method" value="phone" {lead_gen_phone_checked}>
                                         <div>
-                                            <div class="card-checkbox-label" style="font-weight: bold; font-size: 14px;">📝 Web Form Submissions</div>
-                                            <div class="card-radio-sub" style="font-size: 11px; color: #666;">Website contact forms with ad Click IDs (GCLID, FBCLID, etc.)</div>
+                                            <div class="card-radio-label">Phone Calls Only</div>
                                         </div>
                                     </div>
-                                    <div class="card-radio {lg_chat_selected}" onclick="toggleCardCheckbox(this, event)">
-                                        <input type="checkbox" name="lead_gen_method" value="chat" {lg_chat_checked}>
+                                    <div class="card-radio {lead_gen_form_checked and 'selected'}" onclick="selectCardRadio('lead_gen_method', 'form', this)">
+                                        <input type="radio" name="lead_gen_method" value="form" {lead_gen_form_checked}>
                                         <div>
-                                            <div class="card-checkbox-label" style="font-weight: bold; font-size: 14px;">💬 Live Chat Widgets</div>
-                                            <div class="card-radio-sub" style="font-size: 11px; color: #666;">LiveChat, Intercom, Drift, Crisp, Zendesk, Tidio, HubSpot Chat, etc.</div>
-                                        </div>
-                                    </div>
-                                    <div class="card-radio {lg_messaging_selected}" onclick="toggleCardCheckbox(this, event)">
-                                        <input type="checkbox" name="lead_gen_method" value="messaging" {lg_messaging_checked}>
-                                        <div>
-                                            <div class="card-checkbox-label" style="font-weight: bold; font-size: 14px;">📱 Direct Messaging Apps</div>
-                                            <div class="card-radio-sub" style="font-size: 11px; color: #666;">WhatsApp Business, SMS, Telegram, Viber & Messenger</div>
+                                            <div class="card-radio-label">Form Submissions Only</div>
                                         </div>
                                     </div>
                                 </div>
@@ -2218,28 +2196,7 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     }}
                 }}
 
-                
-                function toggleCardCheckbox(element, event) {{
-                    if (event && (event.target.tagName === 'INPUT' || event.target.tagName === 'LABEL')) {{
-                        const cb = element.querySelector('input[type="checkbox"]');
-                        if (cb && cb.checked) {{
-                            element.classList.add('selected');
-                        }} else if (cb) {{
-                            element.classList.remove('selected');
-                        }}
-                        return;
-                    }}
-                    const cb = element.querySelector('input[type="checkbox"]');
-                    if (cb) {{
-                        cb.checked = !cb.checked;
-                        if (cb.checked) {{
-                            element.classList.add('selected');
-                        }} else {{
-                            element.classList.remove('selected');
-                        }}
-                    }}
-                }}
-function openAppPasswordModal() {{
+                function openAppPasswordModal() {{
                     const providerSelect = document.getElementById('email_provider');
                     const selectedProvider = providerSelect ? providerSelect.value : 'gmail';
                     if (selectedProvider === 'outlook') {{
@@ -3146,15 +3103,11 @@ function openAppPasswordModal() {{
                             if (wLabel) wLabel.innerText = 'Which tags/statuses on Google sheet signify a won deal conversion?';
                         }}
                         else if (sot === 'zapier' && zapierBox) {{ zapierBox.style.display = 'block'; if (dealBox) dealBox.style.display = 'block'; }}
-                    }} else if (['email', 'manual', 'spreadsheets'].includes(sot)) {{
+                    }} else if (sot === 'email') {{
                         if (monthlyEmailBox) monthlyEmailBox.style.display = 'block';
                         if (dealBox) dealBox.style.display = 'block';
                         if (emailCard) emailCard.style.display = 'block';
-                        const dLabel = document.getElementById('sot-deal-tags-label');
-                        const wLabel = document.getElementById('sot-won-deal-tags-label');
-                        if (dLabel) dLabel.innerText = 'Which tags/statuses on your spreadsheet signify a qualified conversion?';
-                        if (wLabel) wLabel.innerText = 'Which tags/statuses on your spreadsheet signify a won deal conversion?';
-                    }} else if (['ai_rating', 'transcripts'].includes(sot)) {{
+                    }} else if (sot === 'ai_rating') {{
                         if (emailBox) emailBox.style.display = 'block';
                         if (voipBox) {{
                             voipBox.style.display = 'block';
@@ -4200,8 +4153,6 @@ def add_client_page(request: Request):
         conn.close()
     except Exception:
         next_id = 1
-    wiz_sot_options = "".join([f'<option value="{c}" {"selected" if c == "manual" else ""}>{l}</option>' for c, l in SOT_MAP.items()])
-
     admin_link_html = ""
     if email in ADMIN_EMAILS:
         admin_link_html = ' | <a href="/admin/users" style="color: #2e7d32; text-decoration: none; font-weight: bold; margin-left: 5px;">️ Admin User Directory</a>'
@@ -4623,8 +4574,23 @@ def add_client_page(request: Request):
                                 i.e. Where does your sales data exist that indicates which of your incoming leads close into sales or not?
                             </small>
                             <select id="source_of_truth" onchange="toggleSOTFields()">
-                                    {wiz_sot_options}
-                                </select>
+                                <option value="transcripts" selected>Phone/Email Transcripts (AI-Graded Lead Qualification & Sales Tracking)</option>
+                                <option value="spreadsheets">Spreadsheets (Manual CSV / Spreadsheet Ingestion)</option>
+                                <option value="hubspot">HubSpot CRM</option>
+                                <option value="zoho">Zoho CRM</option>
+                                <option value="salesforce">Salesforce CRM</option>
+                                <option value="servicetitan">ServiceTitan CRM</option>
+                                <option value="housecallpro">Housecall Pro CRM</option>
+                                <option value="gohighlevel">GoHighLevel (GHL) CRM</option>
+                                <option value="quickbooks">QuickBooks Billing</option>
+                                <option value="xero">Xero Accounting</option>
+                                <option value="zoho_books">Zoho Books Accounting</option>
+                                <option value="netsuite">NetSuite ERP/Accounting</option>
+                                <option value="sage">Sage Accounting</option>
+                                <option value="freshbooks">FreshBooks Billing</option>
+                                <option value="google_sheets">Google Sheets (Live Sync)</option>
+                                <option value="zapier">Zapier Custom Integration</option>
+                            </select>
                         </div>
                         
                         <!-- CONDITIONAL INPUT: CRM Deal status tags (HubSpot, Salesforce, Zoho) -->
@@ -6195,14 +6161,10 @@ def add_client_page(request: Request):
                         else if (sot === 'freshbooks' && freshbooksBox) freshbooksBox.style.display = 'block';
                         else if (sot === 'google_sheets' && googleSheetsBox) { googleSheetsBox.style.display = 'block'; if (dealBox) dealBox.style.display = 'block'; }
                         else if (sot === 'zapier' && zapierBox) { zapierBox.style.display = 'block'; if (dealBox) dealBox.style.display = 'block'; }
-                    } else if (['email', 'manual', 'spreadsheets'].includes(sot)) {
+                    } else if (sot === 'email') {
                         if (monthlyEmailBox) monthlyEmailBox.style.display = 'block';
                         if (dealBox) dealBox.style.display = 'block';
-                        const dLabel = document.getElementById('sot-deal-tags-label');
-                        const wLabel = document.getElementById('sot-won-deal-tags-label');
-                        if (dLabel) dLabel.innerText = 'Which tags/statuses on your spreadsheet signify a qualified conversion?';
-                        if (wLabel) wLabel.innerText = 'Which tags/statuses on your spreadsheet signify a won deal conversion?';
-                    } else if (['ai_rating', 'transcripts'].includes(sot)) {
+                    } else if (sot === 'ai_rating') {
                         if (emailBox) emailBox.style.display = 'block';
                         if (voipBox) {
                             voipBox.style.display = 'block';
@@ -6389,7 +6351,7 @@ def add_client_page(request: Request):
                                 sotLabel.innerHTML = ` <strong>Step 3: Connect Your ${displayName} Integration Webhook</strong><br>Copy this webhook URL and paste it into your developer or integration settings console to sync transactions instantly:`;
                                 sotUrlInput.value = `${window.location.origin}/webhooks/billing?client_id=${data.client_id}`;
                                 sotBox.style.display = 'block';
-                            } else if (['email', 'manual', 'spreadsheets'].includes(payload.source_of_truth)) {
+                            } else if (payload.source_of_truth === 'email') {
                                 const host = window.location.host;
                                 const emailDomain = host.includes('localhost') ? 'your-agency.com' : host.replace('www.', '').split(':')[0];
                                 sotEmailAddress.value = `conversions-${data.client_id}@${emailDomain}`;
@@ -6433,7 +6395,6 @@ def add_client_page(request: Request):
     """
     html_content = html_content.replace('<body>\n            <div class="container">', f'<body>\n            <div class="container">\n                {user_header_bar}')
     html_content = html_content.replace("conversions-[id]", f"conversions-{next_id}")
-    html_content = html_content.replace("{wiz_sot_options}", wiz_sot_options)
     return HTMLResponse(html_content)
 
 

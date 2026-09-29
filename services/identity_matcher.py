@@ -147,3 +147,12 @@ def is_in_date_range(created_at_str: str, date_range: str, start_date: Optional[
         except Exception:
             return True
     return True
+
+
+def find_dynamic_columns_custom(columns):
+    phone_col = next((c for c in columns if any(k in c.lower() for k in ['phone', 'mobile', 'cell', 'telephone'])), None)
+    email_col = next((c for c in columns if 'email' in c.lower()), None)
+    value_col = next((c for c in columns if any(k in c.lower() for k in ['value', 'amount', 'revenue', 'price', 'total', 'cost', 'deal_value', 'sale_value'])), None)
+    name_col = next((c for c in columns if any(k in c.lower() for k in ['name', 'customer', 'client', 'contact'])), None)
+    company_col = next((c for c in columns if 'company' in c.lower() or 'organization' in c.lower()), None)
+    return phone_col, email_col, value_col, name_col, company_col
