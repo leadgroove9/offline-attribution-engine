@@ -1,12 +1,12 @@
 import os
 import sqlite3
 import re
-from fastapi import APIRouter, Request, HTTPException, File, UploadFile, Form
+from fastapi import APIRouter, Request, HTTPException, UploadFile, File, Form
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.responses import HTMLResponse, RedirectResponse
 from typing import Optional
 from database.connection import db_router
 from services.auth_service import is_authenticated, get_user_role_and_client
-from services.identity_matcher import normalize_phone, find_dynamic_columns_custom, check_is_excluded_customer
 from models.schemas import ClientCreate, ClientUpdate, UserInvite, UserRoleUpdate, UserDelete, InviteRoleUpdate, InviteDelete, SaleAdjustment, ExcludedCustomer
 from config import CRITERIA_MAP, SOT_MAP, ADMIN_EMAILS
 
@@ -444,9 +444,18 @@ def view_settings(request: Request, client_id: Optional[int] = None):
             dropdown_options += f'<option value="{c_id}" {is_selected}> {c_name} (Ads: {c_ads})</option>'
 
     # Handle dropdown lists with pre-selected options
-    lead_gen_both_checked = "checked" if client_data.get("lead_gen_method") == "both" else ""
-    lead_gen_phone_checked = "checked" if client_data.get("lead_gen_method") == "phone" else ""
-    lead_gen_form_checked = "checked" if client_data.get("lead_gen_method") == "form" else ""
+    lg_val = str(client_data.get("lead_gen_method", "both") or "both").lower()
+    lg_phone_checked = "checked" if ("phone" in lg_val or lg_val == "both") else ""
+    lg_phone_selected = "selected" if lg_phone_checked else ""
+    
+    lg_form_checked = "checked" if ("form" in lg_val or lg_val == "both") else ""
+    lg_form_selected = "selected" if lg_form_checked else ""
+    
+    lg_chat_checked = "checked" if "chat" in lg_val else ""
+    lg_chat_selected = "selected" if lg_chat_checked else ""
+    
+    lg_messaging_checked = "checked" if "messaging" in lg_val else ""
+    lg_messaging_selected = "selected" if lg_messaging_checked else ""
 
     lead_count_all_checked = "checked" if client_data.get("lead_count_rule") == "all" else ""
     lead_count_max_checked = "checked" if client_data.get("lead_count_rule") == "maximum_one" else ""
@@ -960,24 +969,37 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             <div class="section-title"> Lead Generation & AI Auditing</div>
                             
                             <div class="form-group">
-                                <label>How do you generate your leads?</label>
+                                <label>Which lead generation channels do you want to track?</label>
+                                <small style="color: #666; font-size: 12px; display: block; margin-top: -4px; margin-bottom: 10px;">
+                                    Select all that apply to you:
+                                </small>
                                 <div class="card-radio-group">
-                                    <div class="card-radio {lead_gen_both_checked and 'selected'}" onclick="selectCardRadio('lead_gen_method', 'both', this)">
-                                        <input type="radio" name="lead_gen_method" value="both" {lead_gen_both_checked}>
+                                    <div class="card-radio {lg_phone_selected}" onclick="toggleCardCheckbox(this, event)">
+                                        <input type="checkbox" name="lead_gen_method" value="phone" {lg_phone_checked}>
                                         <div>
-                                            <div class="card-radio-label">Both Phone Calls & Web Forms</div>
+                                            <div class="card-checkbox-label" style="font-weight: bold; font-size: 14px;">📞 Phone Calls</div>
+                                            <div class="card-radio-sub" style="font-size: 11px; color: #666;">CallRail, CallTrackingMetrics, WhatConverts & VoIP transcripts</div>
                                         </div>
                                     </div>
-                                    <div class="card-radio {lead_gen_phone_checked and 'selected'}" onclick="selectCardRadio('lead_gen_method', 'phone', this)">
-                                        <input type="radio" name="lead_gen_method" value="phone" {lead_gen_phone_checked}>
+                                    <div class="card-radio {lg_form_selected}" onclick="toggleCardCheckbox(this, event)">
+                                        <input type="checkbox" name="lead_gen_method" value="form" {lg_form_checked}>
                                         <div>
-                                            <div class="card-radio-label">Phone Calls Only</div>
+                                            <div class="card-checkbox-label" style="font-weight: bold; font-size: 14px;">📝 Web Form Submissions</div>
+                                            <div class="card-radio-sub" style="font-size: 11px; color: #666;">Website contact forms with ad Click IDs (GCLID, FBCLID, etc.)</div>
                                         </div>
                                     </div>
-                                    <div class="card-radio {lead_gen_form_checked and 'selected'}" onclick="selectCardRadio('lead_gen_method', 'form', this)">
-                                        <input type="radio" name="lead_gen_method" value="form" {lead_gen_form_checked}>
+                                    <div class="card-radio {lg_chat_selected}" onclick="toggleCardCheckbox(this, event)">
+                                        <input type="checkbox" name="lead_gen_method" value="chat" {lg_chat_checked}>
                                         <div>
-                                            <div class="card-radio-label">Form Submissions Only</div>
+                                            <div class="card-checkbox-label" style="font-weight: bold; font-size: 14px;">💬 Live Chat Widgets</div>
+                                            <div class="card-radio-sub" style="font-size: 11px; color: #666;">LiveChat, Intercom, Drift, Crisp, Zendesk, Tidio, HubSpot Chat, etc.</div>
+                                        </div>
+                                    </div>
+                                    <div class="card-radio {lg_messaging_selected}" onclick="toggleCardCheckbox(this, event)">
+                                        <input type="checkbox" name="lead_gen_method" value="messaging" {lg_messaging_checked}>
+                                        <div>
+                                            <div class="card-checkbox-label" style="font-weight: bold; font-size: 14px;">📱 Direct Messaging Apps</div>
+                                            <div class="card-radio-sub" style="font-size: 11px; color: #666;">WhatsApp Business, SMS, Telegram, Viber & Messenger</div>
                                         </div>
                                     </div>
                                 </div>
@@ -2196,7 +2218,28 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                     }}
                 }}
 
-                function openAppPasswordModal() {{
+                
+                function toggleCardCheckbox(element, event) {{
+                    if (event && (event.target.tagName === 'INPUT' || event.target.tagName === 'LABEL')) {{
+                        const cb = element.querySelector('input[type="checkbox"]');
+                        if (cb && cb.checked) {{
+                            element.classList.add('selected');
+                        }} else if (cb) {{
+                            element.classList.remove('selected');
+                        }}
+                        return;
+                    }}
+                    const cb = element.querySelector('input[type="checkbox"]');
+                    if (cb) {{
+                        cb.checked = !cb.checked;
+                        if (cb.checked) {{
+                            element.classList.add('selected');
+                        }} else {{
+                            element.classList.remove('selected');
+                        }}
+                    }}
+                }}
+function openAppPasswordModal() {{
                     const providerSelect = document.getElementById('email_provider');
                     const selectedProvider = providerSelect ? providerSelect.value : 'gmail';
                     if (selectedProvider === 'outlook') {{
@@ -3103,11 +3146,15 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                             if (wLabel) wLabel.innerText = 'Which tags/statuses on Google sheet signify a won deal conversion?';
                         }}
                         else if (sot === 'zapier' && zapierBox) {{ zapierBox.style.display = 'block'; if (dealBox) dealBox.style.display = 'block'; }}
-                    }} else if (sot === 'email') {{
+                    }} else if (['email', 'manual', 'spreadsheets'].includes(sot)) {{
                         if (monthlyEmailBox) monthlyEmailBox.style.display = 'block';
                         if (dealBox) dealBox.style.display = 'block';
                         if (emailCard) emailCard.style.display = 'block';
-                    }} else if (sot === 'ai_rating') {{
+                        const dLabel = document.getElementById('sot-deal-tags-label');
+                        const wLabel = document.getElementById('sot-won-deal-tags-label');
+                        if (dLabel) dLabel.innerText = 'Which tags/statuses on your spreadsheet signify a qualified conversion?';
+                        if (wLabel) wLabel.innerText = 'Which tags/statuses on your spreadsheet signify a won deal conversion?';
+                    }} else if (['ai_rating', 'transcripts'].includes(sot)) {{
                         if (emailBox) emailBox.style.display = 'block';
                         if (voipBox) {{
                             voipBox.style.display = 'block';
@@ -3436,12 +3483,12 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         twitter_ads_id: document.getElementById('twitter_ads_id').value.trim(),
                         pinterest_ads_id: document.getElementById('pinterest_ads_id').value.trim(),
                         snapchat_ads_id: document.getElementById('snapchat_ads_id').value.trim(),
-                        snapchat_ads_id: document.getElementById('snapchat_ads_id').value.trim(),
                         chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
                         reddit_ads_id: document.getElementById('reddit_ads_id').value.trim(),
-                        chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
-                        reddit_ads_id: document.getElementById('reddit_ads_id').value.trim(),
-                        lead_gen_method: document.querySelector('input[name="lead_gen_method"]:checked').value,
+                        lead_gen_method: (function() {{
+                            const checkedLgList = Array.from(document.querySelectorAll('input[name="lead_gen_method"]:checked')).map(cb => cb.value);
+                            return checkedLgList.length > 0 ? checkedLgList.join(',') : 'both';
+                        }})(),
                         qualification_criteria: document.getElementById('qualification_criteria').value,
                         source_of_truth: document.getElementById('source_of_truth').value,
                         email_provider: document.getElementById('email_provider').value,
@@ -3455,7 +3502,6 @@ def view_settings(request: Request, client_id: Optional[int] = None):
                         email_app_password_4: document.getElementById('email_app_password_4') ? document.getElementById('email_app_password_4').value.trim() : '',
                         email_account_5: document.getElementById('email_account_5') ? document.getElementById('email_account_5').value.trim() : '',
                         email_app_password_5: document.getElementById('email_app_password_5') ? document.getElementById('email_app_password_5').value.trim() : '',
-                        email_app_password: document.getElementById('email_app_password').value.trim(),
                         email_account_2: document.getElementById('email_account_2') ? document.getElementById('email_account_2').value.trim() : '',
                         email_app_password_2: document.getElementById('email_app_password_2') ? document.getElementById('email_app_password_2').value.trim() : '',
                         email_account_3: document.getElementById('email_account_3') ? document.getElementById('email_account_3').value.trim() : '',
@@ -4154,6 +4200,8 @@ def add_client_page(request: Request):
         conn.close()
     except Exception:
         next_id = 1
+    wiz_sot_options = "".join([f'<option value="{c}" {"selected" if c == "manual" else ""}>{l}</option>' for c, l in SOT_MAP.items()])
+
     admin_link_html = ""
     if email in ADMIN_EMAILS:
         admin_link_html = ' | <a href="/admin/users" style="color: #2e7d32; text-decoration: none; font-weight: bold; margin-left: 5px;">️ Admin User Directory</a>'
@@ -4499,31 +4547,41 @@ def add_client_page(request: Request):
                     <div class="wizard-step" id="step-panel-2">
                         <div class="instructions">
                              <strong>Step 2: Lead Generation & Qualification Preferences</strong><br>
-                            Tell us how this client receives and identifies a qualified lead so that Claude's sales auditing aligns perfectly.
+                            Tell us the total ways you receive leads now so that our systems can track all possible lead sources
                         </div>
                         
                         <div class="form-group">
-                            <label>How do you generate your leads?</label>
+                            <label>Which lead generation channels do you want to track?</label>
+                            <small style="color: #666; font-size: 12px; display: block; margin-top: -4px; margin-bottom: 10px;">
+                                Select all that apply to you:
+                            </small>
                             <div class="card-radio-group">
-                                <div class="card-radio selected" onclick="selectCardRadio('lead_gen_method', 'both', this)">
-                                    <input type="radio" name="lead_gen_method" value="both" checked>
+                                <div class="card-radio selected" onclick="toggleCardCheckbox(this)">
+                                    <input type="checkbox" name="lead_gen_method" value="phone" checked>
                                     <div>
-                                        <div class="card-radio-label">Both Phone Calls & Web Forms</div>
-                                        <div class="card-radio-sub">Full multi-channel capture (Recommended)</div>
+                                        <div class="card-checkbox-label" style="font-weight: bold; font-size: 14px;">📞 Phone Calls</div>
+                                        <div class="card-radio-sub" style="font-size: 11px; color: #666;">CallRail, CallTrackingMetrics, WhatConverts & VoIP transcripts</div>
                                     </div>
                                 </div>
-                                <div class="card-radio" onclick="selectCardRadio('lead_gen_method', 'phone', this)">
-                                    <input type="radio" name="lead_gen_method" value="phone">
+                                <div class="card-radio selected" onclick="toggleCardCheckbox(this)">
+                                    <input type="checkbox" name="lead_gen_method" value="form" checked>
                                     <div>
-                                        <div class="card-radio-label">Phone Calls Only</div>
-                                        <div class="card-radio-sub">Auditing CallRail phone transcripts exclusively</div>
+                                        <div class="card-checkbox-label" style="font-weight: bold; font-size: 14px;">📝 Web Form Submissions</div>
+                                        <div class="card-radio-sub" style="font-size: 11px; color: #666;">Website contact forms with ad Click IDs (GCLID, FBCLID, etc.)</div>
                                     </div>
                                 </div>
-                                <div class="card-radio" onclick="selectCardRadio('lead_gen_method', 'form', this)">
-                                    <input type="radio" name="lead_gen_method" value="form">
+                                <div class="card-radio" onclick="toggleCardCheckbox(this)">
+                                    <input type="checkbox" name="lead_gen_method" value="chat">
                                     <div>
-                                        <div class="card-radio-label">Form Submissions Only</div>
-                                        <div class="card-radio-sub">Matching visitor website form GCLIDs only</div>
+                                        <div class="card-checkbox-label" style="font-weight: bold; font-size: 14px;">💬 Live Chat Widgets</div>
+                                        <div class="card-radio-sub" style="font-size: 11px; color: #666;">LiveChat, Intercom, Drift, Crisp, Zendesk, Tidio, HubSpot Chat, etc.</div>
+                                    </div>
+                                </div>
+                                <div class="card-radio" onclick="toggleCardCheckbox(this)">
+                                    <input type="checkbox" name="lead_gen_method" value="messaging">
+                                    <div>
+                                        <div class="card-checkbox-label" style="font-weight: bold; font-size: 14px;">📱 Direct Messaging Apps</div>
+                                        <div class="card-radio-sub" style="font-size: 11px; color: #666;">WhatsApp Business, Telegram Bot, Viber Business</div>
                                     </div>
                                 </div>
                             </div>
@@ -4556,29 +4614,17 @@ def add_client_page(request: Request):
                     <div class="wizard-step" id="step-panel-3">
                         <div class="instructions">
                              <strong>Step 3: Single Source of Truth & Integration Mapping</strong><br>
-                            Identify where your conversion status lives. Your platform scans this resource to upload revenue data to Ad Networks.
+                            Identify where your lead information lives. LeadGrove will continuously scan this resource to upload relevant lead qualification data to your Ad networks.
                         </div>
                         
                         <div class="form-group">
                             <label for="source_of_truth">Where is your Single Source of Truth?</label>
+                            <small style="color: #666; font-size: 12px; display: block; margin-top: -4px; margin-bottom: 8px;">
+                                i.e. Where does your sales data exist that indicates which of your incoming leads close into sales or not?
+                            </small>
                             <select id="source_of_truth" onchange="toggleSOTFields()">
-                                <option value="hubspot">HubSpot CRM</option>
-                                <option value="salesforce">Salesforce CRM</option>
-                                <option value="zoho">Zoho CRM</option>
-                                <option value="servicetitan">ServiceTitan (Home Services)</option>
-                                <option value="housecallpro">Housecall Pro (Home Services)</option>
-                                <option value="gohighlevel">GoHighLevel / GHL (CRM & Funnels)</option>
-                                <option value="quickbooks">QuickBooks Accounting</option>
-                                <option value="xero">Xero Accounting</option>
-                                <option value="zoho_books">Zoho Books Accounting</option>
-                                <option value="netsuite">NetSuite ERP/Accounting</option>
-                                <option value="sage">Sage Accounting</option>
-                                <option value="freshbooks">FreshBooks Billing</option>
-                                <option value="google_sheets">Google Sheets (Live Sync)</option>
-                                <option value="zapier">Zapier Custom Integration</option>
-                                <option value="email">Monthly Sales Spreadsheet Ingestion via Email</option>
-                                <option value="ai_rating">AI Rating (Direct Call Audits & Dynamic Form-Email Monitoring)</option>
-                            </select>
+                                    {wiz_sot_options}
+                                </select>
                         </div>
                         
                         <!-- CONDITIONAL INPUT: CRM Deal status tags (HubSpot, Salesforce, Zoho) -->
@@ -6149,10 +6195,14 @@ def add_client_page(request: Request):
                         else if (sot === 'freshbooks' && freshbooksBox) freshbooksBox.style.display = 'block';
                         else if (sot === 'google_sheets' && googleSheetsBox) { googleSheetsBox.style.display = 'block'; if (dealBox) dealBox.style.display = 'block'; }
                         else if (sot === 'zapier' && zapierBox) { zapierBox.style.display = 'block'; if (dealBox) dealBox.style.display = 'block'; }
-                    } else if (sot === 'email') {
+                    } else if (['email', 'manual', 'spreadsheets'].includes(sot)) {
                         if (monthlyEmailBox) monthlyEmailBox.style.display = 'block';
                         if (dealBox) dealBox.style.display = 'block';
-                    } else if (sot === 'ai_rating') {
+                        const dLabel = document.getElementById('sot-deal-tags-label');
+                        const wLabel = document.getElementById('sot-won-deal-tags-label');
+                        if (dLabel) dLabel.innerText = 'Which tags/statuses on your spreadsheet signify a qualified conversion?';
+                        if (wLabel) wLabel.innerText = 'Which tags/statuses on your spreadsheet signify a won deal conversion?';
+                    } else if (['ai_rating', 'transcripts'].includes(sot)) {
                         if (emailBox) emailBox.style.display = 'block';
                         if (voipBox) {
                             voipBox.style.display = 'block';
@@ -6212,7 +6262,10 @@ def add_client_page(request: Request):
                         snapchat_ads_id: document.getElementById('snapchat_ads_id').value.trim(),
                         chatgpt_ads_id: document.getElementById('chatgpt_ads_id').value.trim(),
                         reddit_ads_id: document.getElementById('reddit_ads_id').value.trim(),
-                        lead_gen_method: document.querySelector('input[name="lead_gen_method"]:checked').value,
+                        lead_gen_method: (function() {
+                            const checkedLgList = Array.from(document.querySelectorAll('input[name="lead_gen_method"]:checked')).map(cb => cb.value);
+                            return checkedLgList.length > 0 ? checkedLgList.join(',') : 'both';
+                        })(),
                         qualification_criteria: document.getElementById('qualification_criteria').value,
                         source_of_truth: document.getElementById('source_of_truth').value,
                         email_provider: document.getElementById('email_provider').value,
@@ -6336,7 +6389,7 @@ def add_client_page(request: Request):
                                 sotLabel.innerHTML = ` <strong>Step 3: Connect Your ${displayName} Integration Webhook</strong><br>Copy this webhook URL and paste it into your developer or integration settings console to sync transactions instantly:`;
                                 sotUrlInput.value = `${window.location.origin}/webhooks/billing?client_id=${data.client_id}`;
                                 sotBox.style.display = 'block';
-                            } else if (payload.source_of_truth === 'email') {
+                            } else if (['email', 'manual', 'spreadsheets'].includes(payload.source_of_truth)) {
                                 const host = window.location.host;
                                 const emailDomain = host.includes('localhost') ? 'your-agency.com' : host.replace('www.', '').split(':')[0];
                                 sotEmailAddress.value = `conversions-${data.client_id}@${emailDomain}`;
@@ -6380,6 +6433,7 @@ def add_client_page(request: Request):
     """
     html_content = html_content.replace('<body>\n            <div class="container">', f'<body>\n            <div class="container">\n                {user_header_bar}')
     html_content = html_content.replace("conversions-[id]", f"conversions-{next_id}")
+    html_content = html_content.replace("{wiz_sot_options}", wiz_sot_options)
     return HTMLResponse(html_content)
 
 

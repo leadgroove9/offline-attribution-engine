@@ -47,10 +47,21 @@ class SaleAdjustment(BaseModel):
 
 class ClientCreate(BaseModel):
     name: str
+    call_tracking_provider: Optional[str] = "callrail"
     callrail_account_id: Optional[str] = ""
     callrail_company_id: Optional[str] = ""
+    ctm_account_id: Optional[str] = ""
+    ctm_profile_id: Optional[str] = ""
+    wc_account_id: Optional[str] = ""
+    wc_profile_id: Optional[str] = ""
     google_ads_customer_id: Optional[str] = ""
     facebook_ads_id: Optional[str] = ""
+    tiktok_ads_id: Optional[str] = ""
+    twitter_ads_id: Optional[str] = ""
+    pinterest_ads_id: Optional[str] = ""
+    snapchat_ads_id: Optional[str] = ""
+    chatgpt_ads_id: Optional[str] = ""
+    reddit_ads_id: Optional[str] = ""
     linkedin_ads_id: Optional[str] = ""
     microsoft_ads_id: Optional[str] = ""
     lead_gen_method: str
@@ -74,6 +85,7 @@ class ClientCreate(BaseModel):
     lead_count_rule: str
     exclude_past_customers: str
     excluded_customers: Optional[List[ExcludedCustomer]] = []
+    exclusion_action: Optional[str] = "append"
 
 class ClientUpdate(BaseModel):
     id: int

@@ -6,6 +6,9 @@ ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()
 ADMIN_EMAILS = {"admin@leadgrove.net", "admin@leadgroove.net", "corey@test.com", "corey@leadgrove.net"}
 
 SOT_MAP = {
+    "manual": "Manual CSV / Spreadsheet Upload",
+    "ai_rating": "Claude AI Transcript Rating (All Calls)",
+    "email": "Automated Email Sales Log Scanner",
     "hubspot": "HubSpot CRM Webhook",
     "salesforce": "Salesforce CRM Webhook",
     "zoho": "Zoho CRM Webhook",
@@ -20,10 +23,7 @@ SOT_MAP = {
     "sage": "Sage Accounting Paid Invoice Webhook",
     "freshbooks": "FreshBooks Paid Invoice Webhook",
     "google_sheets": "Google Sheets Live Sync",
-    "zapier": "Zapier Custom Webhook",
-    "email": "Automated Email Sales Log Scanner",
-    "manual": "Manual CSV / Spreadsheet Upload",
-    "ai_rating": "Claude AI Transcript Rating (All Calls)"
+    "zapier": "Zapier Custom Webhook"
 }
 
 CRITERIA_MAP = {

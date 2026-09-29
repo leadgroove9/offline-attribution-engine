@@ -116,24 +116,10 @@ def extract_param_from_url(url: str, param_name: str) -> Optional[str]:
     return match.group(1) if match else None
 
 
-def find_dynamic_columns_custom(columns):
-    phone_col, email_col, value_col, name_col, company_col = None, None, None, None, None
-    for col in columns:
-        c_lower = str(col).strip().lower().replace("_", " ").replace("-", " ")
-        if not phone_col and any(k in c_lower for k in ["phone", "caller", "mobile", "telephone", "cell", "number"]):
-            phone_col = col
-        elif not email_col and any(k in c_lower for k in ["email", "e-mail", "mail"]):
-            email_col = col
-        elif not value_col and any(k in c_lower for k in ["value", "amount", "price", "sale", "revenue", "total", "cost", "fee"]):
-            value_col = col
-        elif not name_col and any(k in c_lower for k in ["name", "contact", "customer", "client", "buyer"]):
-            name_col = col
-        elif not company_col and any(k in c_lower for k in ["company", "business", "organization", "account", "org"]):
-            company_col = col
-    return phone_col, email_col, value_col, name_col, company_col
-
 def is_in_date_range(created_at_str: str, date_range: str, start_date: Optional[str] = None, end_date: Optional[str] = None) -> bool:
-    if not created_at_str or date_range == "all":
+    if not created_at_str:
+        return True
+    if date_range == "all":
         return True
     try:
         dt = datetime.strptime(str(created_at_str)[:19], "%Y-%m-%d %H:%M:%S")
